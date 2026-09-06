@@ -287,7 +287,9 @@ public sealed class Mostek : IDisposable
             }
             finally { _bramka.Release(); }
 
-            await Task.Delay(1000, ct);
+            // Przy otwartym podgladzie ekranu odpytujemy rzadziej - wzmacniacz ma wtedy
+            // wiecej czasu na klatki, a stan i tak widac na samym ekranie.
+            await Task.Delay(_trybEkranu ? 3000 : 1000, ct);
         }
     }
 

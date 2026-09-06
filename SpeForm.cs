@@ -17,6 +17,10 @@ public sealed class SpeForm : Form
     private readonly System.Windows.Forms.Timer _zegar, _puls;
     private DateTime _ostatniPuls = DateTime.MinValue;
 
+    // Puls wypadajacy tuz po klawiszu gubi ten klawisz, wiec na czas jego obslugi
+    // wstrzymujemy pulsowanie z zegara.
+    private bool _klawiszWToku;
+
     // Klawisze, ktore zmieniaja stan nadawania albo zasilania - pytamy przed wyslaniem.
     private static readonly byte[] Ostrozne = { 0x09, 0x0A, 0x0B, 0x0D };
 
@@ -123,7 +127,7 @@ public sealed class SpeForm : Form
             new Point(18, y + 4), new Size(480, 32));
         Controls.Add(_stopka);
 
-        _zegar = new System.Windows.Forms.Timer { Interval = 150 };
+        _zegar = new System.Windows.Forms.Timer { Interval = 60 };
         _zegar.Tick += (_, _) => Odswiez();
         _zegar.Start();
         Odswiez();
@@ -181,14 +185,25 @@ public sealed class SpeForm : Form
     {
         bool poszlo = await _mostek.WyslijKlawisz(k.Kod, CancellationToken.None);
 
-        // Nie czekamy na kolejny takt pulsu - po klawiszu chcemy zobaczyc skutek od razu.
-        if (poszlo) await Puls();
-
         _stopka.Text = poszlo
             ? k.Napis + " wysłany (kod 0x" + k.Kod.ToString("X2") + ") — " + k.Opis
             : "Nie wysłano: mostek nie jest połączony.";
 
         _stopka.ForeColor = poszlo ? Theme.TekstSzary : Color.FromArgb(0xB3, 0x26, 0x1E);
+
+        if (!poszlo) return;
+
+        // Puls zaraz po klawiszu gubi go: przy zwloce 0 i 20 ms wzmacniacz nie zmienia
+        // ekranu w ogole, przy 60 ms nowa klatka jest po ~550 ms, przy 200 ms po ~720 ms.
+        // 60 ms to zmierzone minimum, ktore dziala. Na ten czas wstrzymujemy tez puls
+        // z zegara, bo trafiony w zla chwile kasuje klawisz.
+        _klawiszWToku = true;
+        try
+        {
+            await Task.Delay(60);
+            await Puls();
+        }
+        finally { _klawiszWToku = false; }
     }
 
     /// <summary>
@@ -213,6 +228,8 @@ public sealed class SpeForm : Form
     /// </summary>
     private async Task PulsGdyTrzeba()
     {
+        if (_klawiszWToku) return;
+
         var ekran = _mostek.Ekran;
         bool klatkaPoPulsie = ekran is not null && ekran.Kiedy > _ostatniPuls;
         bool czekamyZaDlugo = DateTime.UtcNow - _ostatniPuls > TimeSpan.FromSeconds(1);
@@ -229,7 +246,10 @@ public sealed class SpeForm : Form
             ? "czekam na wyświetlacz…"
             : "mostek rozłączony";
 
-        _lcd.Ekran = swiezy ? ekran : null;
+        // Podmieniamy tylko przy nowej klatce - inaczej kontrolka przerysowywalaby sie
+        // kilkanascie razy na sekunde bez powodu.
+        var doPokazania = swiezy ? ekran : null;
+        if (!ReferenceEquals(_lcd.Ekran, doPokazania)) _lcd.Ekran = doPokazania;
     }
 
     private void Odswiez()

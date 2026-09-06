@@ -110,6 +110,12 @@ Sprawdzian koncowy to zdjecia ekranow w instrukcji Experta 1.3K-FA - renderowani
 z nimi co do znaku. Jesli kiedys nie bedzie sie zgadzac, porownaj z `obraz-12.jpg`
 (SET ANTENNA ON BANK "A") wyciagnietym z tego PDF-a.
 
+**Puls tuz po klawiszu kasuje ten klawisz.** Zmierzone na Expercie 1.3K-FA: przy zwloce 0
+i 20 ms miedzy klawiszem a przelaczeniem RCU wzmacniacz nie zmienia ekranu **w ogole**, przy
+60 ms nowa klatka jest po ~550 ms, przy 200 ms po ~720 ms. Stad `SpeForm` czeka 60 ms po
+klawiszu i na ten czas wstrzymuje puls z zegara (`_klawiszWToku`) - bez tej blokady timer
+potrafil strzelic w zla chwile i klawisz przepadal, a uzytkownik czekal na kolejny cykl.
+
 **Wzmacniacz nie przysyla ekranu sam - nawet po klawiszu.** Zmierzone: po nacisnieciu
 strzalki bez wymuszenia nie przychodzi nic przez trzy sekundy. Swieza klatke daje dopiero
 przelaczenie RCU wylacz/wlacz z przerwa okolo 20 ms (przy 5 ms wzmacniacz juz nie reaguje),
