@@ -110,6 +110,24 @@ Sprawdzian koncowy to zdjecia ekranow w instrukcji Experta 1.3K-FA - renderowani
 z nimi co do znaku. Jesli kiedys nie bedzie sie zgadzac, porownaj z `obraz-12.jpg`
 (SET ANTENNA ON BANK "A") wyciagnietym z tego PDF-a.
 
+**Wzmacniacz nie przysyla ekranu sam - nawet po klawiszu.** Zmierzone: po nacisnieciu
+strzalki bez wymuszenia nie przychodzi nic przez trzy sekundy. Swieza klatke daje dopiero
+przelaczenie RCU wylacz/wlacz z przerwa okolo 20 ms (przy 5 ms wzmacniacz juz nie reaguje),
+a od klawisza do ramki mija u niego okolo **500 ms** - to jest podloga, ponizej ktorej program
+nie zejdzie. Dlatego `SpeForm` pulsuje zdarzeniowo: kolejny puls dopiero po odebraniu klatki,
+plus jeden zaraz po kazdym klawiszu. Nie podkrecaj tego sztywnym taktem - polecenia zaczna sie
+pietrzyc szybciej, niz wzmacniacz odpowiada.
+
+**Nie czekaj z ramka ekranu na nastepna synchronizacje.** Ramka nie ma pola dlugosci, ale
+czekanie na nastepny naglowek opoznialo podglad o cale odpytanie, bo kolejna ramka przychodzi
+dopiero przy nastepnym pulsie. `CzytnikSpe` bierze wiec typowa dlugosc (367 bajtow), gdy juz ja
+ma, a na synchronizacje czeka tylko wtedy, gdy ramka jest krotsza.
+
+**Wlasne znaki wyswietlacza rozpoznane do tej pory:** `0x8D` pozioma kreska, `0x8F` pionowa,
+`0x99`/`0x9A`/`0x9B`/`0x9C` strzalki w podpowiedzi klawiszy (para na jeden nawias), `0xAA`
+stopien przy temperaturze. Kafelki `0x9F`-`0xDF` to mapa bitowa logo i wykresow - rysowanie ich
+jednym znakiem dawalo pole szumu, wiec zostaja puste.
+
 **Kursor to jeden bajt na kolumne, bit wskazuje wiersz.** 40 bajtow zaraz za siatka
 (`EkranSpe.PoczatekFlag`), potem dwubajtowa suma kontrolna. Zmierzone przez porownanie ramek
 przed i po nacisnieciu strzalki: 13 kolejnych bajtow zmienilo sie z `08` na `04`, czyli

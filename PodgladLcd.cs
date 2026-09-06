@@ -6,19 +6,21 @@ namespace RotorPanel;
 /// menu wygladalo tak samo jak na panelu.
 ///
 /// Zaznaczona pozycja idzie w negatywie, kreski poziome i pionowe tak, jak je
-/// przysyla wzmacniacz. Wlasne znaki graficzne (logo, wykresy na ekranie glownym)
-/// sa kafelkami mapy bitowej - tych nie da sie odczytac jako tekst, wiec pokazujemy
-/// w ich miejscu delikatna teksture.
+/// przysyla wzmacniacz. Wlasne znaki graficzne (logo i wykresy na ekranie glownym)
+/// sa kafelkami mapy bitowej - kazdy bajt to inny wycinek obrazka. Rysowanie ich
+/// jednym znakiem dawalo pole szumu, wiec zostawiamy tam puste miejsce.
 /// </summary>
 public sealed class PodgladLcd : Control
 {
     private static readonly Color TloEkranu = Color.FromArgb(0x10, 0x18, 0x14);
     private static readonly Color Litery    = Color.FromArgb(0xC8, 0xF5, 0xD0);
-    private static readonly Color KolorGrafiki = Color.FromArgb(0x35, 0x52, 0x40);
     private static readonly Color Uspione   = Color.FromArgb(0x60, 0x74, 0x68);
 
     private const byte Kreska    = 0x8D;
     private const byte Separator = 0x8F;
+    private const byte StrzalkaLewo = 0x99, StrzalkaGora = 0x9A;
+    private const byte StrzalkaDol  = 0x9B, StrzalkaPrawo = 0x9C;
+    private const byte Stopien      = 0xAA;
 
     private EkranSpe _ekran;
     private string _zastepczy = "";
@@ -91,9 +93,7 @@ public sealed class PodgladLcd : Control
                 char znak = Znak(bajt);
                 if (znak == ' ') continue;
 
-                Color kolor = zaznaczone ? TloEkranu
-                            : CzyGrafika(bajt) ? KolorGrafiki
-                            : Litery;
+                Color kolor = zaznaczone ? TloEkranu : Litery;
 
                 TextRenderer.DrawText(g, znak.ToString(), Font, new Point(x, y), kolor,
                     TextFormatFlags.NoPadding);
@@ -101,16 +101,17 @@ public sealed class PodgladLcd : Control
         }
     }
 
-    private static bool CzyGrafika(byte b)
-        => b != Kreska && b != Separator && b > 0x7E;
-
     private static char Znak(byte b)
     {
         if (b >= 0x10 && b <= 0x3F) return (char)(b + 0x20);   // znak z atrybutem
         if (b >= 0x40 && b <= 0x7E) return (char)b;
         if (b == Separator)         return (char)0x2502;       // pionowa kreska
         if (b == Kreska)            return (char)0x2500;       // pozioma kreska
-        if (b > 0x7E)               return (char)0x2591;       // kafelek grafiki
-        return ' ';
+        if (b == StrzalkaLewo)      return (char)0x25C0;
+        if (b == StrzalkaGora)      return (char)0x25B2;
+        if (b == StrzalkaDol)       return (char)0x25BC;
+        if (b == StrzalkaPrawo)     return (char)0x25B6;
+        if (b == Stopien)           return (char)0x00B0;
+        return ' ';                                            // pusto albo kafelek grafiki
     }
 }

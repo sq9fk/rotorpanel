@@ -224,9 +224,11 @@ chodzić normalnie, a nie na ślepo. Producent tego nie opisuje — tryb podglą
 ekranu. Kodowanie znaków: `0x10`–`0x3F` to znaki z atrybutem (prawdziwy ASCII = bajt + `0x20`),
 `0x40`–`0x7E` zwykły ASCII, reszta to własne znaki wyświetlacza.
 
-Tryb RCU jest włączany na czas otwarcia okna i wyłączany przy zamknięciu. Ekran przychodzi
-tylko przy zmianie, więc program co chwilę przełącza RCU wyłącz/włącz — to zeruje pamięć zmian
-wzmacniacza i wymusza świeżą klatkę.
+Tryb RCU jest włączany na czas otwarcia okna i wyłączany przy zamknięciu. Wzmacniacz nie
+przysyła ekranu sam z siebie — nawet po naciśnięciu klawisza — więc program wymusza świeżą
+klatkę przełączeniem RCU wyłącz/włącz: raz zaraz po każdym klawiszu i dalej za każdym razem,
+gdy poprzednia klatka już dotarła. Od polecenia do gotowej ramki mija u wzmacniacza około
+**pół sekundy** i tego się nie przeskoczy — tyle zajmuje mu odrysowanie ekranu.
 
 Ekran to **siatka 40 znaków na 8 wierszy, zaczynająca się od piątego bajtu ramki**. Nie było
 tego w żadnym opisie — wyszło z pomiaru: separatory kolumn stoją co 40 bajtów (58, 98, 138,

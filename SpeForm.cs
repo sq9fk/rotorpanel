@@ -123,15 +123,17 @@ public sealed class SpeForm : Form
             new Point(18, y + 4), new Size(480, 32));
         Controls.Add(_stopka);
 
-        _zegar = new System.Windows.Forms.Timer { Interval = 400 };
+        _zegar = new System.Windows.Forms.Timer { Interval = 150 };
         _zegar.Tick += (_, _) => Odswiez();
         _zegar.Start();
         Odswiez();
 
-        // Wzmacniacz przysyla ekran tylko przy zmianie, wiec zeby podglad byl
-        // zywy, co chwile przelaczamy tryb RCU - to zeruje jego pamiec zmian.
-        _puls = new System.Windows.Forms.Timer { Interval = 900 };
-        _puls.Tick += async (_, _) => await Puls();
+        // Wzmacniacz nie przysyla ekranu sam z siebie - nawet po nacisnieciu klawisza.
+        // Swieza klatke wymusza dopiero przelaczenie RCU wylacz/wlacz, a od polecenia
+        // do ramki mija u niego okolo pol sekundy (zmierzone). Dlatego nie pulsujemy
+        // na sztywny takt, tylko zaraz po tym, jak przyjdzie poprzednia klatka.
+        _puls = new System.Windows.Forms.Timer { Interval = 120 };
+        _puls.Tick += async (_, _) => await PulsGdyTrzeba();
 
         Shown += async (_, _) =>
         {
@@ -179,6 +181,9 @@ public sealed class SpeForm : Form
     {
         bool poszlo = await _mostek.WyslijKlawisz(k.Kod, CancellationToken.None);
 
+        // Nie czekamy na kolejny takt pulsu - po klawiszu chcemy zobaczyc skutek od razu.
+        if (poszlo) await Puls();
+
         _stopka.Text = poszlo
             ? k.Napis + " wysłany (kod 0x" + k.Kod.ToString("X2") + ") — " + k.Opis
             : "Nie wysłano: mostek nie jest połączony.";
@@ -187,17 +192,32 @@ public sealed class SpeForm : Form
     }
 
     /// <summary>
-    /// RCU OFF, chwila, RCU ON. Wzmacniacz traktuje to jak nowe podlaczenie
-    /// podgladu i przysyla ekran nawet wtedy, gdy nic sie na nim nie zmienilo.
+    /// RCU OFF, chwila, RCU ON. Wzmacniacz traktuje to jak nowe podlaczenie podgladu
+    /// i przysyla ekran nawet wtedy, gdy nic sie na nim nie zmienilo. Przerwa miedzy
+    /// poleceniami jest potrzebna - przy 5 ms wzmacniacz juz nie reaguje.
     /// </summary>
     private async Task Puls()
     {
         if (_mostek.Stan != StanMostka.Polaczony) return;
 
-        await _mostek.WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None);
-        await Task.Delay(60);
-        await _mostek.WyslijKlawisz(EkranSpe.RcuWlacz, CancellationToken.None);
         _ostatniPuls = DateTime.UtcNow;
+        await _mostek.WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None);
+        await Task.Delay(20);
+        await _mostek.WyslijKlawisz(EkranSpe.RcuWlacz, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Pulsuje dopiero wtedy, gdy poprzednia klatka juz przyszla - inaczej polecenia
+    /// pietrzylyby sie szybciej, niz wzmacniacz zdazy odpowiedziec. Po sekundzie bez
+    /// odpowiedzi probujemy mimo wszystko, zeby podglad nie zamarl na dobre.
+    /// </summary>
+    private async Task PulsGdyTrzeba()
+    {
+        var ekran = _mostek.Ekran;
+        bool klatkaPoPulsie = ekran is not null && ekran.Kiedy > _ostatniPuls;
+        bool czekamyZaDlugo = DateTime.UtcNow - _ostatniPuls > TimeSpan.FromSeconds(1);
+
+        if (klatkaPoPulsie || czekamyZaDlugo) await Puls();
     }
 
     private void PokazEkran()

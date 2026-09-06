@@ -111,8 +111,10 @@ public sealed class CzytnikSpe
     }
 
     /// <summary>
-    /// Ramka ekranu nie ma pola dlugosci - konczy sie tam, gdzie zaczyna sie
-    /// nastepna synchronizacja. Czekamy na nia, ale nie w nieskonczonosc.
+    /// Ramka ekranu nie ma pola dlugosci. Konczy sie tam, gdzie zaczyna sie
+    /// nastepna synchronizacja - ale czekanie na nia opoznialo podglad o cale
+    /// odpytanie, bo kolejna ramka przychodzi dopiero przy nastepnym pulsie.
+    /// Dlatego gdy mamy juz typowa dlugosc, bierzemy ja od razu.
     /// </summary>
     private bool ZdejmijEkran(out bool czekam)
     {
@@ -122,12 +124,21 @@ public sealed class CzytnikSpe
 
         if (koniec < 0)
         {
-            if (_reszta.Count < EkranSpe.DlugoscMaksymalna)
+            int typowa = EkranSpe.DlugoscNaglowka + EkranSpe.DlugoscTypowa;
+
+            if (_reszta.Count >= typowa)
+            {
+                koniec = typowa;
+            }
+            else if (_reszta.Count < EkranSpe.DlugoscMaksymalna)
             {
                 czekam = true;
                 return true;
             }
-            koniec = EkranSpe.DlugoscMaksymalna;
+            else
+            {
+                koniec = EkranSpe.DlugoscMaksymalna;
+            }
         }
 
         int dlugosc = koniec - EkranSpe.DlugoscNaglowka;

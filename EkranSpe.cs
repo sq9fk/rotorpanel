@@ -118,6 +118,15 @@ public sealed class EkranSpe
     private const byte Kreska    = 0x8D;
     private const byte Separator = 0x8F;
 
+    // Wlasne znaki wyswietlacza rozpoznane po bajtach w ramce: strzalki w podpowiedzi
+    // klawiszy stoja parami miedzy nawiasami ([99 9A] i [9B 9C]), a 0xAA trafia sie
+    // przed "C" przy temperaturze.
+    private const byte StrzalkaLewo  = 0x99;
+    private const byte StrzalkaGora   = 0x9A;
+    private const byte StrzalkaDol    = 0x9B;
+    private const byte StrzalkaPrawo  = 0x9C;
+    private const byte Stopien        = 0xAA;
+
     private static string Tekst(IList<byte> dane, int od, int ile)
     {
         var znaki = new char[ile];
@@ -129,6 +138,11 @@ public sealed class EkranSpe
             else if (b >= 0x40 && b <= 0x7E) znaki[i] = (char)b;
             else if (b == Separator)         znaki[i] = (char)0x2502;   // pionowa kreska
             else if (b == Kreska)            znaki[i] = (char)0x2500;   // pozioma kreska
+            else if (b == StrzalkaLewo)      znaki[i] = (char)0x25C0;
+            else if (b == StrzalkaGora)      znaki[i] = (char)0x25B2;
+            else if (b == StrzalkaDol)       znaki[i] = (char)0x25BC;
+            else if (b == StrzalkaPrawo)     znaki[i] = (char)0x25B6;
+            else if (b == Stopien)           znaki[i] = (char)0x00B0;
             else                             znaki[i] = ' ';
         }
         return new string(znaki);
