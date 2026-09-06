@@ -19,7 +19,7 @@ public partial class SettingsForm : Form
     private readonly Dictionary<string, ParaPortow> _mapaPar = new();
 
     private const int RNr = 0, RNazwa = 1, RPara = 2, RIp = 3, RPort = 4, RProtokol = 5;
-    private const int UPredkosc = 6, UBityDanych = 7, UParzystosc = 8, UStop = 9;
+    private const int UPredkosc = 6, UBityDanych = 7, UParzystosc = 8, UStop = 9, USpe = 10;
     private const int ANr = 0, ANazwa = 1, ARotor = 2;
 
     public SettingsForm(Config cfg)

@@ -22,12 +22,22 @@ public sealed class Mostek : IDisposable
     private volatile TcpClient _biezacyKlient;
     private volatile Stream _biezacyPort;
 
+    // Do gniazda pisza dwie strony: pompa z portu i odpytywanie wzmacniacza.
+    // Bez bramki ich ramki potrafilyby sie przeplesc w polowie.
+    private readonly SemaphoreSlim _bramka = new SemaphoreSlim(1, 1);
+    private volatile StatusSpe _status;
+
     public Polaczenie Punkt { get; }
     public string Adres => _cfg.AdresDla(Punkt);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
     public long Rx => Interlocked.Read(ref _rx);
     public long Tx => Interlocked.Read(ref _tx);
     public string Blad => _blad;
+
+    /// <summary>Ostatni odczytany stan wzmacniacza SPE albo null.</summary>
+    public StatusSpe Status => _status;
+
+    private bool OdpytywacSpe => Punkt is Urzadzenie { Spe: true };
 
     public Mostek(Config cfg, Polaczenie punkt)
     {
@@ -42,6 +52,7 @@ public sealed class Mostek : IDisposable
         Interlocked.Exchange(ref _rx, 0);
         Interlocked.Exchange(ref _tx, 0);
         _blad = "";
+        _status = null;
         _cts = new CancellationTokenSource();
         Volatile.Write(ref _stan, (int)StanMostka.Laczenie);
         _petla = Task.Run(() => Petla(_cts.Token));
@@ -59,6 +70,7 @@ public sealed class Mostek : IDisposable
 
         try { _petla?.Wait(2500); } catch { /* nic */ }
         Volatile.Write(ref _stan, (int)StanMostka.Zatrzymany);
+        _status = null;
     }
 
     private async Task Petla(CancellationToken ct)
@@ -95,9 +107,14 @@ public sealed class Mostek : IDisposable
                 _blad = "";
                 Volatile.Write(ref _stan, (int)StanMostka.Polaczony);
 
-                var wGore = Pompa(port, siec, zPortu: true,  ct);
-                var wDol  = Pompa(siec, port, zPortu: false, ct);
-                await Task.WhenAny(wGore, wDol);
+                var czytnik = OdpytywacSpe ? new CzytnikSpe() : null;
+
+                var wGore = Pompa(port, siec, zPortu: true,  null, ct);
+                var wDol  = Pompa(siec, port, zPortu: false, czytnik, ct);
+                var pytania = czytnik is null ? Task.Delay(Timeout.Infinite, ct)
+                                              : OdpytujSpe(siec, czytnik, ct);
+
+                await Task.WhenAny(wGore, wDol, pytania);
             }
             catch (OperationCanceledException) { break; }
             catch (ObjectDisposedException) { break; }
@@ -140,7 +157,8 @@ public sealed class Mostek : IDisposable
         await laczenie;   // przenosi ewentualny wyjatek polaczenia
     }
 
-    private async Task Pompa(Stream skad, Stream dokad, bool zPortu, CancellationToken ct)
+    private async Task Pompa(Stream skad, Stream dokad, bool zPortu, CzytnikSpe czytnik,
+                             CancellationToken ct)
     {
         var bufor = new byte[1024];
         while (!ct.IsCancellationRequested)
@@ -154,11 +172,60 @@ public sealed class Mostek : IDisposable
                 continue;
             }
 
-            await dokad.WriteAsync(bufor, 0, n, ct);
-            await dokad.FlushAsync(ct);
-
             if (zPortu) Interlocked.Add(ref _tx, n);
             else        Interlocked.Add(ref _rx, n);
+
+            if (czytnik is not null)
+            {
+                // Odpowiedzi na wlasne zapytania o status zdejmujemy ze strumienia -
+                // program po drugiej stronie pary o nie nie prosil.
+                var dalej = czytnik.Przepusc(bufor, n);
+                _status = czytnik.Status ?? _status;
+                if (dalej.Length == 0) continue;
+
+                await dokad.WriteAsync(dalej, 0, dalej.Length, ct);
+                await dokad.FlushAsync(ct);
+                continue;
+            }
+
+            if (zPortu)
+            {
+                await _bramka.WaitAsync(ct);
+                try
+                {
+                    await dokad.WriteAsync(bufor, 0, n, ct);
+                    await dokad.FlushAsync(ct);
+                }
+                finally { _bramka.Release(); }
+            }
+            else
+            {
+                await dokad.WriteAsync(bufor, 0, n, ct);
+                await dokad.FlushAsync(ct);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Pyta wzmacniacz SPE o status raz na sekunde. Ramka: 55 55 55, jeden bajt
+    /// dlugosci, kod polecenia i suma kontrolna rowna temu bajtowi.
+    /// </summary>
+    private async Task OdpytujSpe(Stream siec, CzytnikSpe czytnik, CancellationToken ct)
+    {
+        var zapytanie = new byte[]
+            { 0x55, 0x55, 0x55, 0x01, StatusSpe.Zapytanie, StatusSpe.Zapytanie };
+
+        while (!ct.IsCancellationRequested)
+        {
+            await _bramka.WaitAsync(ct);
+            try
+            {
+                await siec.WriteAsync(zapytanie, 0, zapytanie.Length, ct);
+                await siec.FlushAsync(ct);
+            }
+            finally { _bramka.Release(); }
+
+            await Task.Delay(1000, ct);
         }
     }
 
@@ -166,5 +233,6 @@ public sealed class Mostek : IDisposable
     {
         Stop();
         _cts?.Dispose();
+        _bramka.Dispose();
     }
 }

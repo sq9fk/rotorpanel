@@ -27,6 +27,9 @@ public partial class MainForm : Form
         public Label Ruch;
         public Button Przelacz;
         public Znacznik[] Trx;
+        public Label Spe;
+        public Znacznik Klopot;
+        public string Trasa = "";
         public long PoprzedniLacznie;
         public DateTime PoprzedniCzas = DateTime.UtcNow;
         public double Szybkosc;

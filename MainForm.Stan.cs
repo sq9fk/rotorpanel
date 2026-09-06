@@ -47,10 +47,18 @@ public partial class MainForm
         return stan;
     }
 
-    private Label EtykietaRuchu(Karta karta)
+    /// <summary>
+    /// Licznik ruchu stoi w drugim wierszu karty, po prawej. Zaczyna sie tam, gdzie
+    /// konczy sie tekst po lewej - etykieta dodana wczesniej jest w WinForms rysowana
+    /// nad pozniejsza i zaslanialaby mu poczatek.
+    /// </summary>
+    private Label EtykietaRuchu(Karta karta, string tekstObok)
     {
+        int koniecTekstu = 44 + TextRenderer.MeasureText(tekstObok, Theme.Maly()).Width;
+        int x = Math.Min(Math.Max(koniecTekstu + 10, 176), 236);
+
         var ruch = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(240, 28), new Size(160, 16));
+            new Point(x, 28), new Size(400 - x, 16));
         ruch.TextAlign = ContentAlignment.MiddleRight;
         karta.Controls.Add(ruch);
         return ruch;
@@ -96,7 +104,7 @@ public partial class MainForm
         if (rotor != null) _dymek.SetToolTip(etykietaTrasy, rotor.Etykieta + Environment.NewLine + trasa);
 
         var stan = EtykietaStanuKarty(karta, rotor != null);
-        var ruch = EtykietaRuchu(karta);
+        var ruch = EtykietaRuchu(karta, rotor == null ? "bez rotora" : rotor.Etykieta);
         Button przelacz = rotor == null ? null : PrzyciskPrzelaczania(karta, m);
 
         _ui["a" + a.Nr] = new Wiersz
@@ -117,27 +125,67 @@ public partial class MainForm
         karta.Controls.Add(Ui.Etykieta(u.Etykieta, Theme.Nazwa(), Theme.Tekst,
             new Point(44, 6), new Size(230, 20)));
 
-        karta.Controls.Add(Ui.Etykieta(
-            u.NazwaProtokolu + " " + (char)0x00B7 + " " + u.OpisTransmisji,
-            Theme.Maly(), Theme.TekstSzary, new Point(44, 28), new Size(230, 16)));
+        string opisPolaczenia = u.NazwaProtokolu + " " + (char)0x00B7 + " " + u.OpisTransmisji;
+        karta.Controls.Add(Ui.Etykieta(opisPolaczenia, Theme.Maly(), Theme.TekstSzary,
+            new Point(44, 28),
+            new Size(TextRenderer.MeasureText(opisPolaczenia, Theme.Maly()).Width + 4, 16)));
 
         string trasa = OpisTrasy(u, m);
         var etykietaTrasy = Ui.Etykieta(trasa, Theme.Maly(), Theme.TekstSzary,
-            new Point(44, 46), new Size(220, 16));
+            new Point(44, 46), new Size(350, 16));
         karta.Controls.Add(etykietaTrasy);
+
+        // Znacznik z ostrzezeniem wzmacniacza stoi tuz za nazwa, jak oznaczenia TRX.
+        Znacznik klopot = null;
+        if (u.Spe)
+        {
+            int szerokoscNazwy = Math.Min(
+                TextRenderer.MeasureText(u.Etykieta, Theme.Nazwa()).Width + 4, 190);
+            klopot = new Znacznik
+            {
+                Location = new Point(44 + szerokoscNazwy + 6, 7),
+                Size = new Size(150, 18),
+                Tlo = Color.FromArgb(0xB3, 0x26, 0x1E)
+            };
+            karta.Controls.Add(klopot);
+        }
         _dymek.SetToolTip(etykietaTrasy, u.Etykieta + Environment.NewLine + trasa +
                           Environment.NewLine + "protokół: " + u.NazwaProtokolu +
                           Environment.NewLine + "transmisja: " + u.OpisTransmisji);
 
         var stan = EtykietaStanuKarty(karta, true);
-        var ruch = EtykietaRuchu(karta);
+        var ruch = EtykietaRuchu(karta, opisPolaczenia);
         var przelacz = PrzyciskPrzelaczania(karta, m);
 
         _ui["u" + u.Nr] = new Wiersz
         {
-            Mostek = m, Dioda = dioda, Stan = stan, Ruch = ruch, Przelacz = przelacz
+            Mostek = m, Dioda = dioda, Stan = stan, Ruch = ruch, Przelacz = przelacz,
+            Spe = u.Spe ? etykietaTrasy : null, Klopot = klopot, Trasa = trasa
         };
         return karta;
+    }
+
+    /// <summary>
+    /// Na karcie wzmacniacza SPE pokazuje jego stan zamiast trasy; trasa i tak
+    /// jest w dymku. Gdy odczyt sie zestarzeje, wraca opis trasy - lepiej nic
+    /// nie pokazac niz pokazywac nieaktualna moc czy temperature.
+    /// </summary>
+    private void OdswiezSpe(Wiersz u, Mostek m)
+    {
+        if (u.Spe is null) return;
+
+        var status = m.Status;
+        bool swiezy = status is not null &&
+                      (DateTime.UtcNow - status.Kiedy).TotalSeconds < 5;
+
+        u.Spe.Text = swiezy ? status.Opis : u.Trasa;
+        u.Spe.ForeColor = swiezy ? Theme.Tekst : Theme.TekstSzary;
+
+        if (u.Klopot is null) return;
+
+        string klopot = swiezy ? status.Klopot : "";
+        u.Klopot.Text = klopot;
+        u.Klopot.Visible = klopot.Length > 0;
     }
 
     private static string Bajty(long n)
@@ -203,6 +251,8 @@ public partial class MainForm
                 u.Ruch.Text = "RX " + Bajty(m.Rx) + kropka + "TX " + Bajty(m.Tx) +
                               kropka + u.Szybkosc.ToString("0") + " B/s";
             }
+
+            OdswiezSpe(u, m);
 
             if (!string.IsNullOrEmpty(m.Blad)) ostatniBlad = m.Punkt.Etykieta + ": " + m.Blad;
         }

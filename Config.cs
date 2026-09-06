@@ -84,6 +84,9 @@ public class Rotor : Polaczenie
 public class Urzadzenie : Polaczenie
 {
     protected override string DomyslnaNazwa => "Urządzenie " + Nr;
+
+    /// <summary>Wzmacniacz SPE Expert - mostek odpytuje go o status komenda 0x90.</summary>
+    public bool Spe { get; set; }
 }
 
 public class Antena

@@ -121,7 +121,8 @@ public partial class Config
                 Predkosc   = Json.Liczba(o, "predkosc"),
                 BityDanych = Json.Liczba(o, "bityDanych", 8),
                 Parzystosc = ParzystoscZTekstu(Json.Tekst(o, "parzystosc")),
-                BityStopu  = BityStopuZTekstu(Json.Tekst(o, "bityStopu"))
+                BityStopu  = BityStopuZTekstu(Json.Tekst(o, "bityStopu")),
+                Spe        = Json.Flaga(o, "spe")
             });
         }
     }
@@ -231,6 +232,7 @@ public partial class Config
             wpis.Dodaj("bityDanych", u.BityDanych);
             wpis.Dodaj("parzystosc", NazwyParzystosci[(int)u.Parzystosc]);
             wpis.Dodaj("bityStopu", NazwyBitowStopu[(int)u.BityStopu]);
+            wpis.Dodaj("spe", u.Spe);
             urzadzenia.Add(wpis);
         }
 

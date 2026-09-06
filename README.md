@@ -163,6 +163,35 @@ z akcepterem `telnet` zamiast `tcp`.
 
 ---
 
+## Wzmacniacz SPE Expert
+
+Zaznaczenie kolumny **SPE** przy urządzeniu włącza monitorowanie wzmacniacza Expert.
+Mostek raz na sekundę wysyła udokumentowaną komendę STATUS (`0x90`) i rozkłada odpowiedź
+na pola, a karta w oknie głównym pokazuje stan zamiast trasy:
+
+```
+SPE Expert                                    połączony
+RFC 2217 · 115200 8N1        RX 2,0 kB · TX 468 B · 185 B/s
+Standby · RX · 20 m · ant 1a · 27 °C
+```
+
+Widać tryb (Standby/Operate), kierunek (RX/TX), pasmo, antenę z ATU, temperaturę, a przy
+nadawaniu moc wyjściową i SWR anteny. Ostrzeżenie albo alarm wzmacniacza pojawia się jako
+czerwony znacznik przy nazwie — na przykład `ALARM: SWR ponad limit` czy
+`uwaga: przegrzanie`. Gdy odczyt się zestarzeje (ponad pięć sekund), karta wraca do opisu
+trasy; lepiej nie pokazać nic niż nieaktualną temperaturę.
+
+Ramka wygląda tak: `55 55 55` (do wzmacniacza) albo `AA AA AA` (od niego), bajt długości,
+dane i suma kontrolna modulo 256. Odpowiedź STATUS ma 67 znaków rozdzielonych przecinkami.
+Odpowiedzi na własne zapytania mostek **zdejmuje ze strumienia** — program po drugiej stronie
+pary portów o nie nie prosił i nie ma powodu ich oglądać. Wszystko inne przechodzi nietknięte,
+więc program sterujący (na przykład SPE Term) działa równolegle.
+
+Odbicia wyświetlacza z programu KTerm tą drogą nie uświadczysz — to zamknięta część
+protokołu, a producent publikuje wyłącznie podstawowy podzbiór poleceń.
+
+---
+
 ## Aktualizacje
 
 Kilka sekund po uruchomieniu program sprawdza, czy w [wydaniach](https://github.com/sq9fk/rotorpanel/releases)

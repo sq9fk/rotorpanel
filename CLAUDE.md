@@ -97,6 +97,12 @@ uruchomionego programu, ale pozwala zmienić mu nazwę — stąd `.old`. Przed s
 drugą i tylko obudzi tę kończącą pracę. Nowa kopia dostaje argument `--po-aktualizacji`
 i czeka do dziesięciu sekund na zwolnienie blokady.
 
+**Status SPE czytamy sami i sami go zjadamy.** `Mostek` przy `Urzadzenie.Spe` wstrzykuje
+w strumień własne zapytanie `0x90` raz na sekundę, a `CzytnikSpe` wyjmuje odpowiedzi zanim
+trafią na drugą stronę pary portów. Klient (SPE Term) o nie nie prosił, więc nie może ich
+dostać. Do gniazda piszą wtedy dwie strony — pompa i odpytywanie — stąd semafor `_bramka`;
+bez niego ramki potrafiłyby się przepleść w połowie.
+
 ## Pułapki, na które już wpadliśmy
 
 **`setupc` wymaga katalogu roboczego.** Szuka `com0com.inf` w katalogu bieżącym; wywołany
@@ -159,6 +165,18 @@ są rysowane własnoręcznie i nie mają wzorca `Invoke` w UI Automation, a prog
 zasobnika, więc głównego okna zwykle nie ma na ekranie. Mały program pomocniczy z referencją do
 `RotorPanel.exe` tworzy `SettingsForm`, pokazuje ją poza ekranem i zrzuca do pliku PNG — to
 sprawdza układ bez ruszania pulpitu. `MainForm` tak się nie da obejrzeć, bo sama się ukrywa.
+
+**W WinForms etykieta dodana wcześniej zasłania późniejszą.** Licznik ruchu na karcie miał
+ucięty początek (`,1 kB` zamiast `RX 1,1 kB`), bo etykieta protokołu, dodana przed nim, jest
+wyżej w kolejności rysowania i zamalowywała mu lewą stronę. Nie chodziło o za małą szerokość —
+naprawą było skrócenie etykiety protokołu do szerokości jej tekstu i wyliczenie pozycji
+licznika z tego pomiaru (`EtykietaRuchu` przyjmuje tekst stojący obok).
+
+**Wzmacniacz potrafi urwać ramkę statusu w połowie.** W nagraniu z Expert 1.3K-FA jedna
+odpowiedź na siedem kończy się po 56 bajtach i od razu zaczyna się kolejna ramka.
+`CzytnikSpe` wykrywa to po następnym nagłówku `AA AA AA` bliżej niż długość ramki i odrzuca
+ogryzek zamiast puszczać go dalej. Test w `scratchpad/testspe` przepuszcza nagranie przez
+czytnik kawałkami po 1, 5, 76 i 1130 bajtów — wynik ma być identyczny.
 
 **PowerShell rozwija tablice zwracane z funkcji.** W generatorze ikony (`ikona/generuj-ikone.ps1`)
 `return ,$dane` z przecinkiem chroni tablicę bajtów. Bez tego plik `.ico` wychodził uszkodzony,

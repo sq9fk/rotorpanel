@@ -39,14 +39,14 @@ public partial class SettingsForm
 
         _siatkaUrzadzen.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Nazwa", Width = 112,
+            HeaderText = "Nazwa", Width = 104,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
         _kolParaU = new DataGridViewComboBoxColumn
         {
             HeaderText = "Para portów",
-            Width = 160,
+            Width = 146,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -55,7 +55,7 @@ public partial class SettingsForm
 
         _siatkaUrzadzen.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Adres", Width = 100,
+            HeaderText = "Adres", Width = 96,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
@@ -80,7 +80,7 @@ public partial class SettingsForm
         // Przy RFC 2217 to my podajemy urzadzeniu parametry portu - stad listy wyboru.
         _kolPredkosc = new DataGridViewComboBoxColumn
         {
-            HeaderText = "Prędkość", Width = 112,
+            HeaderText = "Prędkość", Width = 104,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -101,7 +101,7 @@ public partial class SettingsForm
 
         var kolParzystosc = new DataGridViewComboBoxColumn
         {
-            HeaderText = "Parzystość", Width = 92,
+            HeaderText = "Parzystość", Width = 84,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -118,6 +118,14 @@ public partial class SettingsForm
         };
         foreach (var v in BityStopuNazwy) kolStop.Items.Add(v);
         _siatkaUrzadzen.Columns.Add(kolStop);
+
+        // Zaznaczone znaczy: to wzmacniacz SPE Expert, wiec mostek moze go odpytywac
+        // o status i pokazywac go na karcie.
+        _siatkaUrzadzen.Columns.Add(new DataGridViewCheckBoxColumn
+        {
+            HeaderText = "SPE", Width = 44,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        });
 
         _siatkaUrzadzen.CurrentCellDirtyStateChanged += (_, _) =>
         {
@@ -146,8 +154,8 @@ public partial class SettingsForm
         Controls.Add(usun);
 
         Controls.Add(Ui.Etykieta(
-            "RFC 2217 to port szeregowy przez Telnet (konwertery microBit). Urządzenie otwiera " +
-            "swój port dopiero po otrzymaniu prędkości; „z urządzenia” zostawia jego ustawienia.",
+            "RFC 2217 to port szeregowy przez Telnet (konwertery microBit); urządzenie otwiera port " +
+            "dopiero po podaniu prędkości. Kolumna SPE włącza odpytywanie wzmacniacza Expert o stan.",
             Theme.Maly(), Theme.TekstSzary, new Point(324, 508), new Size(578, 44)));
     }
 
@@ -175,7 +183,8 @@ public partial class SettingsForm
                                      BityDanychNazwy.Contains(u.BityDanych.ToString())
                                          ? u.BityDanych.ToString() : "8",
                                      Parzystosci[(int)u.Parzystosc],
-                                     BityStopuNazwy[(int)u.BityStopu]);
+                                     BityStopuNazwy[(int)u.BityStopu],
+                                     u.Spe);
         }
     }
 
@@ -189,7 +198,7 @@ public partial class SettingsForm
         while (uzyte.Contains(nr)) nr++;
 
         _siatkaUrzadzen.Rows.Add(nr, "Urządzenie " + nr, Brak, "", "", ProtokolTelnet,
-                                 "9600", "8", Parzystosci[0], BityStopuNazwy[0]);
+                                 "9600", "8", Parzystosci[0], BityStopuNazwy[0], false);
         OdswiezListyPar();
     }
 
@@ -225,7 +234,8 @@ public partial class SettingsForm
             Predkosc = predkosc,
             BityDanych = bityDanych,
             Parzystosc = (Parzystosc)Math.Max(parzystosc, 0),
-            BityStopu = (BityStopu)Math.Max(stop, 0)
+            BityStopu = (BityStopu)Math.Max(stop, 0),
+            Spe = w.Cells[USpe].Value is bool zaznaczone && zaznaczone
         };
     }
 }
