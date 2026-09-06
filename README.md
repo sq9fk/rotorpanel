@@ -87,19 +87,24 @@ JSON-em bez podwajania znaków.
 | `setupc` | ścieżka do `setupc.exe` z com0com |
 | `sterownikAnten` | adres sterownika anten w postaci `host` albo `host:port`, np. `192.168.1.101` |
 | `autoPolacz` | czy zestawiać mostki od razu po uruchomieniu |
+| `rotory[].nr` | numer rotora, do którego odwołują się anteny |
+| `rotory[].nazwa` | nazwa własna, np. „maszt A” |
+| `rotory[].com` | port widoczny dla PstRotatora |
+| `rotory[].dev` | druga strona pary, używana przez mostek |
+| `rotory[].ip` | adres `ser2net` dla tego rotora; puste znaczy `piIp` |
+| `rotory[].port` | port TCP wystawiony przez `ser2net` |
 | `anteny[].nr` | numer wyjścia w przełącznicy antenowej |
 | `anteny[].nazwa` | nazwa anteny, pobierana ze sterownika |
-| `anteny[].maRotor` | czy do anteny podpięty jest rotor |
-| `anteny[].com` | port widoczny dla PstRotatora |
-| `anteny[].dev` | druga strona pary, używana przez mostek |
-| `anteny[].ip` | adres `ser2net` dla tej anteny; puste znaczy `piIp` |
-| `anteny[].port` | port TCP wystawiony przez `ser2net` |
+| `anteny[].rotor` | numer przypisanego rotora; zero oznacza antenę bez rotora |
 
 Wzór znajdziesz w [`rotory.przyklad.json`](rotory.przyklad.json).
 
-Kilka anten może wskazywać **tę samą parę portów** — tak wygląda maszt z kilkoma antenami.
-Program tworzy wtedy jeden mostek współdzielony przez te anteny, bo fizycznie to jedno
-połączenie.
+**Rotor definiuje się raz** — jako para portów plus punkt końcowy `ser2net` — a antena tylko
+wskazuje, który rotor nią obraca. Maszt z kilkoma antenami to po prostu kilka anten wskazujących
+ten sam rotor; mostek powstaje jeden, bo fizycznie to jedno połączenie.
+
+Starsze konfiguracje, w których para i port były przypisane wprost do anteny, są przy wczytaniu
+zamieniane na ten model. Wystarczy raz zapisać ustawienia, żeby plik zapisał się w nowej postaci.
 
 ---
 
@@ -133,10 +138,20 @@ przełączającym. Okno dopasowuje wysokość do liczby anten, więc lista nigdy
 | pomarańczowa | trwa łączenie albo ponawianie po zerwaniu |
 | zielona | port otwarty i połączenie TCP zestawione |
 
-W nagłówku okna, po prawej stronie, jest osobna dioda **łączności ze sterownikiem anten**:
-zielona gdy odpowiada, czerwona gdy nie, szara gdy adres nie został podany. Program sprawdza
-to samym nawiązaniem połączenia TCP — co 60 sekund po udanej próbie i co 20 po nieudanej.
-Sterowniki na Arduino mają kilka gniazd sieciowych, więc nie ma powodu ich męczyć.
+W nagłówku okna, po prawej stronie, są dwie diody łączności. Górna dotyczy **`ser2net`**, dolna
+**sterownika anten**. Pod kursorem pokazują szczegóły — przy `ser2net` stan każdego portu z osobna.
+
+| kolor | ser2net | sterownik anten |
+|---|---|---|
+| zielona | wszystkie porty odpowiadają | odpowiada |
+| pomarańczowa | część portów odpowiada | trwa sprawdzanie |
+| czerwona | żaden port nie odpowiada | nie odpowiada |
+| szara | nie zdefiniowano rotorów | nie podano adresu |
+
+Sprawdzanie to samo nawiązanie połączenia TCP, co 60 sekund po udanej próbie i co 20 po
+nieudanej. **Porty z działającym mostkiem nie są badane** — każdy port `ser2net` przyjmuje jedno
+połączenie, a przy ustawieniu `kickolduser` próba nawiązania drugiego rozłączyłaby własny mostek.
+Działający mostek i tak jest dowodem, że port odpowiada.
 
 Liczniki `RX` i `TX` pokazują bajty, które faktycznie przeszły, oraz bieżącą przepustowość.
 To najprostszy sposób sprawdzenia, czy PstRotator w ogóle odpytuje sterownik: zielona dioda
@@ -154,6 +169,8 @@ Tabela anten: numer, checkbox **Rotor**, nazwa, para portów z listy rozwijanej,
   postaci.
 - **Ścieżkę do `setupc.exe`** można wskazać przyciskiem `…`, który otwiera okno wyboru pliku.
   Startuje z obecnego katalogu, a gdy go nie ma — z typowego miejsca instalacji com0com.
+- **Rotory i anteny są w osobnych tabelach.** Rotor to para portów, adres i port TCP; antena
+  wybiera rotor z listy, która powstaje automatycznie z tabeli rotorów.
 - **Nazwy anten są nieedytowalne** — pochodzą wyłącznie ze sterownika, przycisk *Pobierz nazwy*.
   Przy braku łączności zostają `ANT1`–`ANT6`.
 - **Pary wybiera się z listy**, budowanej z rejestru sterownika com0com. Nie da się wpisać

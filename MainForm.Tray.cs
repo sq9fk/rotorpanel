@@ -136,9 +136,9 @@ public partial class MainForm
         {
             foreach (var m in _mostki)
             {
-                string opis = _opisMostka.TryGetValue(m.Antena.KluczPary, out string o)
-                    ? o
-                    : m.Antena.Etykieta;
+                string opis = _opisMostka.TryGetValue(m.Rotor.KluczPary, out string o)
+                    ? o + "   (" + m.Rotor.Etykieta + ")"
+                    : m.Rotor.Etykieta;
 
                 string stan = m.Stan switch
                 {

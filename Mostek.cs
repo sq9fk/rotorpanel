@@ -17,22 +17,22 @@ public sealed class Mostek : IDisposable
     private int _stan = (int)StanMostka.Zatrzymany;
     private volatile string _blad = "";
 
-    public Antena Antena { get; }
-    public string Adres => _cfg.AdresDla(Antena);
+    public Rotor Rotor { get; }
+    public string Adres => _cfg.AdresDla(Rotor);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
     public long Rx => Interlocked.Read(ref _rx);
     public long Tx => Interlocked.Read(ref _tx);
     public string Blad => _blad;
 
-    public Mostek(Config cfg, Antena antena)
+    public Mostek(Config cfg, Rotor rotor)
     {
         _cfg = cfg;
-        Antena = antena;
+        Rotor = rotor;
     }
 
     public void Start()
     {
-        if (!Antena.Gotowa) return;
+        if (!Rotor.Gotowy) return;
         if (_petla is { IsCompleted: false }) return;
         Interlocked.Exchange(ref _rx, 0);
         Interlocked.Exchange(ref _tx, 0);
@@ -57,9 +57,9 @@ public sealed class Mostek : IDisposable
             {
                 Volatile.Write(ref _stan, (int)StanMostka.Laczenie);
 
-                using var port = PortIo.Otworz(Antena.Dev);
+                using var port = PortIo.Otworz(Rotor.Dev);
                 using var klient = new TcpClient();
-                await PolaczAsync(klient, Adres, Antena.Port, ct);
+                await PolaczAsync(klient, Adres, Rotor.Port, ct);
                 using var siec = klient.GetStream();
 
                 _blad = "";

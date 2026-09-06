@@ -6,12 +6,18 @@
   "sterownikAnten": "192.168.1.101",
   "autoPolacz": false,
 
+  "rotory": [
+    { "nr": 1, "nazwa": "Rotor 1", "com": "COM10", "dev": "CNCB10", "ip": "", "port": 4001 },
+    { "nr": 2, "nazwa": "Rotor 2", "com": "COM11", "dev": "CNCB11", "ip": "", "port": 4002 },
+    { "nr": 3, "nazwa": "Rotor 3", "com": "COM12", "dev": "CNCB12", "ip": "", "port": 4003 }
+  ],
+
   "anteny": [
-    { "nr": 1, "nazwa": "ANT1", "maRotor": false, "com": "",      "dev": "",       "ip": "", "port": 0 },
-    { "nr": 2, "nazwa": "ANT2", "maRotor": false, "com": "",      "dev": "",       "ip": "", "port": 0 },
-    { "nr": 3, "nazwa": "ANT3", "maRotor": false, "com": "",      "dev": "",       "ip": "", "port": 0 },
-    { "nr": 4, "nazwa": "ANT4", "maRotor": true,  "com": "COM10", "dev": "CNCB10", "ip": "", "port": 4001 },
-    { "nr": 5, "nazwa": "ANT5", "maRotor": true,  "com": "COM11", "dev": "CNCB11", "ip": "", "port": 4002 },
-    { "nr": 6, "nazwa": "ANT6", "maRotor": true,  "com": "COM12", "dev": "CNCB12", "ip": "", "port": 4003 }
+    { "nr": 1, "nazwa": "ANT1", "rotor": 0 },
+    { "nr": 2, "nazwa": "ANT2", "rotor": 0 },
+    { "nr": 3, "nazwa": "ANT3", "rotor": 0 },
+    { "nr": 4, "nazwa": "ANT4", "rotor": 1 },
+    { "nr": 5, "nazwa": "ANT5", "rotor": 2 },
+    { "nr": 6, "nazwa": "ANT6", "rotor": 3 }
   ]
 }

@@ -1,7 +1,10 @@
 ﻿namespace RotorPanel;
 
-/// <summary>Jedna antena: nazwa ze sterownika plus opcjonalne przypisanie rotora.</summary>
-public class Antena
+/// <summary>
+/// Rotor to para portow com0com plus punkt koncowy ser2net. Anteny wskazuja rotor
+/// numerem, wiec kilka anten na wspolnym maszcie po prostu wskazuje ten sam.
+/// </summary>
+public class Rotor
 {
     public int    Nr    { get; set; }
     public string Nazwa { get; set; } = "";
@@ -10,32 +13,42 @@ public class Antena
     public string Ip    { get; set; } = "";
     public int    Port  { get; set; }
 
-    /// <summary>Jawny przelacznik: czy do tej anteny podpiety jest rotor.</summary>
-    public bool MaRotor { get; set; }
+    /// <summary>Ma komplet danych potrzebnych do zestawienia mostka.</summary>
+    public bool Gotowy => !string.IsNullOrWhiteSpace(Dev) && Port > 0;
 
-    /// <summary>Ma rotor i komplet danych potrzebnych do zestawienia mostka.</summary>
-    public bool Gotowa => MaRotor && !string.IsNullOrWhiteSpace(Dev) && Port > 0;
-
-    /// <summary>Klucz pary portow - anteny na tym samym maszcie dziela jeden mostek.</summary>
     public string KluczPary => (Dev ?? "").Trim().ToUpperInvariant();
+
+    public string Etykieta => string.IsNullOrWhiteSpace(Nazwa) ? "Rotor " + Nr : Nazwa;
+
+    /// <summary>Opis do list wyboru: nazwa wraz z trasa.</summary>
+    public string Opis => Gotowy
+        ? Etykieta + "   (" + Com + " " + ((char)0x2192) + " :" + Port + ")"
+        : Etykieta + "   (niekompletny)";
+}
+
+public class Antena
+{
+    public int    Nr    { get; set; }
+    public string Nazwa { get; set; } = "";
+
+    /// <summary>Numer przypisanego rotora; zero oznacza antene bez rotora.</summary>
+    public int Rotor { get; set; }
 
     public string Etykieta => string.IsNullOrWhiteSpace(Nazwa) ? "ANT" + Nr : Nazwa;
 }
 
-public class Config
+public partial class Config
 {
     public string PiIp           { get; set; } = "127.0.0.1";
     public string Setupc         { get; set; } = "";
     public string SterownikAnten { get; set; } = "";
     public bool   AutoPolacz     { get; set; }
-    public List<Antena> Anteny   { get; set; } = new List<Antena>();
+
+    public List<Rotor>  Rotory { get; set; } = new List<Rotor>();
+    public List<Antena> Anteny { get; set; } = new List<Antena>();
 
     private static string _sciezka;
 
-    /// <summary>
-    /// Konfiguracja lezy obok pliku exe - dzieki temu wersja przenosna nosi swoje
-    /// ustawienia ze soba. Gdy katalog jest tylko do odczytu, przenosimy sie do profilu.
-    /// </summary>
     public static string Sciezka
     {
         get
@@ -69,101 +82,23 @@ public class Config
         catch { return false; }
     }
 
-    /// <summary>Adres ser2net dla danej anteny - wlasny, a gdy pusty to domyslny.</summary>
-    public string AdresDla(Antena a) => string.IsNullOrWhiteSpace(a.Ip) ? PiIp : a.Ip.Trim();
+    /// <summary>Adres ser2net dla rotora - wlasny, a gdy pusty to domyslny.</summary>
+    public string AdresDla(Rotor r) => string.IsNullOrWhiteSpace(r.Ip) ? PiIp : r.Ip.Trim();
 
-    /// <summary>Konfiguracja startowa, gdy pliku jeszcze nie ma.</summary>
-    private static Config Domyslna()
+    public Rotor ZnajdzRotor(int nr) => nr <= 0 ? null : Rotory.FirstOrDefault(r => r.Nr == nr);
+
+    /// <summary>Rotor przypisany do anteny, o ile jest kompletny.</summary>
+    public Rotor RotorAnteny(Antena a)
     {
-        var cfg = new Config
-        {
-            PiIp = "192.168.1.100",
-            Setupc = "C:/Program Files (x86)/com0com/setupc.exe",
-            SterownikAnten = "",
-            AutoPolacz = false
-        };
-        for (int i = 1; i <= 6; i++)
-            cfg.Anteny.Add(new Antena { Nr = i, Nazwa = "ANT" + i });
-        return cfg;
+        var r = ZnajdzRotor(a.Rotor);
+        return r != null && r.Gotowy ? r : null;
     }
 
-    public static Config Wczytaj()
+    public int WolnyNumerRotora()
     {
-        if (!File.Exists(Sciezka))
-        {
-            var startowa = Domyslna();
-            startowa.Zapisz();
-            return startowa;
-        }
-
-        var korzen = Json.Parsuj(File.ReadAllText(Sciezka)) as Dictionary<string, object>;
-        if (korzen == null) throw new InvalidDataException("Konfiguracja nie jest obiektem JSON.");
-
-        var cfg = new Config
-        {
-            PiIp           = Json.Tekst(korzen, "piIp", "127.0.0.1"),
-            Setupc         = Json.Tekst(korzen, "setupc"),
-            SterownikAnten = NormalizujHost(Json.Tekst(korzen, "sterownikAnten")),
-            AutoPolacz     = Json.Flaga(korzen, "autoPolacz", false)
-        };
-
-        if (korzen.TryGetValue("anteny", out object lista) && lista is List<object> tablica)
-        {
-            foreach (var element in tablica)
-            {
-                var o = element as Dictionary<string, object>;
-                if (o == null) continue;
-
-                cfg.Anteny.Add(new Antena
-                {
-                    Nr      = Json.Liczba(o, "nr"),
-                    Nazwa   = Json.Tekst(o, "nazwa"),
-                    Com     = Json.Tekst(o, "com"),
-                    Dev     = Json.Tekst(o, "dev"),
-                    Ip      = Json.Tekst(o, "ip"),
-                    Port    = Json.Liczba(o, "port"),
-                    MaRotor = Json.Flaga(o, "maRotor")
-                });
-            }
-        }
-
-        if (cfg.Anteny.Count == 0) cfg.Anteny = Domyslna().Anteny;
-
-        for (int i = 0; i < cfg.Anteny.Count; i++)
-        {
-            if (cfg.Anteny[i].Nr == 0) cfg.Anteny[i].Nr = i + 1;
-            // Nazwy pochodza ze sterownika anten; gdy go nie ma, zostaje ANT1..ANTn.
-            if (string.IsNullOrWhiteSpace(cfg.Anteny[i].Nazwa))
-                cfg.Anteny[i].Nazwa = "ANT" + cfg.Anteny[i].Nr;
-        }
-
-        return cfg;
-    }
-
-    public void Zapisz()
-    {
-        var anteny = new List<object>();
-        foreach (var a in Anteny)
-        {
-            var wpis = new JsonObiekt();
-            wpis.Dodaj("nr", a.Nr);
-            wpis.Dodaj("nazwa", a.Nazwa);
-            wpis.Dodaj("maRotor", a.MaRotor);
-            wpis.Dodaj("com", a.Com);
-            wpis.Dodaj("dev", a.Dev);
-            wpis.Dodaj("ip", a.Ip);
-            wpis.Dodaj("port", a.Port);
-            anteny.Add(wpis);
-        }
-
-        var korzen = new JsonObiekt();
-        korzen.Dodaj("piIp", PiIp);
-        korzen.Dodaj("setupc", Setupc);
-        korzen.Dodaj("sterownikAnten", SterownikAnten);
-        korzen.Dodaj("autoPolacz", AutoPolacz);
-        korzen.Dodaj("anteny", anteny);
-
-        File.WriteAllText(Sciezka, Json.Zapisz(korzen));
+        int nr = 1;
+        while (Rotory.Any(r => r.Nr == nr)) nr++;
+        return nr;
     }
 
     /// <summary>

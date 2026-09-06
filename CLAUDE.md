@@ -50,8 +50,14 @@ jest istotne; potraktowanie ich tak samo albo zapętli program, albo zerwie dzia
 zgłasza `HandleDestroyed`, więc `Close()` nie kończy pętli komunikatów. Program wychodzi przez
 `Application.Exit()` po posprzątaniu, nie przez `Close()`.
 
-**Jeden mostek na parę portów, nie na antenę.** Kilka anten na wspólnym maszcie wskazuje tę
-samą parę i dzieli jedno połączenie — inaczej dwa mostki biłyby się o ten sam port.
+**Rotor jest bytem osobnym od anteny.** `Rotor` trzyma parę portów i punkt `ser2net`, a `Antena`
+tylko numer rotora. Kilka anten na wspólnym maszcie wskazuje ten sam rotor i dzieli jedno
+połączenie — inaczej dwa mostki biłyby się o ten sam port. Starszy format, w którym para i port
+wisiały przy antenie, jest migrowany w `ConfigIO.CzytajAnteny`; nie usuwaj tego kodu.
+
+**Portów ser2net z działającym mostkiem nie wolno sondować.** Każdy port przyjmuje jedno
+połączenie, a przy `kickolduser` próba nawiązania drugiego rozłącza własny mostek. `OdswiezSer2net`
+traktuje połączony mostek jako dowód dostępności i pomija badanie.
 
 **Adres sterownika anten trzymamy jako `host[:port]`, nie URL.** `Config.NormalizujHost`
 obcina schemat i ścieżkę przy wczytywaniu i zapisie, a `SterownikAnten.Rozdziel` rozbija to

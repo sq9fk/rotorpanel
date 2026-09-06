@@ -1,4 +1,4 @@
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 
 namespace RotorPanel;
 
@@ -49,10 +49,14 @@ public class Led : Control
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using (var poswiata = new SolidBrush(Color.FromArgb(56, _kolor)))
+        // Proporcjonalnie do rozmiaru - inaczej mniejsza dioda gubi wypelnienie.
+        float margines = Math.Max(2f, Width * 0.22f);
+
+        using (var poswiata = new SolidBrush(Color.FromArgb(64, _kolor)))
             g.FillEllipse(poswiata, 0, 0, Width - 1, Height - 1);
         using (var srodek = new SolidBrush(_kolor))
-            g.FillEllipse(srodek, 5, 5, Width - 11, Height - 11);
+            g.FillEllipse(srodek, margines, margines,
+                          Width - 1 - 2 * margines, Height - 1 - 2 * margines);
     }
 }
 
