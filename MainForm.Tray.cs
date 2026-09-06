@@ -76,6 +76,10 @@ public partial class MainForm
 
     private void UtworzTray()
     {
+        // Przy wylogowaniu albo zamykaniu systemu WinForms nie zawsze zdazy wywolac
+        // OnFormClosing, wiec porty rozlaczamy takze tutaj.
+        Microsoft.Win32.SystemEvents.SessionEnding += (_, _) => RozlaczWszystko();
+
         // Wymuszamy utworzenie uchwytu okna. Bez tego formularz, ktory nigdy nie byl
         // pokazany, nie zglasza HandleDestroyed i Close() nie konczy petli komunikatow.
         _ = Handle;
@@ -237,6 +241,21 @@ public partial class MainForm
     /// Konczy program. Nie polegamy na Close(), bo formularz moze nie miec
     /// utworzonego uchwytu - Application.Exit domyka petle komunikatow niezawodnie.
     /// </summary>
+    /// <summary>
+    /// Rozlacza wszystkie mostki. Kazdy zamykany jest osobno i rownolegle, zeby
+    /// zamkniecie programu nie sumowalo limitow czasu.
+    /// </summary>
+    private void RozlaczWszystko()
+    {
+        var mostki = _mostki.ToList();
+        if (mostki.Count == 0) return;
+
+        var zadania = mostki.Select(m => Task.Run(() => m.Dispose())).ToArray();
+        try { Task.WaitAll(zadania, 4000); } catch { /* i tak konczymy */ }
+
+        _mostki.Clear();
+    }
+
     private void ZamknijNaprawde()
     {
         _naprawdeZamykam = true;
@@ -250,9 +269,7 @@ public partial class MainForm
             _tray = null;
         }
 
-        foreach (var m in _mostki) m.Dispose();
-        _mostki.Clear();
-
+        RozlaczWszystko();
         Application.Exit();
     }
 }

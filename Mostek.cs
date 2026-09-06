@@ -17,6 +17,11 @@ public sealed class Mostek : IDisposable
     private int _stan = (int)StanMostka.Zatrzymany;
     private volatile string _blad = "";
 
+    // Odczyt z gniazda w .NET Framework nie reaguje na token anulowania, wiec zeby
+    // rozlaczyc natychmiast, trzeba zamknac same uchwyty.
+    private volatile TcpClient _biezacyKlient;
+    private volatile Stream _biezacyPort;
+
     public Polaczenie Punkt { get; }
     public string Adres => _cfg.AdresDla(Punkt);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
@@ -45,6 +50,13 @@ public sealed class Mostek : IDisposable
     public void Stop()
     {
         try { _cts?.Cancel(); } catch { /* nic */ }
+
+        // Zamkniecie uchwytow przerywa zawieszone odczyty - bez tego kazde
+        // zatrzymanie czekaloby caly limit czasu, a polaczenie TCP trwaloby
+        // az do konca procesu.
+        try { _biezacyKlient?.Close(); } catch { /* juz zamkniete */ }
+        try { _biezacyPort?.Dispose(); } catch { /* jak wyzej */ }
+
         try { _petla?.Wait(2500); } catch { /* nic */ }
         Volatile.Write(ref _stan, (int)StanMostka.Zatrzymany);
     }
@@ -53,15 +65,22 @@ public sealed class Mostek : IDisposable
     {
         while (!ct.IsCancellationRequested)
         {
+            Stream port = null;
+            TcpClient klient = null;
+            Stream siec = null;
+
             try
             {
                 Volatile.Write(ref _stan, (int)StanMostka.Laczenie);
 
-                using var port = PortIo.Otworz(Punkt.Dev);
-                using var klient = new TcpClient();
+                port = PortIo.Otworz(Punkt.Dev);
+                _biezacyPort = port;
+
+                klient = new TcpClient();
+                _biezacyKlient = klient;
                 await PolaczAsync(klient, Adres, Punkt.Port, ct);
 
-                Stream siec = klient.GetStream();
+                siec = klient.GetStream();
 
                 // Serwer RFC 2217 mowi Telnetem - bez rozpakowania sekwencji IAC
                 // trafialyby one do danych.
@@ -75,16 +94,22 @@ public sealed class Mostek : IDisposable
                 _blad = "";
                 Volatile.Write(ref _stan, (int)StanMostka.Polaczony);
 
-                try
-                {
-                    var wGore = Pompa(port, siec, zPortu: true,  ct);
-                    var wDol  = Pompa(siec, port, zPortu: false, ct);
-                    await Task.WhenAny(wGore, wDol);
-                }
-                finally { siec.Dispose(); }
+                var wGore = Pompa(port, siec, zPortu: true,  ct);
+                var wDol  = Pompa(siec, port, zPortu: false, ct);
+                await Task.WhenAny(wGore, wDol);
             }
             catch (OperationCanceledException) { break; }
+            catch (ObjectDisposedException) { break; }
             catch (Exception ex) { _blad = ex.Message; }
+            finally
+            {
+                _biezacyKlient = null;
+                _biezacyPort = null;
+
+                try { siec?.Dispose(); } catch { }
+                try { klient?.Close(); } catch { }
+                try { port?.Dispose(); } catch { }
+            }
 
             if (ct.IsCancellationRequested) break;
 

@@ -54,6 +54,12 @@ odrzuca nazwy nierozpoczynające się od `COM`, a druga strona pary com0com nazy
 wraca natychmiast po nadejściu danych, a przy ciszy po 200 ms z zerem bajtów — dzięki temu
 pętla reaguje na żądanie zatrzymania.
 
+**Odczyt z gniazda w .NET Framework nie reaguje na token anulowania.** Samo odwołanie tokenu
+zostawia pompę zawieszoną na `Read` aż do nadejścia danych, więc `Mostek.Stop` zamyka jawnie
+uchwyt gniazda i portu — dopiero to przerywa odczyt. Bez tego każde zatrzymanie czekało pełny
+limit czasu, a połączenie TCP trwało do końca procesu. Zmierzone: rozłączenie trzech mostków
+zajmuje 4 ms zamiast trzech razy po 2,5 sekundy.
+
 **Zero bajtów z portu to cisza, z gniazda to rozłączenie.** Rozróżnienie w `Mostek.Pompa`
 jest istotne; potraktowanie ich tak samo albo zapętli program, albo zerwie działające łącze.
 

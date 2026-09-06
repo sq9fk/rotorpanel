@@ -238,7 +238,7 @@ public partial class MainForm
 
         _timer.Stop();
         if (_tray is not null) _tray.Visible = false;
-        foreach (var m in _mostki) m.Dispose();
+        RozlaczWszystko();
         base.OnFormClosing(e);
     }
 }

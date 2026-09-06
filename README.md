@@ -180,7 +180,9 @@ jeden mostek jest połączony.
 | kliknięcie prawym | menu: otwarcie panelu, łączenie pojedynczego rotora lub wszystkich, wyjście |
 | krzyżyk w oknie | chowa program do zasobnika, **nie** zamyka go |
 
-Program kończy się wyłącznie przez pozycję **Zamknij** w menu ikony.
+Program kończy się wyłącznie przez pozycję **Zamknij** w menu ikony. Przy zamykaniu wszystkie
+mostki są rozłączane, więc porty po stronie `ser2net` i urządzeń zwalniają się od razu, a nie
+dopiero po wygaśnięciu sesji. To samo dzieje się przy wylogowaniu i zamykaniu systemu.
 
 Może działać tylko w jednej kopii. Ponowne uruchomienie — ze skrótu, z autostartu czy
 z pliku exe — nie tworzy drugiej instancji, tylko wyciąga z zasobnika tę już działającą.
