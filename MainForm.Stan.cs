@@ -49,13 +49,25 @@ public partial class MainForm
             karta.Controls.Add(znaczniki[i]);
         }
 
-        string strzalka = ((char)0x2192).ToString();
-        string trasa = rotor == null
-            ? "bez rotora"
-            : rotor.Etykieta + ":  " + rotor.Com + " " + strzalka + " " + m.Adres + ":" + rotor.Port;
+        string strzalka = " " + ((char)0x2192) + " ";
+        string trasa, dymek;
 
-        karta.Controls.Add(Ui.Etykieta(trasa, Theme.Maly(), Theme.TekstSzary,
-            new Point(44, 30), new Size(200, 16)));
+        if (rotor == null)
+        {
+            trasa = dymek = "bez rotora";
+        }
+        else
+        {
+            // Na karcie liczy sie trasa: skad dokad. Nazwa rotora jest w dymku,
+            // w menu zasobnika i w ustawieniach - tutaj wypchnelaby adres poza etykiete.
+            trasa = rotor.Com + strzalka + m.Adres + ":" + rotor.Port;
+            dymek = rotor.Etykieta + Environment.NewLine + trasa;
+        }
+
+        var etykietaTrasy = Ui.Etykieta(trasa, Theme.Maly(), Theme.TekstSzary,
+            new Point(44, 30), new Size(190, 16));
+        karta.Controls.Add(etykietaTrasy);
+        _dymek.SetToolTip(etykietaTrasy, dymek);
 
         var stan = Ui.Etykieta(rotor != null ? "zatrzymany" : "", Theme.Zwykly(), Theme.TekstSzary,
             new Point(238, 8), new Size(162, 20));
@@ -63,7 +75,7 @@ public partial class MainForm
         karta.Controls.Add(stan);
 
         var ruch = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(228, 30), new Size(172, 16));
+            new Point(240, 30), new Size(160, 16));
         ruch.TextAlign = ContentAlignment.MiddleRight;
         karta.Controls.Add(ruch);
 

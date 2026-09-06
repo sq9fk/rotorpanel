@@ -3,6 +3,49 @@
 /// <summary>Budowa i obsluga obu tabel okna ustawien.</summary>
 public partial class SettingsForm
 {
+    private bool _przebudowaList;
+
+    /// <summary>
+    /// Kazdy wiersz dostaje wlasna liste par: bez tych zajetych przez inne rotory.
+    /// Wlasny wybor zostaje na liscie, zeby dalo sie go zobaczyc i zmienic.
+    /// </summary>
+    private void OdswiezListyPar()
+    {
+        if (_przebudowaList) return;
+        _przebudowaList = true;
+
+        try
+        {
+            foreach (DataGridViewRow w in _siatkaRotorow.Rows)
+            {
+                if (!(w.Cells[RPara] is DataGridViewComboBoxCell komorka)) continue;
+
+                string wlasna = Kom(w, RPara);
+
+                var zajete = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (DataGridViewRow inny in _siatkaRotorow.Rows)
+                {
+                    if (ReferenceEquals(inny, w)) continue;
+                    string cudza = Kom(inny, RPara);
+                    if (!string.IsNullOrEmpty(cudza) && cudza != Brak) zajete.Add(cudza);
+                }
+
+                komorka.Items.Clear();
+                komorka.Items.Add(Brak);
+
+                foreach (string opis in _kolPara.Items)
+                {
+                    if (opis == Brak) continue;
+                    if (zajete.Contains(opis) && opis != wlasna) continue;
+                    komorka.Items.Add(opis);
+                }
+
+                komorka.Value = komorka.Items.Contains(wlasna) ? wlasna : Brak;
+            }
+        }
+        finally { _przebudowaList = false; }
+    }
+
     private void BudujSekcjeRotorow()
     {
         Controls.Add(Ui.Etykieta("Rotory — para portów i punkt ser2net",
@@ -53,7 +96,9 @@ public partial class SettingsForm
         };
         _siatkaRotorow.CellValueChanged += (_, e) =>
         {
-            if (e.RowIndex >= 0) OdswiezListeRotorow();
+            if (e.RowIndex < 0) return;
+            if (e.ColumnIndex == RPara) OdswiezListyPar();
+            OdswiezListeRotorow();
         };
 
         Controls.Add(_siatkaRotorow);
@@ -100,14 +145,28 @@ public partial class SettingsForm
         int nr = 1;
         while (uzyte.Contains(nr)) nr++;
 
-        _siatkaRotorow.Rows.Add(nr, "Rotor " + nr, Brak, "", "");
+        _siatkaRotorow.Rows.Add(nr, WolnaNazwa(nr), Brak, "", "");
+        OdswiezListyPar();
         OdswiezListeRotorow();
+    }
+
+    /// <summary>Nazwa dla nowego rotora, nietrafiajaca w zadna juz uzyta.</summary>
+    private string WolnaNazwa(int nr)
+    {
+        var uzyte = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (DataGridViewRow w in _siatkaRotorow.Rows) uzyte.Add(Kom(w, RNazwa));
+
+        string nazwa = "Rotor " + nr;
+        int kolejny = nr;
+        while (uzyte.Contains(nazwa)) nazwa = "Rotor " + (++kolejny);
+        return nazwa;
     }
 
     private void UsunRotor()
     {
         if (_siatkaRotorow.CurrentRow == null) return;
         _siatkaRotorow.Rows.Remove(_siatkaRotorow.CurrentRow);
+        OdswiezListyPar();
         OdswiezListeRotorow();
     }
 
@@ -188,7 +247,7 @@ public partial class SettingsForm
         foreach (DataGridViewRow w in _siatkaRotorow.Rows)
         {
             var r = RotorZWiersza(w);
-            if (r.Nr > 0) _kolRotor.Items.Add(r.Opis);
+            if (r.Nr > 0) _kolRotor.Items.Add(OpisRotora(r));
         }
 
         PrzypiszWyborRotora();
@@ -201,18 +260,18 @@ public partial class SettingsForm
         foreach (DataGridViewRow w in _siatkaAnten.Rows)
         {
             int nr = w.Tag is int t ? t : 0;
-            string opis = OpisRotora(nr);
+            string opis = OpisRotoraONumerze(nr);
             w.Cells[ARotor].Value =
                 opis != null && _kolRotor.Items.Contains(opis) ? opis : Brak;
         }
     }
 
-    private string OpisRotora(int nr)
+    private string OpisRotoraONumerze(int nr)
     {
         foreach (DataGridViewRow w in _siatkaRotorow.Rows)
         {
             var r = RotorZWiersza(w);
-            if (r.Nr == nr) return r.Opis;
+            if (r.Nr == nr) return OpisRotora(r);
         }
         return null;
     }
@@ -224,9 +283,23 @@ public partial class SettingsForm
         foreach (DataGridViewRow w in _siatkaRotorow.Rows)
         {
             var r = RotorZWiersza(w);
-            if (r.Opis == opis) return r.Nr;
+            if (OpisRotora(r) == opis) return r.Nr;
         }
         return domyslny;
+    }
+
+    /// <summary>
+    /// Opis rotora na liste wyboru przy antenach. Adres bierzemy z wiersza, a gdy pusty -
+    /// z pola domyslnego u gory okna, zeby na liscie zawsze bylo widac dokad to prowadzi.
+    /// </summary>
+    private string OpisRotora(Rotor r)
+    {
+        if (!r.Gotowy) return r.Etykieta + "   (niekompletny)";
+
+        string adres = string.IsNullOrWhiteSpace(r.Ip) ? _ip.Text.Trim() : r.Ip.Trim();
+        if (adres.Length == 0) adres = "?";
+
+        return r.Etykieta + "   (" + r.Com + " " + ((char)0x2192) + " " + adres + ":" + r.Port + ")";
     }
 
     /// <summary>Rotor odczytany z wiersza tabeli, bez zapisywania do konfiguracji.</summary>

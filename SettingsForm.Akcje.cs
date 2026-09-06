@@ -112,6 +112,15 @@ public partial class SettingsForm
                 return;
             }
 
+            // Porownujemy etykiety, bo pusta nazwa i tak wyswietla sie jako "Rotor N"
+            // i moze wejsc w kolizje z nazwa wpisana recznie.
+            if (rotory.Any(x => string.Equals(x.Etykieta, r.Etykieta, StringComparison.OrdinalIgnoreCase)))
+            {
+                Ostrzez("Dwa rotory nazywają się „" + r.Etykieta + "”. " +
+                        "Nazwy muszą być różne, bo po nich wybiera się rotor przy antenie.");
+                return;
+            }
+
             if (!string.IsNullOrWhiteSpace(r.Dev) &&
                 rotory.Any(x => x.KluczPary == r.KluczPary))
             {

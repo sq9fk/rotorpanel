@@ -189,7 +189,10 @@ Tabela anten: numer, checkbox **Rotor**, nazwa, para portów z listy rozwijanej,
 - **Ścieżkę do `setupc.exe`** można wskazać przyciskiem `…`, który otwiera okno wyboru pliku.
   Startuje z obecnego katalogu, a gdy go nie ma — z typowego miejsca instalacji com0com.
 - **Rotory i anteny są w osobnych tabelach.** Rotor to para portów, adres i port TCP; antena
-  wybiera rotor z listy, która powstaje automatycznie z tabeli rotorów.
+  wybiera rotor z listy, która powstaje automatycznie z tabeli rotorów i pokazuje pełną trasę.
+- **Para zajęta przez jeden rotor nie pojawia się na liście u pozostałych**, więc nie da się
+  przypisać jej dwa razy. Nazwy rotorów też muszą być różne — to po nich wybiera się rotor
+  przy antenie.
 - **Nazwy anten są nieedytowalne** — pochodzą wyłącznie ze sterownika, przycisk *Pobierz nazwy*.
   Przy braku łączności zostają `ANT1`–`ANT6`.
 - **Pary wybiera się z listy**, budowanej z rejestru sterownika com0com. Nie da się wpisać
