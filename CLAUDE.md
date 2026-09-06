@@ -146,9 +146,21 @@ czekanie na nastepny naglowek opoznialo podglad o cale odpytanie, bo kolejna ram
 dopiero przy nastepnym pulsie. `CzytnikSpe` bierze wiec typowa dlugosc (367 bajtow), gdy juz ja
 ma, a na synchronizacje czeka tylko wtedy, gdy ramka jest krotsza.
 
+**Znaki to ASCII minus 0x20 - w calym zakresie.** Pierwsza wersja dekodera traktowala
+`0x10`-`0x3F` jako "znaki z atrybutem" (+0x20), a `0x40`-`0x7E` jako zwykly ASCII. Efekt:
+"SOLID STATE" zamiast "Solid State", "20 M" zamiast "20 m", a kropka i myslnik z "1.3K-FA"
+znikaly, bo siedza w bajtach `0x0E` i `0x0D`. Poprawna regula: **znak = bajt + 0x20 dla
+0x01-0x5F**, reszta to wlasne znaki wyswietlacza. Sprawdzone ze zdjeciem panelu przyslanym
+przez uzytkownika - zgadza sie co do znaku.
+
+**Ostatniego ekranu nie kasuj po czasie.** Podglad mial go zerowac po szesciu sekundach bez
+nowej klatki i pokazywac "czekam na wyswietlacz". Poniewaz wzmacniacz co jakis czas przemilcza
+puls, napis mrugal bez powodu - a ekran przeciez nadal pokazuje to samo. Teraz ostatnia klatka
+zostaje na widoku do nastepnej.
+
 **Wlasne znaki wyswietlacza rozpoznane do tej pory:** `0x8D` pozioma kreska, `0x8F` pionowa,
-`0x99`/`0x9A`/`0x9B`/`0x9C` strzalki w podpowiedzi klawiszy (para na jeden nawias), `0xAA`
-stopien przy temperaturze. Kafelki `0x9F`-`0xDF` to mapa bitowa logo i wykresow - rysowanie ich
+`0x8E` trojnik nad separatorem kolumny, `0x99`/`0x9A`/`0x9B`/`0x9C` strzalki w podpowiedzi
+klawiszy (para na jeden nawias), `0xAA` stopien przy temperaturze. Kafelki `0x9F`-`0xDF` to mapa bitowa logo i wykresow - rysowanie ich
 jednym znakiem dawalo pole szumu, wiec zostaja puste.
 
 **Kursor to jeden bajt na kolumne, bit wskazuje wiersz.** 40 bajtow zaraz za siatka

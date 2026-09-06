@@ -275,17 +275,16 @@ public sealed class SpeForm : Form
 
     private void PokazEkran()
     {
-        var ekran = _mostek.Ekran;
-        bool swiezy = ekran is not null && (DateTime.UtcNow - ekran.Kiedy).TotalSeconds < 6;
-
         _lcd.Zastepczy = _mostek.Stan == StanMostka.Polaczony
             ? "czekam na wyświetlacz…"
             : "mostek rozłączony";
 
-        // Podmieniamy tylko przy nowej klatce - inaczej kontrolka przerysowywalaby sie
-        // kilkanascie razy na sekunde bez powodu.
-        var doPokazania = swiezy ? ekran : null;
-        if (!ReferenceEquals(_lcd.Ekran, doPokazania)) _lcd.Ekran = doPokazania;
+        // Ostatni ekran zostaje na widoku, dopoki nie przyjdzie nowy. Kasowanie go po
+        // kilku sekundach mrugalo napisem "czekam na wyswietlacz" za kazdym razem, gdy
+        // wzmacniacz przemilczal puls - a przeciez nadal pokazuje to samo co ostatnio.
+        var ekran = _mostek.Ekran;
+        if (ekran is not null && !ReferenceEquals(_lcd.Ekran, ekran)) _lcd.Ekran = ekran;
+        else if (ekran is null && _lcd.Ekran is not null) _lcd.Ekran = null;
     }
 
     private void Odswiez()

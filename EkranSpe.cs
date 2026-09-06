@@ -7,10 +7,12 @@ namespace RotorPanel;
 /// nad odtworzeniem protokolu w projekcie vu2cpl/macexpert-spe. Tryb podgladu
 /// wlacza komenda RCU ON (0x80), wylacza RCU OFF (0x81).
 ///
-/// Kodowanie znakow:
-///   0x10-0x3F  znak z atrybutem, prawdziwy ASCII = bajt + 0x20
-///   0x40-0x7E  zwykly ASCII
-///   reszta     wlasne znaki wyswietlacza (ramki, ikony)
+/// Kodowanie znakow: wyswietlacz przesyla ASCII pomniejszone o 0x20, czyli
+/// prawdziwy znak = bajt + 0x20 dla calego zakresu 0x01-0x5F. Stad male litery
+/// (0x41-0x5A), kropka (0x0E) i myslnik (0x0D). Traktowanie 0x40-0x7E jako
+/// zwyklego ASCII dawalo "SOLID STATE" zamiast "Solid State" i "20 M" zamiast
+/// "20 m" - sprawdzone ze zdjeciem panelu.
+/// Bajty od 0x60 w gore to wlasne znaki wyswietlacza.
 /// </summary>
 public sealed class EkranSpe
 {
@@ -115,8 +117,9 @@ public sealed class EkranSpe
         return zaznaczone;
     }
 
-    private const byte Kreska    = 0x8D;
-    private const byte Separator = 0x8F;
+    private const byte Kreska    = 0x8D;   // pozioma
+    private const byte Trojnik   = 0x8E;   // polaczenie poziomej z pionowa
+    private const byte Separator = 0x8F;   // pionowa
 
     // Wlasne znaki wyswietlacza rozpoznane po bajtach w ramce: strzalki w podpowiedzi
     // klawiszy stoja parami miedzy nawiasami ([99 9A] i [9B 9C]), a 0xAA trafia sie
@@ -134,10 +137,10 @@ public sealed class EkranSpe
         {
             byte b = od + i < dane.Count ? dane[od + i] : (byte)0;
 
-            if (b >= 0x10 && b <= 0x3F)      znaki[i] = (char)(b + 0x20);
-            else if (b >= 0x40 && b <= 0x7E) znaki[i] = (char)b;
-            else if (b == Separator)         znaki[i] = (char)0x2502;   // pionowa kreska
-            else if (b == Kreska)            znaki[i] = (char)0x2500;   // pozioma kreska
+            if (b >= 0x01 && b <= 0x5F)      znaki[i] = (char)(b + 0x20);
+            else if (b == Separator)         znaki[i] = (char)0x2502;
+            else if (b == Kreska)            znaki[i] = (char)0x2500;
+            else if (b == Trojnik)           znaki[i] = (char)0x252C;
             else if (b == StrzalkaLewo)      znaki[i] = (char)0x25C0;
             else if (b == StrzalkaGora)      znaki[i] = (char)0x25B2;
             else if (b == StrzalkaDol)       znaki[i] = (char)0x25BC;

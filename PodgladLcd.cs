@@ -17,6 +17,7 @@ public sealed class PodgladLcd : Control
     private static readonly Color Uspione   = Color.FromArgb(0x60, 0x74, 0x68);
 
     private const byte Kreska    = 0x8D;
+    private const byte Trojnik   = 0x8E;
     private const byte Separator = 0x8F;
     private const byte StrzalkaLewo = 0x99, StrzalkaGora = 0x9A;
     private const byte StrzalkaDol  = 0x9B, StrzalkaPrawo = 0x9C;
@@ -103,10 +104,12 @@ public sealed class PodgladLcd : Control
 
     private static char Znak(byte b)
     {
-        if (b >= 0x10 && b <= 0x3F) return (char)(b + 0x20);   // znak z atrybutem
-        if (b >= 0x40 && b <= 0x7E) return (char)b;
+        // Wyswietlacz przesyla ASCII pomniejszone o 0x20 - dla calego zakresu,
+        // nie tylko dla wielkich liter.
+        if (b >= 0x01 && b <= 0x5F) return (char)(b + 0x20);
         if (b == Separator)         return (char)0x2502;       // pionowa kreska
         if (b == Kreska)            return (char)0x2500;       // pozioma kreska
+        if (b == Trojnik)           return (char)0x252C;       // trojnik
         if (b == StrzalkaLewo)      return (char)0x25C0;
         if (b == StrzalkaGora)      return (char)0x25B2;
         if (b == StrzalkaDol)       return (char)0x25BC;

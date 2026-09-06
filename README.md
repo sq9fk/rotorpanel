@@ -221,8 +221,9 @@ co na karcie, a na dole informacja, co poszło do wzmacniacza.
 Okno klawiatury pokazuje **zawartość wyświetlacza wzmacniacza**, więc po jego menu da się
 chodzić normalnie, a nie na ślepo. Producent tego nie opisuje — tryb podglądu włącza komenda
 `0x80` (RCU ON), wyłącza `0x81`, a wzmacniacz przysyła wtedy ramki `0x6A` z 367 bajtami stanu
-ekranu. Kodowanie znaków: `0x10`–`0x3F` to znaki z atrybutem (prawdziwy ASCII = bajt + `0x20`),
-`0x40`–`0x7E` zwykły ASCII, reszta to własne znaki wyświetlacza.
+ekranu. Znaki są kodowane jako **ASCII pomniejszone o `0x20`** w całym zakresie `0x01`–`0x5F`,
+więc prawdziwy znak to bajt + `0x20`. Stąd małe litery (`0x41`–`0x5A`), kropka (`0x0E`)
+i myślnik (`0x0D`). Bajty od `0x60` w górę to własne znaki wyświetlacza.
 
 Tryb RCU jest włączany na czas otwarcia okna i wyłączany przy zamknięciu. Wzmacniacz nie
 przysyła ekranu sam z siebie — nawet po naciśnięciu klawisza — więc program wymusza świeżą
@@ -240,7 +241,8 @@ Ramka nie ma pola długości: kończy się tam, gdzie zaczyna się następna syn
 `AA AA AA`, a gdy ta nie przyjdzie — po 512 bajtach.
 
 Poza znakami w ramce siedzą własne symbole wyświetlacza. Dwa niosą treść i program je
-odwzorowuje: `0x8D` to pozioma kreska obok tytułu, `0x8F` pionowa kreska między kolumnami.
+odwzorowuje: `0x8D` to pozioma kreska, `0x8E` trójnik, `0x8F` pionowa kreska między kolumnami,
+`0xAA` stopień przy temperaturze, a `0x99`–`0x9C` strzałki w podpowiedzi klawiszy.
 
 **Zaznaczenie pozycji** siedzi w 40 bajtach za siatką — po jednym na kolumnę, a ustawiony bit
 wskazuje wiersz. Wyszło z pomiaru: naciśnięcie strzałki przesuwa te bity o jeden, a podpowiedź
