@@ -68,6 +68,7 @@ public partial class SettingsForm : Form
         odswiezPary.Click += (_, _) =>
         {
             WczytajPary();
+            OdswiezListyPar();
             _info.ForeColor = Theme.TekstSzary;
             _info.Text = "Lista par odświeżona.";
         };
@@ -104,6 +105,7 @@ public partial class SettingsForm : Form
 
         WczytajPary();
         WypelnijRotory();
+        OdswiezListyPar();
         OdswiezListeRotorow();
         WypelnijAnteny();
     }

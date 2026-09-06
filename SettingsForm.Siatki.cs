@@ -96,7 +96,10 @@ public partial class SettingsForm
         };
         _siatkaRotorow.CellValueChanged += (_, e) =>
         {
-            if (e.RowIndex < 0) return;
+            // W trakcie przebudowy list sami ustawiamy wartosci komorek - bez tego
+            // kazde ustawienie wywolywalo by pelne przeliczenie od nowa.
+            if (_przebudowaList || e.RowIndex < 0) return;
+
             if (e.ColumnIndex == RPara) OdswiezListyPar();
             OdswiezListeRotorow();
         };
