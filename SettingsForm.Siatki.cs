@@ -8,7 +8,7 @@ public partial class SettingsForm
         Controls.Add(Ui.Etykieta("Rotory — para portów i punkt ser2net",
             Theme.Nazwa(), Theme.Tekst, new Point(20, 142), new Size(400, 20)));
 
-        _siatkaRotorow = NowaSiatka(new Point(18, 166), new Size(684, 130));
+        _siatkaRotorow = NowaSiatka(new Point(18, 166), new Size(684, 146));
 
         var kolNr = new DataGridViewTextBoxColumn
         {
@@ -27,7 +27,7 @@ public partial class SettingsForm
         _kolPara = new DataGridViewComboBoxColumn
         {
             HeaderText = "Para portów   (PstRotator - mostek)",
-            Width = 232,
+            Width = 216,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -36,13 +36,13 @@ public partial class SettingsForm
 
         _siatkaRotorow.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "IP (puste = domyślne)", Width = 116,
+            HeaderText = "Adres ser2net", Width = 130,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
         _siatkaRotorow.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Port TCP", Width = 62,
+            HeaderText = "Port TCP", Width = 64,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
@@ -59,18 +59,19 @@ public partial class SettingsForm
         Controls.Add(_siatkaRotorow);
 
         var dodaj = Ui.Przycisk("Dodaj rotor", 120, glowny: true);
-        dodaj.Location = new Point(18, 302);
+        dodaj.Location = new Point(18, 320);
         dodaj.Click += (_, _) => DodajRotor();
         Controls.Add(dodaj);
 
         var usun = Ui.Przycisk("Usuń rotor", 110);
-        usun.Location = new Point(146, 302);
+        usun.Location = new Point(146, 320);
         usun.Click += (_, _) => UsunRotor();
         Controls.Add(usun);
 
         Controls.Add(Ui.Etykieta(
+            "Pusty adres oznacza domyślny, wpisany u góry okna. " +
             "Kilka anten może wskazywać ten sam rotor — dzielą wtedy jeden mostek.",
-            Theme.Maly(), Theme.TekstSzary, new Point(266, 308), new Size(430, 18)));
+            Theme.Maly(), Theme.TekstSzary, new Point(266, 318), new Size(436, 32)));
     }
 
     private void WypelnijRotory()
@@ -113,9 +114,10 @@ public partial class SettingsForm
     private void BudujSekcjeAnten()
     {
         Controls.Add(Ui.Etykieta("Anteny — przypisanie rotora",
-            Theme.Nazwa(), Theme.Tekst, new Point(20, 338), new Size(400, 20)));
+            Theme.Nazwa(), Theme.Tekst, new Point(20, 362), new Size(400, 20)));
 
-        _siatkaAnten = NowaSiatka(new Point(18, 362), new Size(684, 156));
+        // Szesc wierszy plus naglowek, zeby lista anten nigdy sie nie przewijala.
+        _siatkaAnten = NowaSiatka(new Point(18, 386), new Size(684, 6 * 28 + 32));
 
         var kolNr = new DataGridViewTextBoxColumn
         {

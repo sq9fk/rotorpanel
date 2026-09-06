@@ -42,8 +42,8 @@ public partial class MainForm : Form
         BackColor       = Theme.Tlo;
         Font            = Theme.Zwykly();
 
-        Controls.Add(Ui.Etykieta("Anteny", Theme.Naglowek(), Theme.Tekst,
-            new Point(22, 16), new Size(240, 24)));
+        Controls.Add(Ui.Etykieta("Rotory", Theme.NaglowekDuzy(), Theme.Tekst,
+            new Point(22, 12), new Size(240, 32)));
 
         _opisSer2net    = EtykietaStanu(new Point(272, 16));
         _diodaSer2net   = DiodaStanu(new Point(520, 17));

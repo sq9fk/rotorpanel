@@ -1,4 +1,4 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Edycja konfiguracji. Rotor definiuje sie raz - para portow plus punkt ser2net -
@@ -26,7 +26,7 @@ public partial class SettingsForm : Form
         _cfg = cfg;
 
         Text            = "Ustawienia";
-        ClientSize      = new Size(720, 570);
+        ClientSize      = new Size(720, 636);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -80,7 +80,7 @@ public partial class SettingsForm : Form
         {
             Text = "Łącz automatycznie po uruchomieniu",
             Checked = cfg.AutoPolacz,
-            Location = new Point(20, 528),
+            Location = new Point(20, 594),
             Size = new Size(240, 22),
             Font = Theme.Zwykly(),
             ForeColor = Theme.Tekst,
@@ -89,16 +89,16 @@ public partial class SettingsForm : Form
         Controls.Add(_autoPolacz);
 
         _info = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(266, 532), new Size(200, 18));
+            new Point(266, 598), new Size(200, 18));
         Controls.Add(_info);
 
         var zapisz = Ui.Przycisk("Zapisz", 110, glowny: true);
-        zapisz.Location = new Point(478, 526);
+        zapisz.Location = new Point(478, 592);
         zapisz.Click += (_, _) => Zapisz();
         Controls.Add(zapisz);
 
         var anuluj = Ui.Przycisk("Anuluj", 96);
-        anuluj.Location = new Point(600, 526);
+        anuluj.Location = new Point(600, 592);
         anuluj.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         Controls.Add(anuluj);
 

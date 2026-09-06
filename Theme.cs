@@ -1,4 +1,4 @@
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 
 namespace RotorPanel;
 
@@ -16,7 +16,8 @@ public static class Theme
     public static readonly Color Akcent     = Color.FromArgb(0x2D, 0x6C, 0xDF);
     public static readonly Color AkcentCien = Color.FromArgb(0x24, 0x57, 0xB2);
 
-    public static Font Naglowek() => new("Segoe UI Semibold", 12F);
+    public static Font NaglowekDuzy() => new("Segoe UI Semibold", 16F);
+    public static Font Naglowek()     => new("Segoe UI Semibold", 12F);
     public static Font Nazwa()    => new("Segoe UI Semibold", 11F);
     public static Font Zwykly()   => new("Segoe UI", 9F);
     public static Font Maly()     => new("Segoe UI", 8.5F);
