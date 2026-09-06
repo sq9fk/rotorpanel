@@ -230,7 +230,12 @@ wzmacniacza i wymusza świeżą klatkę.
 
 Układ bajtów nie jest równą siatką znaków, bo wyświetlacz jest graficzny. Z pomiaru na
 Expercie 1.3K-FA najczytelniejszy podział to **8 wierszy po 48 znaków** — przy nim tekst nie
-łamie się w połowie słowa.
+łamie się w połowie słowa. Ramka nie ma pola długości: kończy się tam, gdzie zaczyna się
+następna synchronizacja `AA AA AA`, a gdy ta nie przyjdzie, po 512 bajtach.
+
+Poza znakami w ramce siedzą też własne symbole wyświetlacza. Dwa mają znaczenie i program je
+odwzorowuje: `0x8F` to kreska między polami, a `0x8D` wypełnia tło paska tytułu — wiersz z tym
+wypełnieniem rysujemy w negatywie, tak jak wygląda na panelu.
 
 Wiedza o ramce `0x6A` i o komendach RCU pochodzi z projektu
 [vu2cpl/macexpert-spe](https://github.com/vu2cpl/macexpert-spe), gdzie ten protokół został

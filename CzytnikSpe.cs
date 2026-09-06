@@ -110,30 +110,32 @@ public sealed class CzytnikSpe
         return true;
     }
 
+    /// <summary>
+    /// Ramka ekranu nie ma pola dlugosci - konczy sie tam, gdzie zaczyna sie
+    /// nastepna synchronizacja. Czekamy na nia, ale nie w nieskonczonosc.
+    /// </summary>
     private bool ZdejmijEkran(out bool czekam)
     {
         czekam = false;
 
-        // Ramka ekranu tez bywa urwana - wtedy nastepna synchronizacja stoi
-        // blizej niz jej koniec.
-        int nastepny = NastepnySync(EkranSpe.DlugoscRamki);
-        if (nastepny > 0)
+        int koniec = NastepnySync(EkranSpe.DlugoscMaksymalna);
+
+        if (koniec < 0)
         {
-            _reszta.RemoveRange(0, nastepny);
-            return true;
+            if (_reszta.Count < EkranSpe.DlugoscMaksymalna)
+            {
+                czekam = true;
+                return true;
+            }
+            koniec = EkranSpe.DlugoscMaksymalna;
         }
 
-        if (_reszta.Count < EkranSpe.DlugoscRamki)
-        {
-            czekam = true;
-            return true;
-        }
-
-        var ekran = EkranSpe.Rozbierz(_reszta, 4);
+        int dlugosc = koniec - EkranSpe.DlugoscNaglowka;
+        var ekran = EkranSpe.Rozbierz(_reszta, EkranSpe.DlugoscNaglowka, dlugosc);
         if (ekran is null) return false;
 
         Ekran = ekran;
-        _reszta.RemoveRange(0, EkranSpe.DlugoscRamki);
+        _reszta.RemoveRange(0, koniec);
         return true;
     }
 

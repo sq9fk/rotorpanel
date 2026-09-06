@@ -102,6 +102,17 @@ i czeka do dziesięciu sekund na zwolnienie blokady.
 *Typ urzadzenia* mozna wpisac cokolwiek wlasnego, nie wlaczajac przy tym odpytywania protokolem,
 ktorego nie znamy. Starsze pliki z `"spe": true` migruje `ConfigIO.TypUrzadzenia`.
 
+**Ramka ekranu nie ma dlugosci - ramuj ja synchronizacja.** Poczatkowo zakladalismy stale
+367 bajtow. Tak jest w praktyce na 1.3K-FA, ale `macexpert-spe` ramuje od `AA AA AA 6A` do
+nastepnej synchronizacji, z limitem 512 bajtow, i to jest odporniejsze. `CzytnikSpe` robi tak
+samo; `EkranSpe.Rozbierz` przyjmuje dlugosc, zamiast jej zakladac.
+
+**Pokazujemy ekran wzmacniacza, nie skladamy wlasnego.** `macexpert-spe` rozbiera ramke na pola
+i rysuje wlasny interfejs z szescioma dekoderami kursora per ekran. My renderujemy siatke znakow
+w `PodgladLcd` - mniej kodu, a menu wyglada tak jak na panelu i dziala dla ekranow, ktorych nikt
+nie rozbieral. Znaki `0x8F` (kreska) i `0x8D` (tlo paska tytulu) sa odwzorowane; reszta symboli
+idzie jako spacja.
+
 **Ramki od wzmacniacza rozbieraj po kolei, nie po rodzaju.** Pierwsza wersja `CzytnikSpe`
 szukała najpierw ramek ekranu w całym buforze i oddawała klientowi wszystko, co leżało przed
 nimi — razem z ramkami statusu. Efekt: podgląd zamierał, a karta pokazywała „czekam na odczyt

@@ -13,7 +13,7 @@ public sealed class SpeForm : Form
 {
     private readonly Mostek _mostek;
     private readonly Label _stan, _stopka;
-    private readonly Label[] _ekran;
+    private readonly PodgladLcd _lcd;
     private readonly System.Windows.Forms.Timer _zegar, _puls;
     private DateTime _ostatniPuls = DateTime.MinValue;
 
@@ -102,17 +102,8 @@ public sealed class SpeForm : Form
 
         // Podglad wyswietlacza: pieciu wierszy po 32 znaki, czcionka o stalej
         // szerokosci, zeby kolumny stoly tak jak na panelu wzmacniacza.
-        var szybka = new Karta { Location = new Point(18, 100), Size = new Size(480, 172) };
-        Controls.Add(szybka);
-
-        var czcionka = new Font("Consolas", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
-        _ekran = new Label[EkranSpe.Wierszy];
-        for (int i = 0; i < _ekran.Length; i++)
-        {
-            _ekran[i] = Ui.Etykieta("", czcionka, Theme.Tekst,
-                new Point(12, 12 + i * 17), new Size(456, 17));
-            szybka.Controls.Add(_ekran[i]);
-        }
+        _lcd = new PodgladLcd { Location = new Point(18, 100), Size = new Size(480, 172) };
+        Controls.Add(_lcd);
 
         int y = 288;
         foreach (var rzad in Uklad)
@@ -214,23 +205,11 @@ public sealed class SpeForm : Form
         var ekran = _mostek.Ekran;
         bool swiezy = ekran is not null && (DateTime.UtcNow - ekran.Kiedy).TotalSeconds < 6;
 
-        if (!swiezy)
-        {
-            for (int i = 0; i < _ekran.Length; i++) _ekran[i].Text = "";
-            _ekran[3].Text = _mostek.Stan == StanMostka.Polaczony
-                ? "            czekam na wyświetlacz…"
-                : "            mostek rozłączony";
-            _ekran[3].ForeColor = Theme.TekstSzary;
-            return;
-        }
+        _lcd.Zastepczy = _mostek.Stan == StanMostka.Polaczony
+            ? "czekam na wyświetlacz…"
+            : "mostek rozłączony";
 
-        for (int i = 0; i < _ekran.Length; i++)
-        {
-            _ekran[i].Text = i < ekran.Wiersze.Length
-                ? ekran.Wiersze[i].Replace('.', ' ')
-                : "";
-            _ekran[i].ForeColor = Theme.Tekst;
-        }
+        _lcd.Ekran = swiezy ? ekran : null;
     }
 
     private void Odswiez()
