@@ -102,6 +102,19 @@ i czeka do dziesięciu sekund na zwolnienie blokady.
 *Typ urzadzenia* mozna wpisac cokolwiek wlasnego, nie wlaczajac przy tym odpytywania protokolem,
 ktorego nie znamy. Starsze pliki z `"spe": true` migruje `ConfigIO.TypUrzadzenia`.
 
+**Siatka ekranu to 40 kolumn na 8 wierszy od piatego bajtu.** Dochodzenie do tego szlo przez
+dwa bledne zalozenia: najpierw 32 kolumny od bajtu 0 (tekst lamal sie w polowie slowa), potem 48
+(SAVE rozjezdzalo sie na dwa wiersze). Rozstrzygnely dwie rzeczy: separatory kolumn `0x8F` stoja
+co 40 bajtow, a kreski `0x8D` trafiaja w poczatek i koniec wiersza tylko przy przesunieciu 5.
+Sprawdzian koncowy to zdjecia ekranow w instrukcji Experta 1.3K-FA - renderowanie zgadza sie
+z nimi co do znaku. Jesli kiedys nie bedzie sie zgadzac, porownaj z `obraz-12.jpg`
+(SET ANTENNA ON BANK "A") wyciagnietym z tego PDF-a.
+
+**`0x8D` to kreska, nie tlo w negatywie.** Pierwsza wersja rysowala wiersz z tym znakiem jako
+zielony pasek. Na zdjeciach w instrukcji widac, ze to zwykle poziome myslniki obok tytulu -
+renderujemy je jako `U+2500`, a `0x8F` jako `U+2502`. Zaznaczenie pozycji (negatyw na panelu)
+siedzi w flagach kursora za siatka i nie jest odtworzone.
+
 **Ramka ekranu nie ma dlugosci - ramuj ja synchronizacja.** Poczatkowo zakladalismy stale
 367 bajtow. Tak jest w praktyce na 1.3K-FA, ale `macexpert-spe` ramuje od `AA AA AA 6A` do
 nastepnej synchronizacji, z limitem 512 bajtow, i to jest odporniejsze. `CzytnikSpe` robi tak

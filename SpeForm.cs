@@ -77,7 +77,7 @@ public sealed class SpeForm : Form
         _mostek = mostek;
 
         Text            = tytul;
-        ClientSize      = new Size(516, 576);
+        ClientSize      = new Size(516, 584);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -102,10 +102,10 @@ public sealed class SpeForm : Form
 
         // Podglad wyswietlacza: pieciu wierszy po 32 znaki, czcionka o stalej
         // szerokosci, zeby kolumny stoly tak jak na panelu wzmacniacza.
-        _lcd = new PodgladLcd { Location = new Point(18, 100), Size = new Size(480, 172) };
+        _lcd = new PodgladLcd { Location = new Point(18, 100), Size = new Size(480, 180) };
         Controls.Add(_lcd);
 
-        int y = 288;
+        int y = 296;
         foreach (var rzad in Uklad)
         {
             int x = 18;

@@ -25,16 +25,18 @@ public sealed class EkranSpe
     public const int DlugoscMaksymalna = 512;
     public const int DlugoscNaglowka = 4;
 
-    // Wyswietlacz jest graficzny, wiec bajty nie tworza rownej siatki znakow.
-    // Z pomiaru na Expercie 1.3K-FA wiersz po 48 znakow uklada tekst bez ciecia
-    // slow w polowie - to najbardziej czytelny podzial, jaki wyszedl.
-    public const int Kolumn = 48;
+    // Siatka znakow: 40 kolumn na 8 wierszy, zaczyna sie od piatego bajtu ramki.
+    // Wyprowadzone z pomiaru: separatory kolumn stoja co 40 bajtow (58, 98, 138,
+    // 178), a wypelnienia paskow tytulu trafiaja dokladnie w poczatek i koniec
+    // wiersza wlasnie przy tym przesunieciu. Wynik zgadza sie ze zdjeciami ekranow
+    // w instrukcji Experta 1.3K-FA co do znaku.
+    public const int PoczatekSiatki = 5;
+    public const int Kolumn = 40;
     public const int Wierszy = 8;
 
-    public string[] Wiersze { get; private set; } = new string[0];
+    // Za siatka ida jeszcze flagi kursora i dwubajtowa suma kontrolna.
 
-    /// <summary>Ktore wiersze wzmacniacz rysuje jako pasek w negatywie.</summary>
-    public bool[] Paski { get; private set; } = new bool[0];
+    public string[] Wiersze { get; private set; } = new string[0];
 
     public string Podpowiedzi { get; private set; } = "";
     public DateTime Kiedy { get; private set; }
@@ -44,41 +46,33 @@ public sealed class EkranSpe
 
     public static EkranSpe Rozbierz(IList<byte> dane, int od, int dlugosc)
     {
-        if (dlugosc < Kolumn) return null;
+        if (dlugosc < PoczatekSiatki + Kolumn) return null;
 
         var e = new EkranSpe { Kiedy = DateTime.UtcNow };
 
         var wiersze = new List<string>();
-        var paski = new List<bool>();
 
         for (int w = 0; w < Wierszy; w++)
         {
-            int poczatek = od + w * Kolumn;
+            int poczatek = od + PoczatekSiatki + w * Kolumn;
             int ile = Math.Min(Kolumn, od + dlugosc - poczatek);
-            if (ile <= 0) { wiersze.Add(""); paski.Add(false); continue; }
+            if (ile <= 0) { wiersze.Add(""); continue; }
 
             wiersze.Add(Tekst(dane, poczatek, ile));
-
-            // Pasek tytulu wzmacniacz wypelnia znakiem 0x8D po obu stronach napisu.
-            int wypelnien = 0;
-            for (int i = 0; i < ile; i++)
-                if (dane[poczatek + i] == Wypelnienie) wypelnien++;
-            paski.Add(wypelnien >= 3);
         }
 
         e.Wiersze = wiersze.ToArray();
-        e.Paski = paski.ToArray();
 
-        int odPodpowiedzi = od + 224;
-        if (od + dlugosc - odPodpowiedzi > 0)
-            e.Podpowiedzi = Scisnij(Tekst(dane, odPodpowiedzi,
-                                         Math.Min(96, od + dlugosc - odPodpowiedzi)));
+        // Ostatni wiersz to podpowiedzi klawiszy - przydaje sie osobno w dymku.
+        if (e.Wiersze.Length == Wierszy) e.Podpowiedzi = Scisnij(e.Wiersze[Wierszy - 1]);
 
         return e;
     }
 
-    private const byte Wypelnienie = 0x8D;   // tlo paska tytulu
-    private const byte Separator   = 0x8F;   // kreska miedzy polami
+    // Zdjecia ekranow w instrukcji pokazuja, ze 0x8D to pozioma kreska obok tytulu,
+    // a nie tlo w negatywie; 0x8F rozdziela kolumny.
+    private const byte Kreska    = 0x8D;
+    private const byte Separator = 0x8F;
 
     private static string Tekst(IList<byte> dane, int od, int ile)
     {
@@ -89,7 +83,8 @@ public sealed class EkranSpe
 
             if (b >= 0x10 && b <= 0x3F)      znaki[i] = (char)(b + 0x20);
             else if (b >= 0x40 && b <= 0x7E) znaki[i] = (char)b;
-            else if (b == Separator)         znaki[i] = '|';
+            else if (b == Separator)         znaki[i] = (char)0x2502;   // pionowa kreska
+            else if (b == Kreska)            znaki[i] = (char)0x2500;   // pozioma kreska
             else                             znaki[i] = ' ';
         }
         return new string(znaki);

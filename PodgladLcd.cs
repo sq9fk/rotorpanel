@@ -5,15 +5,13 @@ namespace RotorPanel;
 /// z rozebranych pol - pokazuje to, co wzmacniacz naprawde ma na ekranie, zeby
 /// menu wygladalo tak samo jak na panelu.
 ///
-/// Wiersze, ktore wzmacniacz wypelnia znakiem tla, rysujemy w negatywie - tak
-/// wychodza paski tytulowe.
+/// Kreski poziome i pionowe rysujemy tak, jak przysyla je wzmacniacz - dzieki
+/// temu ekran wyglada jak na zdjeciach w instrukcji.
 /// </summary>
 public sealed class PodgladLcd : Control
 {
     private static readonly Color TloEkranu   = Color.FromArgb(0x10, 0x18, 0x14);
     private static readonly Color Litery      = Color.FromArgb(0xC8, 0xF5, 0xD0);
-    private static readonly Color TloPaska    = Color.FromArgb(0x2E, 0x7D, 0x52);
-    private static readonly Color LiteryPaska = Color.FromArgb(0xF2, 0xFF, 0xF6);
     private static readonly Color Uspione     = Color.FromArgb(0x60, 0x74, 0x68);
 
     private EkranSpe _ekran;
@@ -69,22 +67,13 @@ public sealed class PodgladLcd : Control
         {
             string tekst = _ekran.Wiersze[w];
             int y = marginesY + w * wysokoscWiersza;
-            bool pasek = w < _ekran.Paski.Length && _ekran.Paski[w];
-
-            if (pasek)
-            {
-                using var pedzel = new SolidBrush(TloPaska);
-                g.FillRectangle(pedzel, marginesX - 2, y,
-                    szerokoscZnaku * EkranSpe.Kolumn + 4, wysokoscWiersza);
-            }
-
             for (int k = 0; k < tekst.Length; k++)
             {
                 if (tekst[k] == ' ') continue;
 
                 TextRenderer.DrawText(g, tekst[k].ToString(), Font,
                     new Point((int)(marginesX + k * szerokoscZnaku), y),
-                    pasek ? LiteryPaska : Litery, TextFormatFlags.NoPadding);
+                    Litery, TextFormatFlags.NoPadding);
             }
         }
     }
