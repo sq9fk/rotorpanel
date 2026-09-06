@@ -138,6 +138,12 @@ przełączającym. Okno dopasowuje wysokość do liczby anten, więc lista nigdy
 | pomarańczowa | trwa łączenie albo ponawianie po zerwaniu |
 | zielona | port otwarty i połączenie TCP zestawione |
 
+Przy nazwie anteny pojawiają się **kolorowe oznaczenia nadajników** — `TRX1`, `TRX2` —
+pokazujące, który nadajnik jest w danej chwili przełączony na tę antenę. Dane pochodzą wprost
+ze sterownika przełącznicy i odświeżają się co 15 sekund, więc widać je na bieżąco, także gdy
+ktoś przełączy antenę z panelu urządzenia albo z jego strony. Pod kursorem jest pełny opis
+nadajnika, odczytany z jego etykiety w sterowniku.
+
 W nagłówku okna, po prawej stronie, są dwie diody łączności. Górna dotyczy **`ser2net`**, dolna
 **sterownika anten**. Pod kursorem pokazują szczegóły — przy `ser2net` stan każdego portu z osobna.
 
@@ -148,8 +154,10 @@ W nagłówku okna, po prawej stronie, są dwie diody łączności. Górna dotycz
 | czerwona | żaden port nie odpowiada | nie odpowiada |
 | szara | nie zdefiniowano rotorów | nie podano adresu |
 
-Sprawdzanie to samo nawiązanie połączenia TCP, co 60 sekund po udanej próbie i co 20 po
-nieudanej. **Porty z działającym mostkiem nie są badane** — każdy port `ser2net` przyjmuje jedno
+`ser2net` sprawdzany jest samym nawiązaniem połączenia TCP, co 60 sekund po udanej próbie
+i co 20 po nieudanej. Sterownik anten odpytywany jest pełnym zapytaniem HTTP co 15 sekund,
+bo przy okazji dostarcza przypisanie anten do nadajników — jego własna strona odświeża się
+co 10 sekund, więc takie tempo go nie obciąża. **Porty z działającym mostkiem nie są badane** — każdy port `ser2net` przyjmuje jedno
 połączenie, a przy ustawieniu `kickolduser` próba nawiązania drugiego rozłączyłaby własny mostek.
 Działający mostek i tak jest dowodem, że port odpowiada.
 

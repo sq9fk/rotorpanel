@@ -60,6 +60,38 @@ public class Led : Control
     }
 }
 
+/// <summary>Male oznaczenie w ksztalcie pigulki - numer nadajnika przy antenie.</summary>
+public class Znacznik : Label
+{
+    public Color Tlo { get; set; } = Theme.Akcent;
+
+    public Znacznik()
+    {
+        SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.UserPaint, true);
+        AutoSize = false;
+        ForeColor = Color.White;
+        Font = Theme.Maly();
+        BackColor = Theme.Karta;
+        Size = new Size(42, 18);
+        Visible = false;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(BackColor);
+
+        using (var sciezka = Theme.Zaokraglony(new Rectangle(0, 0, Width - 1, Height - 1), Height / 2))
+        using (var pedzel = new SolidBrush(Tlo))
+            g.FillPath(pedzel, sciezka);
+
+        TextRenderer.DrawText(g, Text, Font, new Rectangle(0, 0, Width, Height), ForeColor,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+    }
+}
+
 public static class Ui
 {
     public static Button Przycisk(string tekst, int szerokosc, bool glowny = false)

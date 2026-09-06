@@ -125,14 +125,57 @@ public partial class MainForm
 
     private async void SprawdzSterownika(string adres)
     {
-        bool osiagalny = await SterownikAnten.Dostepny(adres);
+        StanSterownika stan = null;
+        try { stan = await SterownikAnten.PobierzStan(adres); }
+        catch { /* brak lacznosci albo nieoczekiwana strona */ }
 
         if (IsDisposed) return;
 
-        _sterownikOsiagalny = osiagalny;
+        _stanSterownika = stan;
+        _sterownikOsiagalny = stan != null;
         _badanieSterownika = false;
-        // Po udanym sprawdzeniu wystarczy zagladac rzadziej niz po nieudanym.
-        _nastepneSterownik = DateTime.UtcNow.AddSeconds(osiagalny ? 60 : 20);
+
+        // Pobieramy cala strone, bo daje tez przypisanie anten do nadajnikow.
+        // Sam sterownik odswieza swoja strone co 10 sekund, wiec 15 go nie meczy.
+        _nastepneSterownik = DateTime.UtcNow.AddSeconds(stan != null ? 15 : 20);
+
+        OdswiezZnaczniki();
+    }
+
+    /// <summary>Oznaczenia nadajnikow przy nazwach anten.</summary>
+    private void OdswiezZnaczniki()
+    {
+        foreach (var wpis in _ui)
+        {
+            var znaczniki = wpis.Value.Trx;
+            if (znaczniki == null) continue;
+
+            var nadajniki = _stanSterownika?.TrxNaAntenie(wpis.Key) ?? new List<int>();
+
+            for (int i = 0; i < znaczniki.Length; i++)
+            {
+                if (i < nadajniki.Count)
+                {
+                    int trx = nadajniki[i];
+                    string podpis = "TRX" + trx;
+                    if (znaczniki[i].Text != podpis) znaczniki[i].Text = podpis;
+                    znaczniki[i].Tlo = Theme.KolorNadajnika(trx);
+                    znaczniki[i].Visible = true;
+
+                    string opis = "Nadajnik " + trx;
+                    if (_stanSterownika != null &&
+                        _stanSterownika.OpisyTrx.TryGetValue(trx, out string wlasny) &&
+                        !string.IsNullOrWhiteSpace(wlasny))
+                        opis = wlasny;
+
+                    _dymek.SetToolTip(znaczniki[i], opis);
+                }
+                else
+                {
+                    znaczniki[i].Visible = false;
+                }
+            }
+        }
     }
 
     private void Podpowiedz(Control a, Control b, string tekst)

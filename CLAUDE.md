@@ -72,6 +72,11 @@ rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 skądinąd zwraca `SetupOpenInfFile ... ERROR: 2`. Generowany plik `.bat` zaczyna się od
 `cd /d` do katalogu com0com.
 
+**Przypisanie anten do nadajników czytamy z klas CSS.** Przyciski wyboru anteny nazywają się
+`S{trx}{antena}`, a ten odpowiadający aktualnemu wyborowi ma klasę `g`. Tytuły przycisków
+`F{trx}0` dają opis nadajnika. Parsowanie jest w `SterownikAnten.CzytajTrx`; jeśli firmware
+zmieni nazwy klas, to jest miejsce do poprawy.
+
 **Sterownik przełącznicy nie wystawia JSON-a.** Firmware `sq9fk/ant-sw-2x6` oddaje tę samą
 stronę HTML na każdą ścieżkę i przyjmuje polecenia jako parametry zapytania, np. `GET /?N1=...`.
 Nazwy czytamy z pól formularza `N1`..`N6`. Obsługa JSON w `SterownikAnten.cs` jest zapasem na

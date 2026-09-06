@@ -8,6 +8,7 @@ public partial class MainForm
     private bool _badanieSer2net, _badanieSterownika;
     private int _osiagalnePorty = -1, _wszystkiePorty;
     private bool? _sterownikOsiagalny;
+    private StanSterownika _stanSterownika;
 
     private void ZerujStanySieci()
     {
@@ -29,8 +30,24 @@ public partial class MainForm
         var dioda = new Led { Location = new Point(16, 22) };
         karta.Controls.Add(dioda);
 
-        karta.Controls.Add(Ui.Etykieta(a.Nr + ".  " + a.Etykieta, Theme.Nazwa(), Theme.Tekst,
-            new Point(44, 8), new Size(190, 20)));
+        string podpis = a.Nr + ".  " + a.Etykieta;
+        int szerokoscPodpisu = Math.Min(
+            TextRenderer.MeasureText(podpis, Theme.Nazwa()).Width + 4, 170);
+
+        karta.Controls.Add(Ui.Etykieta(podpis, Theme.Nazwa(), Theme.Tekst,
+            new Point(44, 8), new Size(szerokoscPodpisu, 20)));
+
+        // Oznaczenia nadajnikow stoja tuz za nazwa anteny, wiec nie odjezdzaja
+        // od niej przy krotkich nazwach.
+        var znaczniki = new Znacznik[2];
+        for (int i = 0; i < znaczniki.Length; i++)
+        {
+            znaczniki[i] = new Znacznik
+            {
+                Location = new Point(44 + szerokoscPodpisu + 6 + i * 46, 9)
+            };
+            karta.Controls.Add(znaczniki[i]);
+        }
 
         string strzalka = ((char)0x2192).ToString();
         string trasa = rotor == null
@@ -68,7 +85,8 @@ public partial class MainForm
 
         _ui[a.Nr] = new Wiersz
         {
-            Mostek = m, Dioda = dioda, Stan = stan, Ruch = ruch, Przelacz = przelacz
+            Mostek = m, Dioda = dioda, Stan = stan, Ruch = ruch,
+            Przelacz = przelacz, Trx = znaczniki
         };
         return karta;
     }
@@ -148,6 +166,7 @@ public partial class MainForm
         AktualizujTray();
         OdswiezSer2net();
         OdswiezSterownika();
+        OdswiezZnaczniki();
     }
 
     private static void UstawPrzycisk(Button b, string tekst, bool glowny)

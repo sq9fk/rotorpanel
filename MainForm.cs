@@ -26,6 +26,7 @@ public partial class MainForm : Form
         public Label Stan;
         public Label Ruch;
         public Button Przelacz;
+        public Znacznik[] Trx;
         public long PoprzedniLacznie;
         public DateTime PoprzedniCzas = DateTime.UtcNow;
         public double Szybkosc;

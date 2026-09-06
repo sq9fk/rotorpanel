@@ -4,13 +4,26 @@ using System.Text.RegularExpressions;
 
 namespace RotorPanel;
 
-/// <summary>
-/// Pobiera nazwy anten ze sterownika 6x2. Radzi sobie z dwoma postaciami odpowiedzi:
-/// JSON (gdyby firmware kiedys taki wystawil) oraz strona HTML z polami N1..N6.
-/// </summary>
+/// <summary>Odczyt ze sterownika: nazwy anten oraz przypisanie anten do nadajnikow.</summary>
+public sealed class StanSterownika
+{
+    /// <summary>Numer anteny na nazwe.</summary>
+    public Dictionary<int, string> Nazwy { get; } = new Dictionary<int, string>();
+
+    /// <summary>Numer nadajnika na numer wybranej anteny; zero oznacza brak wyboru.</summary>
+    public Dictionary<int, int> Trx { get; } = new Dictionary<int, int>();
+
+    /// <summary>Opisy nadajnikow z tytulow przyciskow, np. "Radio Flex TRX1".</summary>
+    public Dictionary<int, string> OpisyTrx { get; } = new Dictionary<int, string>();
+
+    /// <summary>Nadajniki wskazujace podana antene.</summary>
+    public List<int> TrxNaAntenie(int antena)
+        => Trx.Where(p => p.Value == antena).Select(p => p.Key).OrderBy(n => n).ToList();
+}
+
 public static class SterownikAnten
 {
-    private static readonly HttpClient Klient = new() { Timeout = TimeSpan.FromSeconds(6) };
+    private static readonly HttpClient Klient = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
 
     /// <summary>Rozdziela zapis host[:port] na skladniki; bez portu przyjmujemy 80.</summary>
     public static bool Rozdziel(string adres, out string host, out int port)
@@ -29,10 +42,7 @@ public static class SterownikAnten
         return host.Length > 0;
     }
 
-    /// <summary>
-    /// Czy sterownik odpowiada. Sprawdzamy samo nawiazanie polaczenia TCP - jest tansze
-    /// niz pobieranie strony, a przy ukladzie na Arduino kazde zapytanie kosztuje.
-    /// </summary>
+    /// <summary>Samo nawiazanie polaczenia TCP - tanszy test niz pobranie strony.</summary>
     public static async Task<bool> Dostepny(string adres, int limitMs = 3000)
     {
         if (!Rozdziel(adres, out string host, out int port)) return false;
@@ -48,7 +58,7 @@ public static class SterownikAnten
         catch { return false; }
     }
 
-    public static async Task<Dictionary<int, string>> PobierzNazwy(string adres)
+    public static async Task<StanSterownika> PobierzStan(string adres)
     {
         if (!Rozdziel(adres, out string host, out int port))
             throw new InvalidOperationException("Nie podano adresu sterownika anten.");
@@ -56,62 +66,74 @@ public static class SterownikAnten
         string url = "http://" + host + (port == 80 ? "" : ":" + port) + "/";
         string tresc = await Klient.GetStringAsync(url);
 
-        var zJson = SprobujJson(tresc);
-        if (zJson.Count > 0) return zJson;
+        var stan = new StanSterownika();
+        CzytajNazwy(tresc, stan);
+        CzytajTrx(tresc, stan);
 
-        var zHtml = SprobujHtml(tresc);
-        if (zHtml.Count > 0) return zHtml;
+        if (stan.Nazwy.Count == 0 && stan.Trx.Count == 0)
+            throw new InvalidDataException("Odpowiedz nie wyglada na strone sterownika anten.");
 
-        throw new InvalidDataException(
-            "Odpowiedz nie zawiera nazw anten ani w postaci JSON, ani w polach N1..N6.");
+        return stan;
     }
 
-    /// <summary>Akceptuje tablice nazw albo obiekt postaci klucz-nazwa.</summary>
-    private static Dictionary<int, string> SprobujJson(string tresc)
+    /// <summary>Zgodnosc wsteczna dla okna ustawien.</summary>
+    public static async Task<Dictionary<int, string>> PobierzNazwy(string adres)
+        => (await PobierzStan(adres)).Nazwy;
+
+    private static readonly Regex Znaczniki =
+        new Regex(@"<(input|button)\b[^>]*>", RegexOptions.IgnoreCase);
+
+    private static string Atrybut(string znacznik, string nazwa)
     {
-        var wynik = new Dictionary<int, string>();
-        string t = tresc.TrimStart();
-        if (t.Length == 0 || (t[0] != '{' && t[0] != '[')) return wynik;
+        var m = Regex.Match(znacznik,
+            @"\b" + nazwa + @"\s*=\s*[""']([^""']*)[""']", RegexOptions.IgnoreCase);
+        return m.Success ? m.Groups[1].Value : null;
+    }
 
-        object korzen;
-        try { korzen = Json.Parsuj(tresc); }
-        catch (FormatException) { return wynik; }
-
-        if (korzen is List<object> tablica)
+    /// <summary>Nazwy anten siedza w polach formularza N1..N6.</summary>
+    private static void CzytajNazwy(string tresc, StanSterownika stan)
+    {
+        foreach (Match m in Znaczniki.Matches(tresc))
         {
-            int nr = 1;
-            foreach (var el in tablica)
-                if (el is string nazwa) wynik[nr++] = nazwa;
-            return wynik;
+            string nazwa = Atrybut(m.Value, "name");
+            string wartosc = Atrybut(m.Value, "value");
+            if (nazwa == null || wartosc == null) continue;
+            if (nazwa.Length < 2 || (nazwa[0] != 'N' && nazwa[0] != 'n')) continue;
+
+            if (int.TryParse(nazwa.Substring(1), out int nr) && nr >= 1 && nr <= 32)
+                stan.Nazwy[nr] = System.Net.WebUtility.HtmlDecode(wartosc).Trim();
         }
+    }
 
-        if (korzen is Dictionary<string, object> obiekt)
+    /// <summary>
+    /// Przyciski wyboru anteny nazywaja sie S{trx}{antena}, a ten odpowiadajacy
+    /// aktualnemu wyborowi ma klase "g". Tytuly przyciskow F{trx}0 daja opis nadajnika.
+    /// </summary>
+    private static void CzytajTrx(string tresc, StanSterownika stan)
+    {
+        foreach (Match m in Znaczniki.Matches(tresc))
         {
-            foreach (var pole in obiekt)
+            string nazwa = Atrybut(m.Value, "name");
+            if (string.IsNullOrEmpty(nazwa)) continue;
+
+            if ((nazwa[0] == 'S' || nazwa[0] == 's') && nazwa.Length == 4)
             {
-                if (!(pole.Value is string nazwa)) continue;
-                string klucz = pole.Key.TrimStart('N', 'n');
-                if (int.TryParse(klucz, out int nr) && nr >= 1 && nr <= 32)
-                    wynik[nr] = nazwa;
+                if (!int.TryParse(nazwa.Substring(1, 1), out int trx)) continue;
+                if (!int.TryParse(nazwa.Substring(2, 2), out int antena)) continue;
+
+                if (!stan.Trx.ContainsKey(trx)) stan.Trx[trx] = 0;
+
+                string klasa = Atrybut(m.Value, "class") ?? "";
+                if (Regex.IsMatch(klasa, @"(^|\s)g(\s|$)", RegexOptions.IgnoreCase))
+                    stan.Trx[trx] = antena;
+            }
+            else if ((nazwa[0] == 'F' || nazwa[0] == 'f') && nazwa.Length == 3 && nazwa[2] == '0')
+            {
+                if (!int.TryParse(nazwa.Substring(1, 1), out int trx)) continue;
+                string tytul = Atrybut(m.Value, "title");
+                if (!string.IsNullOrWhiteSpace(tytul))
+                    stan.OpisyTrx[trx] = System.Net.WebUtility.HtmlDecode(tytul).Trim();
             }
         }
-
-        return wynik;
-    }
-
-    /// <summary>Wyciaga value z pol formularza o nazwach N1..N6.</summary>
-    private static Dictionary<int, string> SprobujHtml(string tresc)
-    {
-        var wynik = new Dictionary<int, string>();
-
-        var wzor = new Regex(
-            @"<input[^>]*\bname\s*=\s*[""']N(\d+)[""'][^>]*\bvalue\s*=\s*[""']([^""']*)[""']",
-            RegexOptions.IgnoreCase);
-
-        foreach (Match m in wzor.Matches(tresc))
-            if (int.TryParse(m.Groups[1].Value, out int nr))
-                wynik[nr] = System.Net.WebUtility.HtmlDecode(m.Groups[2].Value).Trim();
-
-        return wynik;
     }
 }

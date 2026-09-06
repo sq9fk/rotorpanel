@@ -16,6 +16,18 @@ public static class Theme
     public static readonly Color Akcent     = Color.FromArgb(0x2D, 0x6C, 0xDF);
     public static readonly Color AkcentCien = Color.FromArgb(0x24, 0x57, 0xB2);
 
+    /// <summary>Kolory oznaczen nadajnikow - TRX1, TRX2 i dalsze cyklicznie.</summary>
+    public static readonly Color[] Nadajniki =
+    {
+        Color.FromArgb(0x2D, 0x6C, 0xDF),
+        Color.FromArgb(0x0E, 0x95, 0x94),
+        Color.FromArgb(0x9A, 0x4D, 0xD6),
+        Color.FromArgb(0xD1, 0x74, 0x0B)
+    };
+
+    public static Color KolorNadajnika(int trx)
+        => Nadajniki[Math.Max(trx - 1, 0) % Nadajniki.Length];
+
     public static Font NaglowekDuzy() => new("Segoe UI Semibold", 16F);
     public static Font Naglowek()     => new("Segoe UI Semibold", 12F);
     public static Font Nazwa()    => new("Segoe UI Semibold", 11F);
