@@ -85,8 +85,22 @@ public class Urzadzenie : Polaczenie
 {
     protected override string DomyslnaNazwa => "Urządzenie " + Nr;
 
-    /// <summary>Wzmacniacz SPE Expert - mostek odpytuje go o status komenda 0x90.</summary>
-    public bool Spe { get; set; }
+    /// <summary>
+    /// Modele, ktorych protokol znamy. Wybor z tej listy wlacza odpytywanie o stan;
+    /// wpisany recznie typ znaczy tyle co "jakies urzadzenie szeregowe".
+    /// </summary>
+    public static readonly string[] TypyZeStanem =
+    {
+        "SPE Expert 1.3K-FA",
+        "SPE Expert 1.5K-FA",
+        "SPE Expert 2K-FA"
+    };
+
+    /// <summary>Model urzadzenia. Puste znaczy: inne urzadzenie.</summary>
+    public string Typ { get; set; } = "";
+
+    /// <summary>Czy umiemy odpytac to urzadzenie o stan.</summary>
+    public bool Spe => Array.IndexOf(TypyZeStanem, Typ) >= 0;
 }
 
 public class Antena

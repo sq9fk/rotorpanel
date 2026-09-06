@@ -64,7 +64,7 @@ public partial class SettingsForm
         Controls.Add(Ui.Etykieta("Rotory — para portów i punkt ser2net",
             Theme.Nazwa(), Theme.Tekst, new Point(20, 142), new Size(400, 20)));
 
-        _siatkaRotorow = NowaSiatka(new Point(18, 166), new Size(884, 146));
+        _siatkaRotorow = NowaSiatka(new Point(18, 166), new Size(964, 146));
 
         var kolNr = new DataGridViewTextBoxColumn
         {
@@ -83,7 +83,7 @@ public partial class SettingsForm
         _kolPara = new DataGridViewComboBoxColumn
         {
             HeaderText = "Para portów   (PstRotator - mostek)",
-            Width = 330,
+            Width = 370,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -92,7 +92,7 @@ public partial class SettingsForm
 
         _siatkaRotorow.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Adres ser2net", Width = 215,
+            HeaderText = "Adres ser2net", Width = 255,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
@@ -192,7 +192,7 @@ public partial class SettingsForm
             Theme.Nazwa(), Theme.Tekst, new Point(20, 550), new Size(400, 20)));
 
         // Szesc wierszy plus naglowek, zeby lista anten nigdy sie nie przewijala.
-        _siatkaAnten = NowaSiatka(new Point(18, 574), new Size(884, 6 * 28 + 32));
+        _siatkaAnten = NowaSiatka(new Point(18, 574), new Size(964, 6 * 28 + 32));
 
         var kolNr = new DataGridViewTextBoxColumn
         {
@@ -213,7 +213,7 @@ public partial class SettingsForm
         _kolRotor = new DataGridViewComboBoxColumn
         {
             HeaderText = "Rotor",
-            Width = 585,
+            Width = 665,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable

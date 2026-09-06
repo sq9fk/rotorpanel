@@ -165,9 +165,13 @@ z akcepterem `telnet` zamiast `tcp`.
 
 ## Wzmacniacz SPE Expert
 
-Zaznaczenie kolumny **SPE** przy urządzeniu włącza monitorowanie wzmacniacza Expert.
-Mostek raz na sekundę wysyła udokumentowaną komendę STATUS (`0x90`) i rozkłada odpowiedź
-na pola, a karta w oknie głównym pokazuje stan zamiast trasy:
+W tabeli **Urządzenia** kolumna *Typ urządzenia* jest listą znanych modeli — wybór jednego
+z nich włącza odczyt stanu i klawiaturę, a przy okazji podstawia parametry transmisji
+(RFC 2217, 115200 8N1). Listę można też zignorować i wpisać własny typ; wtedy urządzenie jest
+zwykłym mostkiem szeregowym, dokładnie jak przedtem.
+
+Po wybraniu modelu mostek raz na sekundę wysyła udokumentowaną komendę STATUS (`0x90`)
+i rozkłada odpowiedź na pola, a karta w oknie głównym pokazuje stan zamiast trasy:
 
 ```
 SPE Expert                                    połączony
@@ -187,8 +191,20 @@ Odpowiedzi na własne zapytania mostek **zdejmuje ze strumienia** — program po
 pary portów o nie nie prosił i nie ma powodu ich oglądać. Wszystko inne przechodzi nietknięte,
 więc program sterujący (na przykład SPE Term) działa równolegle.
 
+### Klawiatura
+
+Przycisk **Klawisze…** na karcie otwiera klawiaturę przedniego panelu. Kody pochodzą wprost
+z firmowej tabeli poleceń: INPUT `0x01`, BAND −/+ `0x02`/`0x03`, ANTENNA `0x04`, L −/+
+`0x05`/`0x06`, C −/+ `0x07`/`0x08`, TUNE `0x09`, WYŁĄCZ `0x0A`, POWER `0x0B`, DISPLAY `0x0C`,
+OPERATE `0x0D`, CAT `0x0E`, strzałki `0x0F`/`0x10`, S `0x11`, podświetlenie `0x82`/`0x83`.
+
+Cztery klawisze zmieniają stan nadawania albo zasilania — **OPERATE, TUNE, POWER i WYŁĄCZ** —
+więc są wyróżnione na czerwono i pytają o potwierdzenie. U góry okna stoi ten sam odczyt stanu
+co na karcie, a na dole informacja, co poszło do wzmacniacza.
+
 Odbicia wyświetlacza z programu KTerm tą drogą nie uświadczysz — to zamknięta część
-protokołu, a producent publikuje wyłącznie podstawowy podzbiór poleceń.
+protokołu, a producent publikuje wyłącznie podstawowy podzbiór poleceń. Menu wzmacniacza da się
+więc obejść klawiszami, ale bez podglądu ekranu.
 
 ---
 

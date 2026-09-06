@@ -10,7 +10,9 @@ public partial class SettingsForm
     private const string ProtokolTelnet  = "RFC 2217";
     private const string PredkoscZUrzadzenia = "z urządzenia";
 
-    private DataGridViewComboBoxColumn _kolPredkosc;
+    private DataGridViewComboBoxColumn _kolPredkosc, _kolTyp;
+
+    private const string TypInny = "— inne urządzenie —";
 
     private static readonly int[] Predkosci =
         { 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200 };
@@ -27,7 +29,7 @@ public partial class SettingsForm
         Controls.Add(Ui.Etykieta("Urządzenia — port szeregowy przez sieć",
             Theme.Nazwa(), Theme.Tekst, new Point(20, 362), new Size(420, 20)));
 
-        _siatkaUrzadzen = NowaSiatka(new Point(18, 386), new Size(884, 118));
+        _siatkaUrzadzen = NowaSiatka(new Point(18, 386), new Size(964, 118));
 
         var kolNr = new DataGridViewTextBoxColumn
         {
@@ -46,7 +48,7 @@ public partial class SettingsForm
         _kolParaU = new DataGridViewComboBoxColumn
         {
             HeaderText = "Para portów",
-            Width = 146,
+            Width = 147,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -119,13 +121,26 @@ public partial class SettingsForm
         foreach (var v in BityStopuNazwy) kolStop.Items.Add(v);
         _siatkaUrzadzen.Columns.Add(kolStop);
 
-        // Zaznaczone znaczy: to wzmacniacz SPE Expert, wiec mostek moze go odpytywac
-        // o status i pokazywac go na karcie.
-        _siatkaUrzadzen.Columns.Add(new DataGridViewCheckBoxColumn
+        // Model z listy wlacza odpytywanie o stan; wpisany recznie znaczy tyle,
+        // ze to jakies inne urzadzenie szeregowe.
+        _kolTyp = new DataGridViewComboBoxColumn
         {
-            HeaderText = "SPE", Width = 44,
+            HeaderText = "Typ urządzenia", Width = 130,
+            FlatStyle = FlatStyle.Flat,
+            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
-        });
+        };
+        _kolTyp.Items.Add(TypInny);
+        foreach (var t in Urzadzenie.TypyZeStanem) _kolTyp.Items.Add(t);
+        _siatkaUrzadzen.Columns.Add(_kolTyp);
+
+        // Lista ma byc podpowiedzia, a nie przymusem - stad pole do wpisania wlasnego.
+        _siatkaUrzadzen.EditingControlShowing += (_, e) =>
+        {
+            if (_siatkaUrzadzen.CurrentCell?.ColumnIndex == UTyp &&
+                e.Control is ComboBox lista)
+                lista.DropDownStyle = ComboBoxStyle.DropDown;
+        };
 
         _siatkaUrzadzen.CurrentCellDirtyStateChanged += (_, _) =>
         {
@@ -139,6 +154,7 @@ public partial class SettingsForm
         {
             if (_przebudowaList || e.RowIndex < 0) return;
             if (e.ColumnIndex == RPara) OdswiezListyPar();
+            if (e.ColumnIndex == UTyp) PodstawParametryModelu(e.RowIndex);
         };
 
         Controls.Add(_siatkaUrzadzen);
@@ -155,9 +171,21 @@ public partial class SettingsForm
 
         Controls.Add(Ui.Etykieta(
             "RFC 2217 to port szeregowy przez Telnet (konwertery microBit); urządzenie otwiera port " +
-            "dopiero po podaniu prędkości. Kolumna SPE włącza odpytywanie wzmacniacza Expert o stan.",
-            Theme.Maly(), Theme.TekstSzary, new Point(324, 508), new Size(578, 44)));
+            "dopiero po podaniu prędkości. Model z listy włącza odczyt stanu i klawiaturę — typ " +
+            "wpisany ręcznie jest tylko opisem.",
+            Theme.Maly(), Theme.TekstSzary, new Point(324, 508), new Size(618, 44)));
     }
+
+    /// <summary>Pusty typ pokazujemy jako pozycje "inne urzadzenie".</summary>
+    private string TypDoKomorki(string typ)
+    {
+        if (typ.Length == 0) return TypInny;
+        if (!_kolTyp.Items.Contains(typ)) _kolTyp.Items.Add(typ);
+        return typ;
+    }
+
+    private static string TypZKomorki(string komorka)
+        => komorka == TypInny ? "" : komorka.Trim();
 
     private void WypelnijUrzadzenia()
     {
@@ -184,8 +212,26 @@ public partial class SettingsForm
                                          ? u.BityDanych.ToString() : "8",
                                      Parzystosci[(int)u.Parzystosc],
                                      BityStopuNazwy[(int)u.BityStopu],
-                                     u.Spe);
+                                     TypDoKomorki(u.Typ));
         }
+    }
+
+    /// <summary>
+    /// Po wybraniu znanego modelu ustawia parametry transmisji z jego dokumentacji,
+    /// zeby nie trzeba bylo ich szukac. Recznie wpisany typ zostawia jak jest.
+    /// </summary>
+    private void PodstawParametryModelu(int wiersz)
+    {
+        var w = _siatkaUrzadzen.Rows[wiersz];
+        if (TypZKomorki(Kom(w, UTyp)).Length == 0) return;
+        if (Array.IndexOf(Urzadzenie.TypyZeStanem, Kom(w, UTyp)) < 0) return;
+
+        // SPE Expert: 8 bitow, 1 stop, bez parzystosci, do 115200.
+        w.Cells[RProtokol].Value   = ProtokolTelnet;
+        w.Cells[UPredkosc].Value   = "115200";
+        w.Cells[UBityDanych].Value = "8";
+        w.Cells[UParzystosc].Value = Parzystosci[0];
+        w.Cells[UStop].Value       = BityStopuNazwy[0];
     }
 
     private void DodajUrzadzenie()
@@ -198,7 +244,7 @@ public partial class SettingsForm
         while (uzyte.Contains(nr)) nr++;
 
         _siatkaUrzadzen.Rows.Add(nr, "Urządzenie " + nr, Brak, "", "", ProtokolTelnet,
-                                 "9600", "8", Parzystosci[0], BityStopuNazwy[0], false);
+                                 "9600", "8", Parzystosci[0], BityStopuNazwy[0], TypInny);
         OdswiezListyPar();
     }
 
@@ -235,7 +281,7 @@ public partial class SettingsForm
             BityDanych = bityDanych,
             Parzystosc = (Parzystosc)Math.Max(parzystosc, 0),
             BityStopu = (BityStopu)Math.Max(stop, 0),
-            Spe = w.Cells[USpe].Value is bool zaznaczone && zaznaczone
+            Typ = TypZKomorki(Kom(w, UTyp))
         };
     }
 }

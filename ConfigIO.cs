@@ -122,9 +122,21 @@ public partial class Config
                 BityDanych = Json.Liczba(o, "bityDanych", 8),
                 Parzystosc = ParzystoscZTekstu(Json.Tekst(o, "parzystosc")),
                 BityStopu  = BityStopuZTekstu(Json.Tekst(o, "bityStopu")),
-                Spe        = Json.Flaga(o, "spe")
+                Typ        = TypUrzadzenia(o)
             });
         }
+    }
+
+    /// <summary>
+    /// Czyta model urzadzenia. Starsze pliki mialy tylko flage "spe" - wtedy
+    /// przyjmujemy pierwszy znany model, bo tylko taki dalo sie wtedy wskazac.
+    /// </summary>
+    private static string TypUrzadzenia(Dictionary<string, object> o)
+    {
+        string typ = Json.Tekst(o, "typ");
+        if (typ.Length > 0) return typ;
+
+        return Json.Flaga(o, "spe") ? Urzadzenie.TypyZeStanem[0] : "";
     }
 
     private static void CzytajAnteny(Config cfg, Dictionary<string, object> korzen)
@@ -232,7 +244,7 @@ public partial class Config
             wpis.Dodaj("bityDanych", u.BityDanych);
             wpis.Dodaj("parzystosc", NazwyParzystosci[(int)u.Parzystosc]);
             wpis.Dodaj("bityStopu", NazwyBitowStopu[(int)u.BityStopu]);
-            wpis.Dodaj("spe", u.Spe);
+            wpis.Dodaj("typ", u.Typ);
             urzadzenia.Add(wpis);
         }
 

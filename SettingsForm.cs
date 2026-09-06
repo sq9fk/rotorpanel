@@ -19,7 +19,7 @@ public partial class SettingsForm : Form
     private readonly Dictionary<string, ParaPortow> _mapaPar = new();
 
     private const int RNr = 0, RNazwa = 1, RPara = 2, RIp = 3, RPort = 4, RProtokol = 5;
-    private const int UPredkosc = 6, UBityDanych = 7, UParzystosc = 8, UStop = 9, USpe = 10;
+    private const int UPredkosc = 6, UBityDanych = 7, UParzystosc = 8, UStop = 9, UTyp = 10;
     private const int ANr = 0, ANazwa = 1, ARotor = 2;
 
     public SettingsForm(Config cfg)
@@ -27,7 +27,7 @@ public partial class SettingsForm : Form
         _cfg = cfg;
 
         Text            = "Ustawienia";
-        ClientSize      = new Size(920, 852);
+        ClientSize      = new Size(1000, 852);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -35,7 +35,7 @@ public partial class SettingsForm : Form
         BackColor       = Theme.Tlo;
         Font            = Theme.Zwykly();
 
-        var karta = new Karta { Location = new Point(18, 16), Size = new Size(884, 116) };
+        var karta = new Karta { Location = new Point(18, 16), Size = new Size(964, 116) };
         Controls.Add(karta);
 
         karta.Controls.Add(Ui.Etykieta("Adres ser2net (domyślny)", Theme.Maly(), Theme.TekstSzary,
@@ -108,12 +108,12 @@ public partial class SettingsForm : Form
         Controls.Add(_info);
 
         var zapisz = Ui.Przycisk("Zapisz", 110, glowny: true);
-        zapisz.Location = new Point(678, 806);
+        zapisz.Location = new Point(758, 806);
         zapisz.Click += (_, _) => Zapisz();
         Controls.Add(zapisz);
 
         var anuluj = Ui.Przycisk("Anuluj", 96);
-        anuluj.Location = new Point(800, 806);
+        anuluj.Location = new Point(880, 806);
         anuluj.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         Controls.Add(anuluj);
 

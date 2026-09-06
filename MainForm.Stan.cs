@@ -22,10 +22,10 @@ public partial class MainForm
     private Karta PustaKarta(int y)
         => new Karta { Location = new Point(0, y), Size = new Size(516, WysokoscKarty), Promien = 8 };
 
-    private Button PrzyciskPrzelaczania(Karta karta, Mostek m)
+    private Button PrzyciskPrzelaczania(Karta karta, Mostek m, int y = 21)
     {
         var przelacz = Ui.Przycisk("Połącz", 92, glowny: true);
-        przelacz.Location = new Point(408, 21);
+        przelacz.Location = new Point(408, y);
         przelacz.Tag = m;
         przelacz.Click += (s, _) =>
         {
@@ -155,7 +155,21 @@ public partial class MainForm
 
         var stan = EtykietaStanuKarty(karta, true);
         var ruch = EtykietaRuchu(karta, opisPolaczenia);
-        var przelacz = PrzyciskPrzelaczania(karta, m);
+
+        // Przy znanym modelu robimy miejsce na drugi przycisk - klawiature panelu.
+        var przelacz = PrzyciskPrzelaczania(karta, m, u.Spe ? 8 : 21);
+
+        if (u.Spe)
+        {
+            var klawisze = Ui.Przycisk("Klawisze…", 92, glowny: false);
+            klawisze.Location = new Point(408, 40);
+            klawisze.Click += (_, _) =>
+            {
+                using var okno = new SpeForm(m, u.Etykieta + " — klawiatura");
+                okno.ShowDialog(this);
+            };
+            karta.Controls.Add(klawisze);
+        }
 
         _ui["u" + u.Nr] = new Wiersz
         {

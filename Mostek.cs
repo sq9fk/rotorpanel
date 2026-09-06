@@ -27,6 +27,9 @@ public sealed class Mostek : IDisposable
     private readonly SemaphoreSlim _bramka = new SemaphoreSlim(1, 1);
     private volatile StatusSpe _status;
 
+    // Strumien do urzadzenia, zeby okno klawiatury mialo gdzie wyslac kod klawisza.
+    private volatile Stream _biezacaSiec;
+
     public Polaczenie Punkt { get; }
     public string Adres => _cfg.AdresDla(Punkt);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
@@ -104,6 +107,7 @@ public sealed class Mostek : IDisposable
                     siec = telnet;
                 }
 
+                _biezacaSiec = siec;
                 _blad = "";
                 Volatile.Write(ref _stan, (int)StanMostka.Polaczony);
 
@@ -123,6 +127,7 @@ public sealed class Mostek : IDisposable
             {
                 _biezacyKlient = null;
                 _biezacyPort = null;
+                _biezacaSiec = null;
 
                 try { siec?.Dispose(); } catch { }
                 try { klient?.Close(); } catch { }
@@ -172,15 +177,20 @@ public sealed class Mostek : IDisposable
                 continue;
             }
 
-            if (zPortu) Interlocked.Add(ref _tx, n);
-            else        Interlocked.Add(ref _rx, n);
+            if (czytnik is null)
+            {
+                if (zPortu) Interlocked.Add(ref _tx, n);
+                else        Interlocked.Add(ref _rx, n);
+            }
 
             if (czytnik is not null)
             {
                 // Odpowiedzi na wlasne zapytania o status zdejmujemy ze strumienia -
-                // program po drugiej stronie pary o nie nie prosil.
+                // program po drugiej stronie pary o nie nie prosil. Liczniki pokazuja
+                // ruch klienta, wiec nasze wlasne odpytywanie do nich nie wchodzi.
                 var dalej = czytnik.Przepusc(bufor, n);
                 _status = czytnik.Status ?? _status;
+                Interlocked.Add(ref _rx, dalej.Length);
                 if (dalej.Length == 0) continue;
 
                 await dokad.WriteAsync(dalej, 0, dalej.Length, ct);
@@ -203,6 +213,36 @@ public sealed class Mostek : IDisposable
                 await dokad.WriteAsync(bufor, 0, n, ct);
                 await dokad.FlushAsync(ct);
             }
+        }
+    }
+
+    /// <summary>
+    /// Wysyla wzmacniaczowi kod klawisza. Zwraca false, gdy mostek nie jest polaczony
+    /// albo pisanie sie nie udalo - wtedy okno klawiatury ma o czym powiedziec.
+    /// </summary>
+    public async Task<bool> WyslijKlawisz(byte kod, CancellationToken ct)
+    {
+        var siec = _biezacaSiec;
+        if (siec is null || Stan != StanMostka.Polaczony) return false;
+
+        var ramka = new byte[] { 0x55, 0x55, 0x55, 0x01, kod, kod };
+
+        try
+        {
+            await _bramka.WaitAsync(ct);
+            try
+            {
+                await siec.WriteAsync(ramka, 0, ramka.Length, ct);
+                await siec.FlushAsync(ct);
+            }
+            finally { _bramka.Release(); }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _blad = ex.Message;
+            return false;
         }
     }
 

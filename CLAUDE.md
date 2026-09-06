@@ -97,6 +97,11 @@ uruchomionego programu, ale pozwala zmienić mu nazwę — stąd `.old`. Przed s
 drugą i tylko obudzi tę kończącą pracę. Nowa kopia dostaje argument `--po-aktualizacji`
 i czeka do dziesięciu sekund na zwolnienie blokady.
 
+**Model urzadzenia jest tekstem, nie flaga.** `Urzadzenie.Typ` trzyma nazwe modelu, a
+`Urzadzenie.Spe` sprawdza tylko, czy jest ona na liscie `TypyZeStanem`. Dzieki temu w kolumnie
+*Typ urzadzenia* mozna wpisac cokolwiek wlasnego, nie wlaczajac przy tym odpytywania protokolem,
+ktorego nie znamy. Starsze pliki z `"spe": true` migruje `ConfigIO.TypUrzadzenia`.
+
 **Status SPE czytamy sami i sami go zjadamy.** `Mostek` przy `Urzadzenie.Spe` wstrzykuje
 w strumień własne zapytanie `0x90` raz na sekundę, a `CzytnikSpe` wyjmuje odpowiedzi zanim
 trafią na drugą stronę pary portów. Klient (SPE Term) o nie nie prosił, więc nie może ich
@@ -165,6 +170,11 @@ są rysowane własnoręcznie i nie mają wzorca `Invoke` w UI Automation, a prog
 zasobnika, więc głównego okna zwykle nie ma na ekranie. Mały program pomocniczy z referencją do
 `RotorPanel.exe` tworzy `SettingsForm`, pokazuje ją poza ekranem i zrzuca do pliku PNG — to
 sprawdza układ bez ruszania pulpitu. `MainForm` tak się nie da obejrzeć, bo sama się ukrywa.
+
+**Liczniki na karcie pokazują ruch klienta, nie nasz.** Odpytywanie o status i klawisze
+wysyłane z okna klawiatury nie wchodzą do `Rx`/`Tx`, a z odbioru liczymy tylko to, co po
+odfiltrowaniu ramek statusu idzie dalej. Inaczej RX rósłby od własnych zapytań przy TX równym
+zeru i licznik kłamałby o ruchu programu sterującego.
 
 **W WinForms etykieta dodana wcześniej zasłania późniejszą.** Licznik ruchu na karcie miał
 ucięty początek (`,1 kB` zamiast `RX 1,1 kB`), bo etykieta protokołu, dodana przed nim, jest
