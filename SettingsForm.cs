@@ -26,7 +26,7 @@ public partial class SettingsForm : Form
         _cfg = cfg;
 
         Text            = "Ustawienia";
-        ClientSize      = new Size(720, 652);
+        ClientSize      = new Size(720, 660);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -81,8 +81,8 @@ public partial class SettingsForm : Form
         {
             Text = "Łącz automatycznie po uruchomieniu",
             Checked = cfg.AutoPolacz,
-            Location = new Point(20, 594),
-            Size = new Size(240, 22),
+            Location = new Point(20, 590),
+            Size = new Size(234, 22),
             Font = Theme.Zwykly(),
             ForeColor = Theme.Tekst,
             BackColor = Color.Transparent
@@ -93,8 +93,8 @@ public partial class SettingsForm : Form
         {
             Text = "Sprawdzaj aktualizacje przy starcie",
             Checked = cfg.SprawdzajAktualizacje,
-            Location = new Point(266, 594),
-            Size = new Size(230, 22),
+            Location = new Point(262, 590),
+            Size = new Size(212, 22),
             Font = Theme.Zwykly(),
             ForeColor = Theme.Tekst,
             BackColor = Color.Transparent
@@ -102,16 +102,16 @@ public partial class SettingsForm : Form
         Controls.Add(_sprawdzajAktualizacje);
 
         _info = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(20, 622), new Size(440, 18));
+            new Point(20, 618), new Size(440, 18));
         Controls.Add(_info);
 
         var zapisz = Ui.Przycisk("Zapisz", 110, glowny: true);
-        zapisz.Location = new Point(478, 610);
+        zapisz.Location = new Point(478, 614);
         zapisz.Click += (_, _) => Zapisz();
         Controls.Add(zapisz);
 
         var anuluj = Ui.Przycisk("Anuluj", 96);
-        anuluj.Location = new Point(600, 610);
+        anuluj.Location = new Point(600, 614);
         anuluj.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         Controls.Add(anuluj);
 
