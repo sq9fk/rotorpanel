@@ -23,11 +23,15 @@ działa na .NET Framework 4.8 wbudowanym w Windows 10 i 11.
 |---|---|
 | System | Windows 10 lub 11 |
 | Środowisko | .NET Framework 4.8 — **część systemu**, nic nie trzeba doinstalowywać |
-| Sterownik | [com0com 3.0.0.0](https://com0com.sourceforge.net/) w wersji **podpisanej** |
+| Sterownik | [com0com](https://sourceforge.net/projects/com0com/files/com0com/) w wersji **podpisanej** |
 | Po stronie Pi | `ser2net` z portami TCP na urządzeniach szeregowych |
 
-> Wersja com0com 2.2.2.0 jest niepodpisana i wymaga wyłączania wymuszania podpisów
-> sterowników. Nie używać.
+> Bierz paczkę, której nazwa kończy się na **`-signed`** — decyduje przyrostek, nie numer
+> wersji. Najwygodniejsza jest `com0com-3.0.0.0-i386-and-x64-signed.zip`, bo obsługuje obie
+> architektury naraz. Gałąź 2.2.2.0 też ma warianty podpisane, osobne dla x64 i i386
+> (`com0com-2.2.2.0-x64-fre-signed.zip`). Paczki bez przyrostka `-signed`, czyli `-fre.zip`,
+> zawierają sterownik niepodpisany i wymagają wyłączenia wymuszania podpisów w Windows —
+> tych nie używaj.
 
 ---
 

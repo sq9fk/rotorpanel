@@ -14,7 +14,8 @@ if not exist "%COM0COM%\setupc.exe" set "COM0COM=%ProgramFiles%\com0com"
 if not exist "%COM0COM%\setupc.exe" (
   echo.
   echo   BLAD: nie znaleziono com0com.
-  echo   Pobierz wersje PODPISANA 3.0.0.0: https://com0com.sourceforge.net/
+  echo   Pobierz wersje PODPISANA - paczka z koncowka -signed w nazwie:
+  echo         https://sourceforge.net/projects/com0com/files/com0com/
   echo.
   pause & exit /b 1
 )

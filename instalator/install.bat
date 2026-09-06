@@ -19,8 +19,8 @@ if exist "%SETUPC%" (
 ) else (
   echo.
   echo   UWAGA: nie znaleziono com0com.
-  echo   Pobierz wersje PODPISANA 3.0.0.0 i zainstaluj:
-  echo         https://com0com.sourceforge.net/
+  echo   Pobierz wersje PODPISANA - paczka z koncowka -signed w nazwie:
+  echo         https://sourceforge.net/projects/com0com/files/com0com/
   echo.
   echo   Instalacja programu bedzie kontynuowana, ale pary portow
   echo   trzeba bedzie utworzyc pozniej plikiem utworz-pary.bat.
