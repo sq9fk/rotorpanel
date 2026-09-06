@@ -149,9 +149,19 @@ public partial class MainForm
             };
             karta.Controls.Add(klopot);
         }
-        _dymek.SetToolTip(etykietaTrasy, u.Etykieta + Environment.NewLine + trasa +
-                          Environment.NewLine + "protokół: " + u.NazwaProtokolu +
-                          Environment.NewLine + "transmisja: " + u.OpisTransmisji);
+        string dymek = u.Etykieta + Environment.NewLine + trasa +
+                       Environment.NewLine + "protokół: " + u.NazwaProtokolu +
+                       Environment.NewLine + "transmisja: " + u.OpisTransmisji;
+
+        // Zmierzone: ustawienie parametrow portu odbiera lacze kontrolerowi RC-1216H,
+        // wiec jego wlasna strona przestaje odswiezac stan. Lepiej to napisac,
+        // niz zeby ktos szukal awarii.
+        if (u.Spe)
+            dymek += Environment.NewLine + Environment.NewLine +
+                     "Przy połączonym mostku strona RC-1216H nie odświeża stanu" +
+                     Environment.NewLine + "wzmacniacza — port szeregowy jest wtedy zajęty.";
+
+        _dymek.SetToolTip(etykietaTrasy, dymek);
 
         var stan = EtykietaStanuKarty(karta, true);
         var ruch = EtykietaRuchu(karta, opisPolaczenia);

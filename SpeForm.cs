@@ -74,7 +74,7 @@ public sealed class SpeForm : Form
         _mostek = mostek;
 
         Text            = tytul;
-        ClientSize      = new Size(516, 348);
+        ClientSize      = new Size(516, 366);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -82,7 +82,7 @@ public sealed class SpeForm : Form
         BackColor       = Theme.Tlo;
         Font            = Theme.Zwykly();
 
-        var karta = new Karta { Location = new Point(18, 16), Size = new Size(480, 56) };
+        var karta = new Karta { Location = new Point(18, 16), Size = new Size(480, 74) };
         Controls.Add(karta);
 
         _stan = Ui.Etykieta("", Theme.Zwykly(), Theme.Tekst,
@@ -93,7 +93,11 @@ public sealed class SpeForm : Form
             "Wyświetlacza wzmacniacza nie widać — to zamknięta część protokołu.",
             Theme.Maly(), Theme.TekstSzary, new Point(16, 30), new Size(448, 16)));
 
-        int y = 88;
+        karta.Controls.Add(Ui.Etykieta(
+            "Dopóki mostek jest połączony, strona RC-1216H nie odświeża stanu.",
+            Theme.Maly(), Theme.TekstSzary, new Point(16, 48), new Size(448, 16)));
+
+        int y = 106;
         foreach (var rzad in Uklad)
         {
             int x = 18;
