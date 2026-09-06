@@ -191,6 +191,20 @@ Odpowiedzi na własne zapytania mostek **zdejmuje ze strumienia** — program po
 pary portów o nie nie prosił i nie ma powodu ich oglądać. Wszystko inne przechodzi nietknięte,
 więc program sterujący (na przykład SPE Term) działa równolegle.
 
+### Kontroler i mostek nie dzielą się portem
+
+Zmierzone na RC-1216H: samo połączenie TCP, nawet z powitaniem Telnetu, niczego nie psuje —
+kontroler stabilnie pokazuje stan wzmacniacza. Dopiero **ustawienie parametrów portu**
+(SET-BAUDRATE i reszta) przejmuje łącze szeregowe, a wtedy kontroler przestaje odpytywać
+wzmacniacz: jego strona *Amplifier* zaczyna przeskakiwać między `Remoted` i `Standby`,
+a po dłuższej chwili pokazuje `Off/Unknown`, mimo że wzmacniacz działa i normalnie odpowiada.
+
+Bez parametrów port po stronie urządzenia w ogóle się nie otwiera, więc nie da się tego ominąć.
+To ograniczenie kontrolera, nie mostka: **albo strona kontrolera, albo pass-through**.
+Kiedy mostek jest połączony, aktualny stan wzmacniacza widać w RotorPanelu, a nie na stronie
+RC-1216H. Po rozłączeniu kontroler potrafi nie wrócić sam do odczytu — pomaga *Restart device*
+na jego stronie; wzmacniacza to nie dotyczy.
+
 ### Klawiatura
 
 Przycisk **Klawisze…** na karcie otwiera klawiaturę przedniego panelu. Kody pochodzą wprost

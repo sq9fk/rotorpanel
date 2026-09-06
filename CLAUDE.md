@@ -145,6 +145,13 @@ stronie urządzenia jest zamknięty. Dlatego `StrumienTelnet.UstawParametry` wys
 połączenia komplet SET-BAUDRATE / SET-DATASIZE / SET-PARITY / SET-STOPSIZE, a parametry są
 w konfiguracji urządzenia. Przy `Predkosc = 0` nie wysyłamy nic — to tryb „z urządzenia”.
 
+**Ustawienie parametrów RFC 2217 odbiera port kontrolerowi RC-1216H.** Pomiar czterema
+wariantami (samo TCP, powitanie Telnetu, powitanie z parametrami, plus DTR/RTS) przy próbkowaniu
+`ampdta.srv` co sekundę: dwa pierwsze warianty zero przełączeń, trzeci przełącza `Remoted` na
+`Standby`, czwarty zostawia `Off/Unknown` na stałe. Wzmacniacz przez cały czas odpowiada na
+`0x90`, więc to kontroler traci własny odczyt, nie sprzęt. Nie da się tego obejść — bez
+parametrów urządzenie nie otwiera portu. Nie szukaj winy w mostku, gdy strona kontrolera miga.
+
 **Zerowy licznik RX nie musi znaczyć, że coś jest nie tak z programem.** Przy SPE Expert
 za RC-1216H okazało się, że wzmacniacz był wyłączony: kontroler na własnej stronie
 (`http://<ip>/ampdta.srv?d=N1D<czas>`, pole 11) raportował `Off/Unknown`, a temperatury `--`.
