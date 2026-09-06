@@ -14,7 +14,6 @@ mkdir dist\paczka\app
 copy /y dist\portable48\RotorPanel.exe dist\paczka\app\ >nul
 copy /y rotory.przyklad.json dist\paczka\app\rotory.json >nul
 copy /y instalator\install.bat dist\paczka\ >nul
-copy /y instalator\utworz-pary.bat dist\paczka\ >nul
 copy /y instalator\autostart.bat dist\paczka\ >nul
 copy /y instalator\CZYTAJ-TO.txt dist\paczka\ >nul
 

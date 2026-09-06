@@ -23,7 +23,7 @@ if exist "%SETUPC%" (
   echo         https://sourceforge.net/projects/com0com/files/com0com/
   echo.
   echo   Instalacja programu bedzie kontynuowana, ale pary portow
-  echo   trzeba bedzie utworzyc pozniej plikiem utworz-pary.bat.
+  echo   trzeba bedzie utworzyc pozniej w samym programie.
   echo.
   pause
 )
@@ -62,8 +62,9 @@ echo   wyjscie jest w menu pod prawym przyciskiem na ikonie.
 echo   autostart.bat wlacza uruchamianie przy logowaniu.
 echo.
 echo   Nastepne kroki:
-echo     1. Uruchom utworz-pary.bat (poprosi o administratora).
-echo     2. Uruchom RotorPanel i w Ustawieniach popraw adres ser2net,
-echo        adres sterownika anten oraz przypisanie par do anten.
+echo     1. Uruchom RotorPanel i otworz "Pary COM..." - przycisk "Nowa para"
+echo        zaklada pare portow. Program sam poprosi o uprawnienia.
+echo     2. W Ustawieniach podaj adres ser2net i sterownika anten,
+echo        zdefiniuj rotory i przypisz je do anten.
 echo.
 pause

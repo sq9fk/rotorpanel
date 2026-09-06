@@ -38,7 +38,8 @@ uruchomic. Przy pierwszym starcie tworzy obok siebie rotory.json z ustawieniami
 domyslnymi. Jesli skopiujesz obok takze rotory.json, zabierze ze soba pelna
 konfiguracje.
 
-Do dzialania potrzebne sa jeszcze pary portow com0com - patrz utworz-pary.bat.
+Do dzialania potrzebne sa jeszcze pary portow com0com - zaklada sie je
+w oknie "Pary COM..." samego programu.
 
 
 Instalacja
@@ -49,17 +50,17 @@ Instalacja
 2. Uruchom  install.bat
    Skopiuje program do %LOCALAPPDATA%\RotorPanel i zrobi skroty.
 
-3. Uruchom  utworz-pary.bat
-   Sam poprosi o uprawnienia administratora. Zaklada trzy pary:
+3. Uruchom RotorPanel i otworz "Pary COM..."
+   Przycisk "Nowa para" zaklada pare portow, podpowiadajac pierwszy wolny
+   numer. Program sam poprosi o uprawnienia administratora.
 
-       COM10 <-> CNCB10
-       COM11 <-> CNCB11
+       COM10 <-> CNCB10     lewa strona jest dla PstRotatora,
+       COM11 <-> CNCB11     prawa dla mostka w RotorPanelu
        COM12 <-> CNCB12
 
-   Lewa strona jest dla PstRotatora, prawa dla RotorPanela.
-   To samo mozna zrobic pozniej w programie: Pary COM... -> Utworz pary.
+   Potrzebujesz tylu par, ilu masz rotorow.
 
-4. Uruchom RotorPanel i wejdz w Ustawienia:
+4. Wejdz w Ustawienia:
      - adres serwera ser2net w Twojej sieci
      - adres sterownika anten, np. http://192.168.1.101/
      - przycisk "Pobierz nazwy" zaciaga nazwy anten ze sterownika;

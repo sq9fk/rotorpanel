@@ -53,7 +53,6 @@ skryptami do `dist\RotorPanel-paczka.zip`. W środku są trzy pliki wsadowe:
 | plik | rola |
 |---|---|
 | `install.bat` | kopiuje program do `%LOCALAPPDATA%\RotorPanel`, tworzy skróty na pulpicie i w menu Start |
-| `utworz-pary.bat` | zakłada pary portów com0com, sam prosi o uprawnienia administratora |
 | `autostart.bat` | włącza lub wyłącza uruchamianie przy logowaniu |
 
 ---
@@ -70,8 +69,8 @@ COM10  ⇄  CNCB10        COM11  ⇄  CNCB11        COM12  ⇄  CNCB12
   └── wybierasz w PstRotatorze
 ```
 
-Pary zakłada `utworz-pary.bat` albo okno **Pary COM…** w samym programie. Oba wywołują
-`setupc.exe` z podniesionymi uprawnieniami.
+Pary zakłada się w oknie **Pary COM…**, przyciskiem *Nowa para…*. Program wywołuje `setupc.exe`
+z podniesionymi uprawnieniami tylko na czas tej operacji.
 
 > `setupc` szuka pliku `com0com.inf` w katalogu bieżącym. Wywołanie go z innego katalogu
 > kończy się błędem `SetupOpenInfFile ... ERROR: 2`. Skrypty i program ustawiają katalog
