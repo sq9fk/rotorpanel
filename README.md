@@ -216,9 +216,25 @@ Cztery klawisze zmieniają stan nadawania albo zasilania — **OPERATE, TUNE, PO
 więc są wyróżnione na czerwono i pytają o potwierdzenie. U góry okna stoi ten sam odczyt stanu
 co na karcie, a na dole informacja, co poszło do wzmacniacza.
 
-Odbicia wyświetlacza z programu KTerm tą drogą nie uświadczysz — to zamknięta część
-protokołu, a producent publikuje wyłącznie podstawowy podzbiór poleceń. Menu wzmacniacza da się
-więc obejść klawiszami, ale bez podglądu ekranu.
+### Podgląd wyświetlacza
+
+Okno klawiatury pokazuje **zawartość wyświetlacza wzmacniacza**, więc po jego menu da się
+chodzić normalnie, a nie na ślepo. Producent tego nie opisuje — tryb podglądu włącza komenda
+`0x80` (RCU ON), wyłącza `0x81`, a wzmacniacz przysyła wtedy ramki `0x6A` z 367 bajtami stanu
+ekranu. Kodowanie znaków: `0x10`–`0x3F` to znaki z atrybutem (prawdziwy ASCII = bajt + `0x20`),
+`0x40`–`0x7E` zwykły ASCII, reszta to własne znaki wyświetlacza.
+
+Tryb RCU jest włączany na czas otwarcia okna i wyłączany przy zamknięciu. Ekran przychodzi
+tylko przy zmianie, więc program co chwilę przełącza RCU wyłącz/włącz — to zeruje pamięć zmian
+wzmacniacza i wymusza świeżą klatkę.
+
+Układ bajtów nie jest równą siatką znaków, bo wyświetlacz jest graficzny. Z pomiaru na
+Expercie 1.3K-FA najczytelniejszy podział to **8 wierszy po 48 znaków** — przy nim tekst nie
+łamie się w połowie słowa.
+
+Wiedza o ramce `0x6A` i o komendach RCU pochodzi z projektu
+[vu2cpl/macexpert-spe](https://github.com/vu2cpl/macexpert-spe), gdzie ten protokół został
+odtworzony.
 
 ---
 

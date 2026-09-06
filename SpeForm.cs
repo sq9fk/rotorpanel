@@ -5,14 +5,17 @@ namespace RotorPanel;
 /// Application Programmer's Guide (rev. 1.1) - kazdy jest odpowiednikiem nacisniecia
 /// przycisku na przednim panelu.
 ///
-/// Wyswietlacza wzmacniacza tedy nie widac: jego odbicie to zamknieta czesc protokolu
-/// programu KTerm. Zamiast niego u gory stoi stan czytany komenda STATUS.
+/// Po otwarciu okna wlaczamy tryb RCU (0x80), w ktorym wzmacniacz przysyla ramki
+/// 0x6A z zawartoscia wyswietlacza - dzieki temu po jego menu da sie chodzic,
+/// a nie klikac na slepo. Przy zamknieciu tryb jest wylaczany (0x81).
 /// </summary>
 public sealed class SpeForm : Form
 {
     private readonly Mostek _mostek;
     private readonly Label _stan, _stopka;
-    private readonly System.Windows.Forms.Timer _zegar;
+    private readonly Label[] _ekran;
+    private readonly System.Windows.Forms.Timer _zegar, _puls;
+    private DateTime _ostatniPuls = DateTime.MinValue;
 
     // Klawisze, ktore zmieniaja stan nadawania albo zasilania - pytamy przed wyslaniem.
     private static readonly byte[] Ostrozne = { 0x09, 0x0A, 0x0B, 0x0D };
@@ -51,7 +54,7 @@ public sealed class SpeForm : Form
         {
             new Klawisz("◀", 0x0F, "strzałka w lewo"),
             new Klawisz("▶", 0x10, "strzałka w prawo"),
-            new Klawisz("S", 0x11, "klawisz S"),
+            new Klawisz("SET", 0x11, "wchodzi w menu i zatwierdza wybór"),
             new Klawisz("CAT", 0x0E, "ustawienia CAT")
         },
         new[]
@@ -74,7 +77,7 @@ public sealed class SpeForm : Form
         _mostek = mostek;
 
         Text            = tytul;
-        ClientSize      = new Size(516, 366);
+        ClientSize      = new Size(516, 576);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -90,14 +93,28 @@ public sealed class SpeForm : Form
         karta.Controls.Add(_stan);
 
         karta.Controls.Add(Ui.Etykieta(
-            "Wyświetlacza wzmacniacza nie widać — to zamknięta część protokołu.",
+            "Podgląd wyświetlacza działa w trybie RCU — włączanym na czas tego okna.",
             Theme.Maly(), Theme.TekstSzary, new Point(16, 30), new Size(448, 16)));
 
         karta.Controls.Add(Ui.Etykieta(
             "Dopóki mostek jest połączony, strona RC-1216H nie odświeża stanu.",
             Theme.Maly(), Theme.TekstSzary, new Point(16, 48), new Size(448, 16)));
 
-        int y = 106;
+        // Podglad wyswietlacza: pieciu wierszy po 32 znaki, czcionka o stalej
+        // szerokosci, zeby kolumny stoly tak jak na panelu wzmacniacza.
+        var szybka = new Karta { Location = new Point(18, 100), Size = new Size(480, 172) };
+        Controls.Add(szybka);
+
+        var czcionka = new Font("Consolas", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
+        _ekran = new Label[EkranSpe.Wierszy];
+        for (int i = 0; i < _ekran.Length; i++)
+        {
+            _ekran[i] = Ui.Etykieta("", czcionka, Theme.Tekst,
+                new Point(12, 12 + i * 17), new Size(456, 17));
+            szybka.Controls.Add(_ekran[i]);
+        }
+
+        int y = 288;
         foreach (var rzad in Uklad)
         {
             int x = 18;
@@ -115,12 +132,32 @@ public sealed class SpeForm : Form
             new Point(18, y + 4), new Size(480, 32));
         Controls.Add(_stopka);
 
-        _zegar = new System.Windows.Forms.Timer { Interval = 500 };
+        _zegar = new System.Windows.Forms.Timer { Interval = 400 };
         _zegar.Tick += (_, _) => Odswiez();
         _zegar.Start();
         Odswiez();
 
-        FormClosed += (_, _) => _zegar.Dispose();
+        // Wzmacniacz przysyla ekran tylko przy zmianie, wiec zeby podglad byl
+        // zywy, co chwile przelaczamy tryb RCU - to zeruje jego pamiec zmian.
+        _puls = new System.Windows.Forms.Timer { Interval = 900 };
+        _puls.Tick += async (_, _) => await Puls();
+
+        Shown += async (_, _) =>
+        {
+            _mostek.TrybEkranu = true;
+            await _mostek.WyslijKlawisz(EkranSpe.RcuWlacz, CancellationToken.None);
+            _puls.Start();
+        };
+
+        FormClosing += (_, _) =>
+        {
+            _puls.Stop();
+            _mostek.TrybEkranu = false;
+            _mostek.WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None)
+                   .GetAwaiter().GetResult();
+        };
+
+        FormClosed += (_, _) => { _zegar.Dispose(); _puls.Dispose(); };
     }
 
     private Button Przycisk(Klawisz k)
@@ -158,8 +195,48 @@ public sealed class SpeForm : Form
         _stopka.ForeColor = poszlo ? Theme.TekstSzary : Color.FromArgb(0xB3, 0x26, 0x1E);
     }
 
+    /// <summary>
+    /// RCU OFF, chwila, RCU ON. Wzmacniacz traktuje to jak nowe podlaczenie
+    /// podgladu i przysyla ekran nawet wtedy, gdy nic sie na nim nie zmienilo.
+    /// </summary>
+    private async Task Puls()
+    {
+        if (_mostek.Stan != StanMostka.Polaczony) return;
+
+        await _mostek.WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None);
+        await Task.Delay(60);
+        await _mostek.WyslijKlawisz(EkranSpe.RcuWlacz, CancellationToken.None);
+        _ostatniPuls = DateTime.UtcNow;
+    }
+
+    private void PokazEkran()
+    {
+        var ekran = _mostek.Ekran;
+        bool swiezy = ekran is not null && (DateTime.UtcNow - ekran.Kiedy).TotalSeconds < 6;
+
+        if (!swiezy)
+        {
+            for (int i = 0; i < _ekran.Length; i++) _ekran[i].Text = "";
+            _ekran[3].Text = _mostek.Stan == StanMostka.Polaczony
+                ? "            czekam na wyświetlacz…"
+                : "            mostek rozłączony";
+            _ekran[3].ForeColor = Theme.TekstSzary;
+            return;
+        }
+
+        for (int i = 0; i < _ekran.Length; i++)
+        {
+            _ekran[i].Text = i < ekran.Wiersze.Length
+                ? ekran.Wiersze[i].Replace('.', ' ')
+                : "";
+            _ekran[i].ForeColor = Theme.Tekst;
+        }
+    }
+
     private void Odswiez()
     {
+        PokazEkran();
+
         var status = _mostek.Status;
         bool swiezy = status is not null && (DateTime.UtcNow - status.Kiedy).TotalSeconds < 5;
 

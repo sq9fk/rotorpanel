@@ -26,6 +26,8 @@ public sealed class Mostek : IDisposable
     // Bez bramki ich ramki potrafilyby sie przeplesc w polowie.
     private readonly SemaphoreSlim _bramka = new SemaphoreSlim(1, 1);
     private volatile StatusSpe _status;
+    private volatile CzytnikSpe _czytnikSpe;
+    private bool _trybEkranu;
 
     // Strumien do urzadzenia, zeby okno klawiatury mialo gdzie wyslac kod klawisza.
     private volatile Stream _biezacaSiec;
@@ -39,6 +41,24 @@ public sealed class Mostek : IDisposable
 
     /// <summary>Ostatni odczytany stan wzmacniacza SPE albo null.</summary>
     public StatusSpe Status => _status;
+
+    /// <summary>Ostatnia zawartosc wyswietlacza albo null.</summary>
+    public EkranSpe Ekran => _czytnikSpe?.Ekran;
+
+    /// <summary>
+    /// Czy sami wlaczylismy tryb RCU i mamy zdejmowac ramki wyswietlacza.
+    /// Gdy nie - przechodza do klienta, bo to on o nie poprosil.
+    /// </summary>
+    public bool TrybEkranu
+    {
+        get => _trybEkranu;
+        set
+        {
+            _trybEkranu = value;
+            var czytnik = _czytnikSpe;
+            if (czytnik is not null) czytnik.PrzechwytujEkran = value;
+        }
+    }
 
     private bool OdpytywacSpe => Punkt is Urzadzenie { Spe: true };
 
@@ -111,7 +131,8 @@ public sealed class Mostek : IDisposable
                 _blad = "";
                 Volatile.Write(ref _stan, (int)StanMostka.Polaczony);
 
-                var czytnik = OdpytywacSpe ? new CzytnikSpe() : null;
+                var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
+                _czytnikSpe = czytnik;
 
                 var wGore = Pompa(port, siec, zPortu: true,  null, ct);
                 var wDol  = Pompa(siec, port, zPortu: false, czytnik, ct);
@@ -128,6 +149,7 @@ public sealed class Mostek : IDisposable
                 _biezacyKlient = null;
                 _biezacyPort = null;
                 _biezacaSiec = null;
+                _czytnikSpe = null;
 
                 try { siec?.Dispose(); } catch { }
                 try { klient?.Close(); } catch { }

@@ -9,7 +9,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>RotorPanel</AssemblyName>
     <RootNamespace>RotorPanel</RootNamespace>
-    <Version>1.5.1</Version>
+    <Version>1.6.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>ikona\icon.ico</ApplicationIcon>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -20,10 +20,8 @@
     <Reference Include="System.Net.Http" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="rotory.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+  <!-- rotory.json NIE jest kopiowany do katalogu wyjsciowego. Plik w katalogu
+       projektu jest przykladem, a obok pliku wykonywalnego lezy zywa konfiguracja
+       uzytkownika - kopiowanie przy budowaniu ja kasowalo. -->
 
 </Project>

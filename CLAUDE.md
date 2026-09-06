@@ -102,6 +102,13 @@ i czeka do dziesięciu sekund na zwolnienie blokady.
 *Typ urzadzenia* mozna wpisac cokolwiek wlasnego, nie wlaczajac przy tym odpytywania protokolem,
 ktorego nie znamy. Starsze pliki z `"spe": true` migruje `ConfigIO.TypUrzadzenia`.
 
+**Ramki od wzmacniacza rozbieraj po kolei, nie po rodzaju.** Pierwsza wersja `CzytnikSpe`
+szukała najpierw ramek ekranu w całym buforze i oddawała klientowi wszystko, co leżało przed
+nimi — razem z ramkami statusu. Efekt: podgląd zamierał, a karta pokazywała „czekam na odczyt
+stanu". Teraz pętla bierze **najwcześniejszy** nagłówek `AA AA AA`, patrzy na bajt rodzaju
+(`0x43` status, `0x6A` ekran) i dopiero wtedy decyduje. Potwierdzenia i wszystko inne idą do
+klienta.
+
 **Status SPE czytamy sami i sami go zjadamy.** `Mostek` przy `Urzadzenie.Spe` wstrzykuje
 w strumień własne zapytanie `0x90` raz na sekundę, a `CzytnikSpe` wyjmuje odpowiedzi zanim
 trafią na drugą stronę pary portów. Klient (SPE Term) o nie nie prosił, więc nie może ich
@@ -214,6 +221,12 @@ kiedyś napisane odwrotnie; nie przywracaj tego.
 łatwo tracą backslashe, gdy plik powstaje przez narzędzie pośredniczące. Po wygenerowaniu
 sprawdź je w pliku, zanim uruchomisz kompilator — `\s` w zwykłym literale C# nie skompiluje
 się w ogóle, ale `` skompiluje się jako znak backspace i po cichu zepsuje wyrażenie.
+
+**Konfiguracji nie kopiujemy do katalogu wyjściowego.** `rotory.json` był w `.csproj` jako
+`None Update` z `CopyToOutputDirectory`, przez co budowanie nadpisywało żywe ustawienia
+użytkownika leżące obok pliku wykonywalnego, a pełna przebudowa (`--no-incremental`) najpierw
+je kasowała jako plik z poprzedniej listy. Wpis jest usunięty — nie przywracaj go. Przykład
+konfiguracji trzymamy w `rotory.przyklad.json`.
 
 ## Konwencje
 

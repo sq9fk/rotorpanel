@@ -1,0 +1,17 @@
+{
+  "_uwaga": "Sciezki pisz z ukosnikiem w przod. maRotor decyduje, czy antena ma rotor.",
+
+  "piIp": "192.168.6.3",
+  "setupc": "C:/Program Files (x86)/com0com/setupc.exe",
+  "sterownikAnten": "192.168.6.6",
+  "autoPolacz": false,
+
+  "anteny": [
+    { "nr": 1, "nazwa": "ANT1",     "maRotor": false, "com": "",      "dev": "",       "ip": "", "port": 0 },
+    { "nr": 2, "nazwa": "ANT2",     "maRotor": false, "com": "",      "dev": "",       "ip": "", "port": 0 },
+    { "nr": 3, "nazwa": "ANT3",     "maRotor": false, "com": "",      "dev": "",       "ip": "", "port": 0 },
+    { "nr": 4, "nazwa": "A3S",      "maRotor": true,  "com": "COM10", "dev": "CNCB10", "ip": "", "port": 4001 },
+    { "nr": 5, "nazwa": "10m 5el.", "maRotor": true,  "com": "COM12", "dev": "CNCB12", "ip": "", "port": 4003 },
+    { "nr": 6, "nazwa": "15m 4el.", "maRotor": true,  "com": "COM11", "dev": "CNCB11", "ip": "", "port": 4002 }
+  ]
+}
