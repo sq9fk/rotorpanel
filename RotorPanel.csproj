@@ -9,7 +9,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>RotorPanel</AssemblyName>
     <RootNamespace>RotorPanel</RootNamespace>
-    <Version>1.6.2</Version>
+    <Version>1.7.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>ikona\icon.ico</ApplicationIcon>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

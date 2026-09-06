@@ -240,6 +240,15 @@ Ramka nie ma pola długości: kończy się tam, gdzie zaczyna się następna syn
 Poza znakami w ramce siedzą własne symbole wyświetlacza. Dwa niosą treść i program je
 odwzorowuje: `0x8D` to pozioma kreska obok tytułu, `0x8F` pionowa kreska między kolumnami.
 
+**Zaznaczenie pozycji** siedzi w 40 bajtach za siatką — po jednym na kolumnę, a ustawiony bit
+wskazuje wiersz. Wyszło z pomiaru: naciśnięcie strzałki przesuwa te bity o jeden, a podpowiedź
+u dołu ekranu zmienia się razem z nimi. Program rysuje takie komórki w negatywie, więc po menu
+widać, gdzie się stoi.
+
+Ekran główny ma w lewej połowie **logo i wykresy** — to kafelki mapy bitowej (bajty `0x9F`–`0xDF`),
+nie tekst. Nie da się ich odczytać jako znaki, więc w ich miejscu jest przygaszona tekstura.
+Reszta ekranu, czyli pasek pól i wszystkie menu, jest odwzorowana wiernie.
+
 Wiedza o ramce `0x6A` i o komendach RCU pochodzi z projektu
 [vu2cpl/macexpert-spe](https://github.com/vu2cpl/macexpert-spe), gdzie ten protokół został
 odtworzony.

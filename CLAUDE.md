@@ -110,6 +110,13 @@ Sprawdzian koncowy to zdjecia ekranow w instrukcji Experta 1.3K-FA - renderowani
 z nimi co do znaku. Jesli kiedys nie bedzie sie zgadzac, porownaj z `obraz-12.jpg`
 (SET ANTENNA ON BANK "A") wyciagnietym z tego PDF-a.
 
+**Kursor to jeden bajt na kolumne, bit wskazuje wiersz.** 40 bajtow zaraz za siatka
+(`EkranSpe.PoczatekFlag`), potem dwubajtowa suma kontrolna. Zmierzone przez porownanie ramek
+przed i po nacisnieciu strzalki: 13 kolejnych bajtow zmienilo sie z `08` na `04`, czyli
+podswietlenie przeskoczylo z wiersza 3 na 2 - i zgadza sie to z podpowiedzia u dolu ekranu,
+ktora opisuje wybrana pozycje. Reguła jest wspolna dla wszystkich ekranow, wiec nie potrzeba
+osobnych dekoderow per ekran, jak ma `macexpert-spe`.
+
 **`0x8D` to kreska, nie tlo w negatywie.** Pierwsza wersja rysowala wiersz z tym znakiem jako
 zielony pasek. Na zdjeciach w instrukcji widac, ze to zwykle poziome myslniki obok tytulu -
 renderujemy je jako `U+2500`, a `0x8F` jako `U+2502`. Zaznaczenie pozycji (negatyw na panelu)

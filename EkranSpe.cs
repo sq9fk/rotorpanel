@@ -34,9 +34,18 @@ public sealed class EkranSpe
     public const int Kolumn = 40;
     public const int Wierszy = 8;
 
-    // Za siatka ida jeszcze flagi kursora i dwubajtowa suma kontrolna.
+    // Za siatka ida flagi kursora - po jednym bajcie na kolumne, a ustawiony bit
+    // wskazuje wiersz. Zmierzone: nacisniecie strzalki przesuwa te bity o jeden
+    // w gore albo w dol, a podpowiedz u dolu ekranu zmienia sie razem z nimi.
+    public const int PoczatekFlag = PoczatekSiatki + Wierszy * Kolumn;
 
     public string[] Wiersze { get; private set; } = new string[0];
+
+    /// <summary>Surowe bajty siatki - kontrolka sama decyduje, jak je narysowac.</summary>
+    public byte[][] Bajty { get; private set; } = new byte[0][];
+
+    /// <summary>Komorki, ktore wzmacniacz pokazuje w negatywie (zaznaczenie).</summary>
+    public bool[][] Zaznaczone { get; private set; } = new bool[0][];
 
     public string Podpowiedzi { get; private set; } = "";
     public DateTime Kiedy { get; private set; }
@@ -62,6 +71,8 @@ public sealed class EkranSpe
         }
 
         e.Wiersze = wiersze.ToArray();
+        e.Bajty = Siatka(dane, od, dlugosc);
+        e.Zaznaczone = Zaznaczenia(dane, od, dlugosc);
 
         // Ostatni wiersz to podpowiedzi klawiszy - przydaje sie osobno w dymku.
         if (e.Wiersze.Length == Wierszy) e.Podpowiedzi = Scisnij(e.Wiersze[Wierszy - 1]);
@@ -71,6 +82,39 @@ public sealed class EkranSpe
 
     // Zdjecia ekranow w instrukcji pokazuja, ze 0x8D to pozioma kreska obok tytulu,
     // a nie tlo w negatywie; 0x8F rozdziela kolumny.
+    private static byte[][] Siatka(IList<byte> dane, int od, int dlugosc)
+    {
+        var siatka = new byte[Wierszy][];
+        for (int w = 0; w < Wierszy; w++)
+        {
+            siatka[w] = new byte[Kolumn];
+            for (int k = 0; k < Kolumn; k++)
+            {
+                int i = od + PoczatekSiatki + w * Kolumn + k;
+                siatka[w][k] = i < od + dlugosc && i < dane.Count ? dane[i] : (byte)0;
+            }
+        }
+        return siatka;
+    }
+
+    private static bool[][] Zaznaczenia(IList<byte> dane, int od, int dlugosc)
+    {
+        var zaznaczone = new bool[Wierszy][];
+        for (int w = 0; w < Wierszy; w++) zaznaczone[w] = new bool[Kolumn];
+
+        for (int k = 0; k < Kolumn; k++)
+        {
+            int i = od + PoczatekFlag + k;
+            if (i >= od + dlugosc || i >= dane.Count) break;
+
+            byte flaga = dane[i];
+            for (int w = 0; w < Wierszy; w++)
+                zaznaczone[w][k] = (flaga & (1 << w)) != 0;
+        }
+
+        return zaznaczone;
+    }
+
     private const byte Kreska    = 0x8D;
     private const byte Separator = 0x8F;
 
