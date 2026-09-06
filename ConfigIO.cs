@@ -63,9 +63,34 @@ public partial class Config
                 Dev   = Json.Tekst(o, "dev"),
                 Ip    = Json.Tekst(o, "ip"),
                 Port  = Json.Liczba(o, "port"),
-                Protokol = ZTekstu(Json.Tekst(o, "protokol"))
+                Protokol   = ZTekstu(Json.Tekst(o, "protokol")),
+                Predkosc   = Json.Liczba(o, "predkosc"),
+                BityDanych = Json.Liczba(o, "bityDanych", 8),
+                Parzystosc = ParzystoscZTekstu(Json.Tekst(o, "parzystosc")),
+                BityStopu  = BityStopuZTekstu(Json.Tekst(o, "bityStopu"))
             });
         }
+    }
+
+    private static readonly string[] NazwyParzystosci =
+        { "brak", "nieparzysta", "parzysta", "znacznik", "spacja" };
+
+    private static readonly string[] NazwyBitowStopu = { "1", "1.5", "2" };
+
+    private static Parzystosc ParzystoscZTekstu(string t)
+    {
+        for (int i = 0; i < NazwyParzystosci.Length; i++)
+            if (string.Equals(NazwyParzystosci[i], (t ?? "").Trim(), StringComparison.OrdinalIgnoreCase))
+                return (Parzystosc)i;
+        return Parzystosc.Brak;
+    }
+
+    private static BityStopu BityStopuZTekstu(string t)
+    {
+        for (int i = 0; i < NazwyBitowStopu.Length; i++)
+            if (string.Equals(NazwyBitowStopu[i], (t ?? "").Trim(), StringComparison.OrdinalIgnoreCase))
+                return (BityStopu)i;
+        return BityStopu.Jeden;
     }
 
     private static Protokol ZTekstu(string t)
@@ -92,7 +117,11 @@ public partial class Config
                 Dev      = Json.Tekst(o, "dev"),
                 Ip       = Json.Tekst(o, "ip"),
                 Port     = Json.Liczba(o, "port"),
-                Protokol = ZTekstu(Json.Tekst(o, "protokol"))
+                Protokol   = ZTekstu(Json.Tekst(o, "protokol")),
+                Predkosc   = Json.Liczba(o, "predkosc"),
+                BityDanych = Json.Liczba(o, "bityDanych", 8),
+                Parzystosc = ParzystoscZTekstu(Json.Tekst(o, "parzystosc")),
+                BityStopu  = BityStopuZTekstu(Json.Tekst(o, "bityStopu"))
             });
         }
     }
@@ -180,6 +209,10 @@ public partial class Config
             wpis.Dodaj("ip", r.Ip);
             wpis.Dodaj("port", r.Port);
             wpis.Dodaj("protokol", NaTekst(r.Protokol));
+            wpis.Dodaj("predkosc", r.Predkosc);
+            wpis.Dodaj("bityDanych", r.BityDanych);
+            wpis.Dodaj("parzystosc", NazwyParzystosci[(int)r.Parzystosc]);
+            wpis.Dodaj("bityStopu", NazwyBitowStopu[(int)r.BityStopu]);
             rotory.Add(wpis);
         }
 
@@ -194,6 +227,10 @@ public partial class Config
             wpis.Dodaj("ip", u.Ip);
             wpis.Dodaj("port", u.Port);
             wpis.Dodaj("protokol", NaTekst(u.Protokol));
+            wpis.Dodaj("predkosc", u.Predkosc);
+            wpis.Dodaj("bityDanych", u.BityDanych);
+            wpis.Dodaj("parzystosc", NazwyParzystosci[(int)u.Parzystosc]);
+            wpis.Dodaj("bityStopu", NazwyBitowStopu[(int)u.BityStopu]);
             urzadzenia.Add(wpis);
         }
 

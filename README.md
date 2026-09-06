@@ -138,8 +138,21 @@ negocjują opcje. Pompowanie bajtów bez zmian wpuściłoby te sekwencje do dany
 transmisję — dlatego protokół wybiera się przy urządzeniu.
 
 Program zgłasza gotowość do trybu binarnego, rozpakowuje sekwencje sterujące i podwaja bajt 255
-przy wysyłaniu. **Parametrów transmisji nie wysyła** — prędkość i format ramki ustawia się po
-stronie urządzenia, tak jak przy `ser2net`.
+przy wysyłaniu.
+
+### Parametry transmisji
+
+RC-1216H trzyma swój port szeregowy zamknięty, dopóki klient nie poda prędkości — połączenie
+zestawia się wtedy poprawnie, dioda świeci na zielono, a licznik odebranych bajtów stoi na zerze.
+Dlatego w tabeli **Urządzenia** każdy wiersz ma cztery listy: **Prędkość**, **Bity**,
+**Parzystość** i **Stop**. Po zestawieniu połączenia program wysyła je urządzeniu opcjami
+COM-PORT-OPTION (SET-BAUDRATE, SET-DATASIZE, SET-PARITY, SET-STOPSIZE).
+
+Wybór `z urządzenia` w kolumnie Prędkość nie wysyła niczego i zostawia urządzeniu jego własne
+ustawienia — tak działa `ser2net`, gdzie format ramki jest w konfiguracji serwera.
+
+Na karcie w oknie głównym format widać obok nazwy protokołu, na przykład `RFC 2217 · 115200 8N1`.
+Dla SPE Expert 1.3K-FA za konwerterem właściwe jest **115200 8N1**.
 
 Ten sam wybór jest dostępny przy rotorach, gdyby `ser2net` był u kogoś skonfigurowany
 z akcepterem `telnet` zamiast `tcp`.

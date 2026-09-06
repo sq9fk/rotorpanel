@@ -127,6 +127,28 @@ zajmujących numery COM, bo mogą pochodzić z usunięcia zrobionego poza progra
 **Rot1Prog odpowiada ramką 5-bajtową**, nie 12-bajtową jak Rot2Prog. Format: `57 H1 H2 H3 20`,
 azymut = `H1*100 + H2*10 + H3 − 360`.
 
+**RC-1216H nie otwiera portu szeregowego, dopóki nie dostanie prędkości.** Połączenie TCP
+zestawia się normalnie, negocjacja Telnetu przechodzi, dioda jest zielona — i nie przychodzi ani
+jeden bajt. Zapytanie SET-BAUDRATE z wartością 0 zwraca w odpowiedzi 0, co potwierdza, że port po
+stronie urządzenia jest zamknięty. Dlatego `StrumienTelnet.UstawParametry` wysyła po nawiązaniu
+połączenia komplet SET-BAUDRATE / SET-DATASIZE / SET-PARITY / SET-STOPSIZE, a parametry są
+w konfiguracji urządzenia. Przy `Predkosc = 0` nie wysyłamy nic — to tryb „z urządzenia”.
+
+**com0com nie przenosi ustawień portu na drugą stronę pary.** Pomiar `GetCommState` na obu
+stronach dał domyślne `1200 7-E-1` niezależnie od tego, co ustawił program po stronie aplikacji.
+Nie da się więc odczytać parametrów z pary i podać ich dalej przez RFC 2217 — stąd jawne listy
+w Ustawieniach. Kod, który to próbował robić, został usunięty z `PortIo.cs`; nie przywracaj go.
+
+**Kolumny `DataGridViewComboBoxColumn` sypią wyjątkiem przy wartości spoza listy.** Prędkość
+wpisana ręcznie w `rotory.json` (na przykład 7200) nie jest jedną z pozycji, więc
+`WypelnijUrzadzenia` dokłada ją do `Items`, zanim doda wiersz.
+
+**Okno Ustawień oglądaj przez `DrawToBitmap`, nie przez klikanie po ekranie.** Kontrolki z `Ui.cs`
+są rysowane własnoręcznie i nie mają wzorca `Invoke` w UI Automation, a program startuje do
+zasobnika, więc głównego okna zwykle nie ma na ekranie. Mały program pomocniczy z referencją do
+`RotorPanel.exe` tworzy `SettingsForm`, pokazuje ją poza ekranem i zrzuca do pliku PNG — to
+sprawdza układ bez ruszania pulpitu. `MainForm` tak się nie da obejrzeć, bo sama się ukrywa.
+
 **PowerShell rozwija tablice zwracane z funkcji.** W generatorze ikony (`ikona/generuj-ikone.ps1`)
 `return ,$dane` z przecinkiem chroni tablicę bajtów. Bez tego plik `.ico` wychodził uszkodzony,
 mimo że wyglądał poprawnie.

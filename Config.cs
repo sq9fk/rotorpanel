@@ -1,5 +1,11 @@
 ﻿namespace RotorPanel;
 
+/// <summary>Kontrola parzystosci na porcie szeregowym.</summary>
+public enum Parzystosc { Brak, Nieparzysta, Parzysta, Znacznik, Spacja }
+
+/// <summary>Liczba bitow stopu.</summary>
+public enum BityStopu { Jeden, Poltora, Dwa }
+
 /// <summary>Sposob rozmowy z drugim koncem: surowy strumien albo Telnet z RFC 2217.</summary>
 public enum Protokol
 {
@@ -19,6 +25,39 @@ public abstract class Polaczenie
     public string   Ip       { get; set; } = "";
     public int      Port     { get; set; }
     public Protokol Protokol { get; set; } = Protokol.Surowy;
+
+    /// <summary>
+    /// Parametry transmisji przekazywane urzadzeniu przy RFC 2217. Predkosc zero
+    /// oznacza brak przekazania - serwer uzyje wtedy wlasnych ustawien.
+    /// </summary>
+    public int Predkosc { get; set; }
+
+    /// <summary>Liczba bitow danych; zmieniana tylko w pliku konfiguracyjnym.</summary>
+    public int BityDanych { get; set; } = 8;
+
+    public Parzystosc Parzystosc { get; set; } = Parzystosc.Brak;
+
+    public BityStopu BityStopu { get; set; } = BityStopu.Jeden;
+
+    /// <summary>Zwiezly zapis formatu ramki, na przyklad 9600 8N1.</summary>
+    public string OpisTransmisji
+    {
+        get
+        {
+            if (Predkosc <= 0) return "ustawienia urządzenia";
+
+            char parzystosc =
+                Parzystosc == Parzystosc.Parzysta     ? 'E' :
+                Parzystosc == Parzystosc.Nieparzysta  ? 'O' :
+                Parzystosc == Parzystosc.Znacznik     ? 'M' :
+                Parzystosc == Parzystosc.Spacja       ? 'S' : 'N';
+
+            string stop = BityStopu == BityStopu.Dwa ? "2"
+                        : BityStopu == BityStopu.Poltora ? "1.5" : "1";
+
+            return Predkosc + " " + BityDanych + parzystosc + stop;
+        }
+    }
 
     /// <summary>Ma komplet danych potrzebnych do zestawienia mostka.</summary>
     public bool Gotowy => !string.IsNullOrWhiteSpace(Dev) && Port > 0;

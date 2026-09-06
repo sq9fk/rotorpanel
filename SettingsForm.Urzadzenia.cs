@@ -8,13 +8,26 @@ public partial class SettingsForm
 {
     private const string ProtokolSurowy  = "surowy";
     private const string ProtokolTelnet  = "RFC 2217";
+    private const string PredkoscZUrzadzenia = "z urządzenia";
+
+    private DataGridViewComboBoxColumn _kolPredkosc;
+
+    private static readonly int[] Predkosci =
+        { 300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200 };
+
+    private static readonly string[] BityDanychNazwy = { "5", "6", "7", "8" };
+
+    private static readonly string[] Parzystosci =
+        { "brak", "nieparzysta", "parzysta", "znacznik", "spacja" };
+
+    private static readonly string[] BityStopuNazwy = { "1", "1.5", "2" };
 
     private void BudujSekcjeUrzadzen()
     {
         Controls.Add(Ui.Etykieta("Urządzenia — port szeregowy przez sieć",
             Theme.Nazwa(), Theme.Tekst, new Point(20, 362), new Size(420, 20)));
 
-        _siatkaUrzadzen = NowaSiatka(new Point(18, 386), new Size(684, 118));
+        _siatkaUrzadzen = NowaSiatka(new Point(18, 386), new Size(884, 118));
 
         var kolNr = new DataGridViewTextBoxColumn
         {
@@ -26,14 +39,14 @@ public partial class SettingsForm
 
         _siatkaUrzadzen.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Nazwa", Width = 150,
+            HeaderText = "Nazwa", Width = 112,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
         _kolParaU = new DataGridViewComboBoxColumn
         {
-            HeaderText = "Para portów   (aplikacja - mostek)",
-            Width = 216,
+            HeaderText = "Para portów",
+            Width = 160,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -42,20 +55,20 @@ public partial class SettingsForm
 
         _siatkaUrzadzen.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Adres", Width = 116,
+            HeaderText = "Adres", Width = 100,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
         _siatkaUrzadzen.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Port TCP", Width = 64,
+            HeaderText = "Port TCP", Width = 60,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
         _kolProtokol = new DataGridViewComboBoxColumn
         {
             HeaderText = "Protokół",
-            Width = 92,
+            Width = 80,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -64,10 +77,54 @@ public partial class SettingsForm
         _kolProtokol.Items.Add(ProtokolTelnet);
         _siatkaUrzadzen.Columns.Add(_kolProtokol);
 
+        // Przy RFC 2217 to my podajemy urzadzeniu parametry portu - stad listy wyboru.
+        _kolPredkosc = new DataGridViewComboBoxColumn
+        {
+            HeaderText = "Prędkość", Width = 112,
+            FlatStyle = FlatStyle.Flat,
+            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        };
+        _kolPredkosc.Items.Add(PredkoscZUrzadzenia);
+        foreach (var v in Predkosci) _kolPredkosc.Items.Add(v.ToString());
+        _siatkaUrzadzen.Columns.Add(_kolPredkosc);
+
+        var kolBity = new DataGridViewComboBoxColumn
+        {
+            HeaderText = "Bity", Width = 50,
+            FlatStyle = FlatStyle.Flat,
+            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        };
+        foreach (var v in BityDanychNazwy) kolBity.Items.Add(v);
+        _siatkaUrzadzen.Columns.Add(kolBity);
+
+        var kolParzystosc = new DataGridViewComboBoxColumn
+        {
+            HeaderText = "Parzystość", Width = 92,
+            FlatStyle = FlatStyle.Flat,
+            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        };
+        foreach (var v in Parzystosci) kolParzystosc.Items.Add(v);
+        _siatkaUrzadzen.Columns.Add(kolParzystosc);
+
+        var kolStop = new DataGridViewComboBoxColumn
+        {
+            HeaderText = "Stop", Width = 50,
+            FlatStyle = FlatStyle.Flat,
+            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        };
+        foreach (var v in BityStopuNazwy) kolStop.Items.Add(v);
+        _siatkaUrzadzen.Columns.Add(kolStop);
+
         _siatkaUrzadzen.CurrentCellDirtyStateChanged += (_, _) =>
         {
             int kol = _siatkaUrzadzen.CurrentCell?.ColumnIndex ?? -1;
-            if (_siatkaUrzadzen.IsCurrentCellDirty && (kol == RPara || kol == RProtokol))
+            if (_siatkaUrzadzen.IsCurrentCellDirty &&
+                (kol == RPara || kol == RProtokol || kol == UPredkosc ||
+                 kol == UBityDanych || kol == UParzystosc || kol == UStop))
                 _siatkaUrzadzen.CommitEdit(DataGridViewDataErrorContexts.Commit);
         };
         _siatkaUrzadzen.CellValueChanged += (_, e) =>
@@ -89,9 +146,9 @@ public partial class SettingsForm
         Controls.Add(usun);
 
         Controls.Add(Ui.Etykieta(
-            "RFC 2217 to port szeregowy przez Telnet — tak wystawiają go m.in. konwertery " +
-            "microBit. Parametry transmisji ustawia się po stronie urządzenia.",
-            Theme.Maly(), Theme.TekstSzary, new Point(324, 506), new Size(378, 32)));
+            "RFC 2217 to port szeregowy przez Telnet (konwertery microBit). Urządzenie otwiera " +
+            "swój port dopiero po otrzymaniu prędkości; „z urządzenia” zostawia jego ustawienia.",
+            Theme.Maly(), Theme.TekstSzary, new Point(324, 508), new Size(578, 44)));
     }
 
     private void WypelnijUrzadzenia()
@@ -106,9 +163,19 @@ public partial class SettingsForm
                 if (_kolPara.Items.Contains(para.Opis)) opis = para.Opis;
             }
 
+            // predkosc spoza listy (recznie wpisana w rotory.json) musi trafic do pozycji,
+            // inaczej DataGridView zglosi blad wartosci komorki
+            string predkosc = u.Predkosc > 0 ? u.Predkosc.ToString() : PredkoscZUrzadzenia;
+            if (!_kolPredkosc.Items.Contains(predkosc)) _kolPredkosc.Items.Add(predkosc);
+
             _siatkaUrzadzen.Rows.Add(u.Nr, u.Etykieta, opis, u.Ip,
                                      u.Port > 0 ? u.Port.ToString() : "",
-                                     u.Protokol == Protokol.Rfc2217 ? ProtokolTelnet : ProtokolSurowy);
+                                     u.Protokol == Protokol.Rfc2217 ? ProtokolTelnet : ProtokolSurowy,
+                                     predkosc,
+                                     BityDanychNazwy.Contains(u.BityDanych.ToString())
+                                         ? u.BityDanych.ToString() : "8",
+                                     Parzystosci[(int)u.Parzystosc],
+                                     BityStopuNazwy[(int)u.BityStopu]);
         }
     }
 
@@ -121,7 +188,8 @@ public partial class SettingsForm
         int nr = 1;
         while (uzyte.Contains(nr)) nr++;
 
-        _siatkaUrzadzen.Rows.Add(nr, "Urządzenie " + nr, Brak, "", "", ProtokolTelnet);
+        _siatkaUrzadzen.Rows.Add(nr, "Urządzenie " + nr, Brak, "", "", ProtokolTelnet,
+                                 "9600", "8", Parzystosci[0], BityStopuNazwy[0]);
         OdswiezListyPar();
     }
 
@@ -139,6 +207,12 @@ public partial class SettingsForm
         int.TryParse(Kom(w, RNr), out int nr);
         int.TryParse(Kom(w, RPort), out int port);
 
+        int.TryParse(Kom(w, UPredkosc), out int predkosc);
+        if (!int.TryParse(Kom(w, UBityDanych), out int bityDanych)) bityDanych = 8;
+
+        int parzystosc = Array.IndexOf(Parzystosci, Kom(w, UParzystosc));
+        int stop = Array.IndexOf(BityStopuNazwy, Kom(w, UStop));
+
         return new Urzadzenie
         {
             Nr = nr,
@@ -147,7 +221,11 @@ public partial class SettingsForm
             Dev = para?.B ?? "",
             Ip = Kom(w, RIp),
             Port = port,
-            Protokol = Kom(w, RProtokol) == ProtokolTelnet ? Protokol.Rfc2217 : Protokol.Surowy
+            Protokol = Kom(w, RProtokol) == ProtokolTelnet ? Protokol.Rfc2217 : Protokol.Surowy,
+            Predkosc = predkosc,
+            BityDanych = bityDanych,
+            Parzystosc = (Parzystosc)Math.Max(parzystosc, 0),
+            BityStopu = (BityStopu)Math.Max(stop, 0)
         };
     }
 }

@@ -22,6 +22,12 @@ public sealed class StrumienTelnet : Stream
     private const byte SE   = 240;
 
     private const byte OpcjaBinarna = 0;
+    private const byte OpcjaPortu   = 44;   // COM-PORT-OPTION z RFC 2217
+
+    private const byte PolecPredkosc   = 1;
+    private const byte PolecBityDanych = 2;
+    private const byte PolecParzystosc = 3;
+    private const byte PolecBityStopu  = 4;
 
     private enum Stan { Dane, PoIac, Negocjacja, Podnegocjacja, PodnegocjacjaIac }
 
@@ -36,12 +42,80 @@ public sealed class StrumienTelnet : Stream
 
     public StrumienTelnet(Stream siec) => _siec = siec;
 
-    /// <summary>Zglasza gotowosc do trybu binarnego - bez niego serwer moze filtrowac bajty.</summary>
+    /// <summary>
+    /// Zglasza tryb binarny oraz gotowosc do sterowania portem. Bez tego drugiego
+    /// czesc urzadzen w ogole nie otwiera swojego portu szeregowego.
+    /// </summary>
     public async Task Przywitaj(CancellationToken ct)
     {
-        var powitanie = new byte[] { IAC, WILL, OpcjaBinarna, IAC, DO, OpcjaBinarna };
+        var powitanie = new byte[]
+        {
+            IAC, WILL, OpcjaBinarna,
+            IAC, DO,   OpcjaBinarna,
+            IAC, WILL, OpcjaPortu
+        };
         await _siec.WriteAsync(powitanie, 0, powitanie.Length, ct);
         await _siec.FlushAsync(ct);
+    }
+
+    /// <summary>
+    /// Przekazuje parametry transmisji. Urzadzenie otwiera swoj port szeregowy dopiero
+    /// po otrzymaniu predkosci - dopoki jej nie zna, zglasza zero i nie przepuszcza danych.
+    /// </summary>
+    public async Task UstawParametry(Polaczenie p, CancellationToken ct)
+    {
+        if (p.Predkosc <= 0) return;
+
+        var polecenia = new List<byte>();
+
+        polecenia.AddRange(Podnegocjacja(PolecPredkosc,
+            (byte)(p.Predkosc >> 24), (byte)(p.Predkosc >> 16),
+            (byte)(p.Predkosc >> 8),  (byte)p.Predkosc));
+
+        polecenia.AddRange(Podnegocjacja(PolecBityDanych, (byte)p.BityDanych));
+        polecenia.AddRange(Podnegocjacja(PolecParzystosc, NaKodParzystosci(p.Parzystosc)));
+        polecenia.AddRange(Podnegocjacja(PolecBityStopu,  NaKodBitowStopu(p.BityStopu)));
+
+        var tablica = polecenia.ToArray();
+        await _siec.WriteAsync(tablica, 0, tablica.Length, ct);
+        await _siec.FlushAsync(ct);
+    }
+
+    /// <summary>RFC 2217: 1 brak, 2 parzysta, 3 nieparzysta, 4 znacznik, 5 spacja.</summary>
+    private static byte NaKodParzystosci(Parzystosc p)
+    {
+        switch (p)
+        {
+            case Parzystosc.Parzysta:    return 2;
+            case Parzystosc.Nieparzysta: return 3;
+            case Parzystosc.Znacznik:    return 4;
+            case Parzystosc.Spacja:      return 5;
+            default:                     return 1;
+        }
+    }
+
+    /// <summary>RFC 2217: 1 jeden bit, 2 dwa bity, 3 poltora.</summary>
+    private static byte NaKodBitowStopu(BityStopu b)
+    {
+        switch (b)
+        {
+            case BityStopu.Dwa:      return 2;
+            case BityStopu.Poltora:  return 3;
+            default:                 return 1;
+        }
+    }
+
+    private static IEnumerable<byte> Podnegocjacja(byte polecenie, params byte[] wartosci)
+    {
+        var wynik = new List<byte> { IAC, SB, OpcjaPortu, polecenie };
+        foreach (var w in wartosci)
+        {
+            wynik.Add(w);
+            if (w == IAC) wynik.Add(IAC);   // takze w podnegocjacji bajt 255 sie podwaja
+        }
+        wynik.Add(IAC);
+        wynik.Add(SE);
+        return wynik;
     }
 
     public override async Task<int> ReadAsync(byte[] bufor, int offset, int ile, CancellationToken ct)
@@ -122,13 +196,15 @@ public sealed class StrumienTelnet : Stream
         }
     }
 
-    /// <summary>Zgadzamy sie tylko na tryb binarny, reszte opcji odrzucamy.</summary>
+    /// <summary>Zgadzamy sie na tryb binarny i sterowanie portem, reszte odrzucamy.</summary>
     private void Odpowiedz(byte polecenie, byte opcja)
     {
         byte odpowiedz;
 
-        if (polecenie == DO)        odpowiedz = opcja == OpcjaBinarna ? WILL : WONT;
-        else if (polecenie == WILL) odpowiedz = opcja == OpcjaBinarna ? DO   : DONT;
+        bool obslugiwana = opcja == OpcjaBinarna || opcja == OpcjaPortu;
+
+        if (polecenie == DO)        odpowiedz = obslugiwana ? WILL : WONT;
+        else if (polecenie == WILL) odpowiedz = obslugiwana ? DO   : DONT;
         else                        return;   // DONT i WONT nie wymagaja odpowiedzi
 
         _odpowiedzi.Add(IAC);

@@ -88,6 +88,7 @@ public sealed class Mostek : IDisposable
                 {
                     var telnet = new StrumienTelnet(siec);
                     await telnet.Przywitaj(ct);
+                    await telnet.UstawParametry(Punkt, ct);
                     siec = telnet;
                 }
 

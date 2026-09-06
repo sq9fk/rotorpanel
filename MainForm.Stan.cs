@@ -117,15 +117,17 @@ public partial class MainForm
         karta.Controls.Add(Ui.Etykieta(u.Etykieta, Theme.Nazwa(), Theme.Tekst,
             new Point(44, 6), new Size(230, 20)));
 
-        karta.Controls.Add(Ui.Etykieta(u.NazwaProtokolu, Theme.Maly(), Theme.TekstSzary,
-            new Point(44, 28), new Size(190, 16)));
+        karta.Controls.Add(Ui.Etykieta(
+            u.NazwaProtokolu + " " + (char)0x00B7 + " " + u.OpisTransmisji,
+            Theme.Maly(), Theme.TekstSzary, new Point(44, 28), new Size(230, 16)));
 
         string trasa = OpisTrasy(u, m);
         var etykietaTrasy = Ui.Etykieta(trasa, Theme.Maly(), Theme.TekstSzary,
             new Point(44, 46), new Size(220, 16));
         karta.Controls.Add(etykietaTrasy);
         _dymek.SetToolTip(etykietaTrasy, u.Etykieta + Environment.NewLine + trasa +
-                          Environment.NewLine + "protokół: " + u.NazwaProtokolu);
+                          Environment.NewLine + "protokół: " + u.NazwaProtokolu +
+                          Environment.NewLine + "transmisja: " + u.OpisTransmisji);
 
         var stan = EtykietaStanuKarty(karta, true);
         var ruch = EtykietaRuchu(karta);
