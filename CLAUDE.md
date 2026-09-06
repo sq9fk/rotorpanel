@@ -25,6 +25,17 @@ do zasobnika), a przy `autoPolacz` mostki zestawiają połączenia:
 Get-NetTCPConnection -RemotePort 4001,4002,4003 -State Established
 ```
 
+Wydanie: podnieś `Version` w `RotorPanel.csproj` **oraz** `assemblyIdentity version` w
+`app.manifest`, opublikuj, a potem `gh release create vX.Y.Z dist\portable48\RotorPanel.exe`.
+Do wydania idzie **sam plik wykonywalny** — bez paczki instalacyjnej.
+
+## Struktura
+
+Okna są dzielone na pliki częściowe według roli, nie mechanicznie: `MainForm.Stan.cs` to karty
+i cykl odświeżania, `MainForm.Siec.cs` diody łączności i oznaczenia nadajników,
+`MainForm.Tray.cs` zasobnik. Podobnie `SettingsForm` — nagłówek, tabele, akcje. Trzymaj się
+tego podziału, zamiast dokładać do pliku, który akurat otworzyłeś.
+
 ## Decyzje, których nie odwracać bez powodu
 
 **.NET Framework 4.8, nie .NET 8.** Windows 11 nie ma .NET 8 w standardzie — ma tylko
@@ -103,6 +114,15 @@ mimo że wyglądał poprawnie.
 **`System.Drawing` nie czyta wpisów PNG w ikonach.** Rozmiary do 64 px zapisujemy jako DIB,
 PNG zostaje dla 128 i 256.
 
+**Paczki com0com bez przyrostka `-signed` są niepodpisane.** Decyduje przyrostek, nie numer
+wersji — gałąź 2.2.2.0 ma zarówno warianty podpisane, jak i niepodpisane. W dokumentacji było
+kiedyś napisane odwrotnie; nie przywracaj tego.
+
+**Przy generowaniu plików uważaj na sekwencje ucieczki.** Literały regex i ścieżki `\.\`
+łatwo tracą backslashe, gdy plik powstaje przez narzędzie pośredniczące. Po wygenerowaniu
+sprawdź je w pliku, zanim uruchomisz kompilator — `\s` w zwykłym literale C# nie skompiluje
+się w ogóle, ale `` skompiluje się jako znak backspace i po cichu zepsuje wyrażenie.
+
 ## Konwencje
 
 - Komentarze i identyfikatory w kodzie **bez polskich znaków diakrytycznych**; napisy widoczne
@@ -110,3 +130,4 @@ PNG zostaje dla 128 i 256.
 - Komentarz wyjaśnia **dlaczego**, nie co robi linijka.
 - Kolory i czcionki wyłącznie z `Theme.cs`. Kontrolki własne w `Ui.cs`.
 - `rotory.json` jest w `.gitignore` — w repo trzymamy `rotory.przyklad.json`.
+- Numer wersji żyje w dwóch miejscach: `RotorPanel.csproj` i `app.manifest`. Podnoś oba naraz.

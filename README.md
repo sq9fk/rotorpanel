@@ -15,6 +15,11 @@ wymaga portu COM.
 Jeden plik wykonywalny, około 113 KB, bez instalatora i bez środowiska uruchomieniowego —
 działa na .NET Framework 4.8 wbudowanym w Windows 10 i 11.
 
+## Pobieranie
+
+Gotowy plik wykonywalny jest w [wydaniach](https://github.com/sq9fk/rotorpanel/releases/latest)
+— jeden plik około 136 KB, bez instalatora.
+
 ---
 
 ## Wymagania
@@ -47,13 +52,16 @@ Zabierając ze sobą także `rotory.json`, przenosisz pełną konfigurację — 
 
 ### Wariant z instalatorem
 
-Paczkę składa `instalator\zloz-paczke.bat` — buduje wersję wynikową i pakuje ją razem ze
-skryptami do `dist\RotorPanel-paczka.zip`. W środku są trzy pliki wsadowe:
+Paczka jest wygodna, gdy stawiasz program na kilku komputerach — sam plik wykonywalny
+wystarcza, ale skróty i autostart trzeba by wtedy robić ręcznie. Składa ją
+`instalator\zloz-paczke.bat`, do `dist\RotorPanel-paczka.zip`:
 
 | plik | rola |
 |---|---|
 | `install.bat` | kopiuje program do `%LOCALAPPDATA%\RotorPanel`, tworzy skróty na pulpicie i w menu Start |
 | `autostart.bat` | włącza lub wyłącza uruchamianie przy logowaniu |
+
+Pary portów zakłada się już z samego programu, więc paczka nie zawiera osobnego skryptu.
 
 ---
 
@@ -311,24 +319,39 @@ Wersja do rozdania, jeden plik wykonywalny:
 dotnet publish -c Release -p:DebugType=none -o dist\portable48
 ```
 
-Ikonę generuje skrypt `ikona\generuj-ikone.ps1` — rysuje kompas z anteną kierunkową
+Ikonę generuje skrypt `ikona\generuj-ikone.ps1` — rysuje kompas ze wskaźnikiem kierunku
 w siedmiu rozmiarach i składa plik `.ico`. Uruchamiać tylko po zmianie wyglądu ikony.
 
+Wydanie powstaje z opublikowanego pliku wykonywalnego:
+
+```
+gh release create v1.2.0 dist\portable48\RotorPanel.exe --title "RotorPanel 1.2.0" --notes-file notatki.md
+```
+
 ## Układ projektu
+
+Klasy okien są dzielone na pliki częściowe, żeby żaden nie urósł ponad czytelną długość.
 
 | plik | rola |
 |---|---|
 | `Program.cs` | punkt wejścia, blokada jednej instancji, obsługa nieprzechwyconych wyjątków |
-| `Config.cs` | model konfiguracji, wczytywanie i zapis |
+| `Config.cs` | model: rotory, anteny, ustawienia ogólne |
+| `ConfigIO.cs` | wczytywanie i zapis konfiguracji wraz z migracją starszego formatu |
 | `Json.cs`, `JsonZapis.cs` | własny czytnik i zapisywacz JSON — brak zależności zewnętrznych |
 | `PortIo.cs` | dostęp do portu szeregowego przez Win32 |
 | `Mostek.cs` | mostek dwukierunkowy port ⇄ TCP, ponawianie, liczniki |
-| `MainForm.cs` | okno główne |
+| `MainForm.cs` | okno główne: budowa listy i układ |
+| `MainForm.Stan.cs` | karty anten i cykl odświeżania |
+| `MainForm.Siec.cs` | diody łączności oraz oznaczenia nadajników |
 | `MainForm.Tray.cs` | ikona w zasobniku, menu, chowanie i zamykanie |
-| `SettingsForm.cs` | edycja konfiguracji |
-| `PairsForm.cs`, `Com0Com.cs` | zarządzanie parami com0com |
-| `SterownikAnten.cs` | pobieranie nazw anten ze sterownika przełącznicy |
-| `Theme.cs`, `Ui.cs` | paleta i kontrolki własne |
+| `SettingsForm.cs` | okno ustawień: nagłówek i przyciski |
+| `SettingsForm.Siatki.cs` | tabele rotorów i anten |
+| `SettingsForm.Akcje.cs` | pary, wybór pliku, pobieranie nazw, zapis |
+| `PairsForm.cs` | lista par com0com, zakładanie i usuwanie |
+| `NewPairForm.cs` | okienko nowej pary z walidacją nazw |
+| `Com0Com.cs` | odczyt par z rejestru i wywołania `setupc` |
+| `SterownikAnten.cs` | odczyt nazw anten i przypisania nadajników ze sterownika |
+| `Theme.cs`, `Ui.cs` | paleta oraz kontrolki własne: karta, dioda, znacznik |
 | `instalator/` | skrypty instalacyjne i skrypt składania paczki |
 | `ikona/` | generator ikony i gotowy plik `.ico` |
 
