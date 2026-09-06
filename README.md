@@ -85,7 +85,7 @@ JSON-em bez podwajania znaków.
 |---|---|
 | `piIp` | domyślny adres serwera `ser2net` |
 | `setupc` | ścieżka do `setupc.exe` z com0com |
-| `sterownikAnten` | adres sterownika anten, np. `http://192.168.1.101/` |
+| `sterownikAnten` | adres sterownika anten w postaci `host` albo `host:port`, np. `192.168.1.101` |
 | `autoPolacz` | czy zestawiać mostki od razu po uruchomieniu |
 | `anteny[].nr` | numer wyjścia w przełącznicy antenowej |
 | `anteny[].nazwa` | nazwa anteny, pobierana ze sterownika |
@@ -133,6 +133,11 @@ przełączającym. Okno dopasowuje wysokość do liczby anten, więc lista nigdy
 | pomarańczowa | trwa łączenie albo ponawianie po zerwaniu |
 | zielona | port otwarty i połączenie TCP zestawione |
 
+W nagłówku okna, po prawej stronie, jest osobna dioda **łączności ze sterownikiem anten**:
+zielona gdy odpowiada, czerwona gdy nie, szara gdy adres nie został podany. Program sprawdza
+to samym nawiązaniem połączenia TCP — co 60 sekund po udanej próbie i co 20 po nieudanej.
+Sterowniki na Arduino mają kilka gniazd sieciowych, więc nie ma powodu ich męczyć.
+
 Liczniki `RX` i `TX` pokazują bajty, które faktycznie przeszły, oraz bieżącą przepustowość.
 To najprostszy sposób sprawdzenia, czy PstRotator w ogóle odpytuje sterownik: zielona dioda
 przy zerowych licznikach znaczy, że łącze stoi, ale nikt z niego nie korzysta.
@@ -144,6 +149,11 @@ chwilowy zanik sieci nie wymagają żadnej reakcji.
 
 Tabela anten: numer, checkbox **Rotor**, nazwa, para portów z listy rozwijanej, adres i port TCP.
 
+- **Adres sterownika anten** podaje się jako `host` albo `host:port`, bez `http://` i bez
+  ścieżki. Starsze zapisy w postaci pełnego adresu URL są przy wczytywaniu sprowadzane do tej
+  postaci.
+- **Ścieżkę do `setupc.exe`** można wskazać przyciskiem `…`, który otwiera okno wyboru pliku.
+  Startuje z obecnego katalogu, a gdy go nie ma — z typowego miejsca instalacji com0com.
 - **Nazwy anten są nieedytowalne** — pochodzą wyłącznie ze sterownika, przycisk *Pobierz nazwy*.
   Przy braku łączności zostają `ANT1`–`ANT6`.
 - **Pary wybiera się z listy**, budowanej z rejestru sterownika com0com. Nie da się wpisać

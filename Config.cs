@@ -103,7 +103,7 @@ public class Config
         {
             PiIp           = Json.Tekst(korzen, "piIp", "127.0.0.1"),
             Setupc         = Json.Tekst(korzen, "setupc"),
-            SterownikAnten = Json.Tekst(korzen, "sterownikAnten"),
+            SterownikAnten = NormalizujHost(Json.Tekst(korzen, "sterownikAnten")),
             AutoPolacz     = Json.Flaga(korzen, "autoPolacz", false)
         };
 
@@ -164,6 +164,24 @@ public class Config
         korzen.Dodaj("anteny", anteny);
 
         File.WriteAllText(Sciezka, Json.Zapisz(korzen));
+    }
+
+    /// <summary>
+    /// Sprowadza adres sterownika anten do postaci host[:port]. Przyjmuje takze pelny
+    /// adres URL, bo tak wygladaly starsze konfiguracje.
+    /// </summary>
+    public static string NormalizujHost(string wartosc)
+    {
+        string s = (wartosc ?? "").Trim();
+        if (s.Length == 0) return "";
+
+        int schemat = s.IndexOf("://", StringComparison.Ordinal);
+        if (schemat >= 0) s = s.Substring(schemat + 3);
+
+        int ukosnik = s.IndexOf('/');
+        if (ukosnik >= 0) s = s.Substring(0, ukosnik);
+
+        return s.Trim();
     }
 
     /// <summary>Zamienia ukosniki w przod na wsteczne - potrzebne przy budowaniu plikow .bat.</summary>

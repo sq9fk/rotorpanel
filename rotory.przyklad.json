@@ -3,7 +3,7 @@
 
   "piIp": "192.168.1.100",
   "setupc": "C:/Program Files (x86)/com0com/setupc.exe",
-  "sterownikAnten": "http://192.168.1.101/",
+  "sterownikAnten": "192.168.1.101",
   "autoPolacz": false,
 
   "anteny": [

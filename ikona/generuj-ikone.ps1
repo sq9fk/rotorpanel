@@ -50,33 +50,14 @@ function Rysuj([int]$s) {
 
     $pedzelAnteny = New-Object Drawing.SolidBrush $antena
 
-    if ($s -ge 48) {
-        # widok z gory: boom z elementami - reflektor, wibrator, direktory
-        $g.FillRectangle($pedzelAnteny, -0.9*$m, -11*$m, 1.8*$m, 20*$m)
-        $elementy = @(@(7.0, -8.5), @(6.0, -4.0), @(4.6, 0.5), @(3.6, 5.0))
-        foreach ($e in $elementy) {
-            $polSzer = [double]$e[0]
-            $y       = [double]$e[1]
-            $g.FillRectangle($pedzelAnteny, -$polSzer*$m, ($y - 0.8)*$m, (2*$polSzer)*$m, 1.6*$m)
-        }
-        # grot wskazujacy kierunek
-        $grot = @(
-            (New-Object Drawing.PointF([float](0*$m),     [float](-13.8*$m))),
-            (New-Object Drawing.PointF([float](-3.2*$m),  [float](-9.6*$m))),
-            (New-Object Drawing.PointF([float](3.2*$m),   [float](-9.6*$m)))
-        )
-        $g.FillPolygon($pedzelAnteny, $grot)
-    }
-    else {
-        # male rozmiary: sama igla, zeby nie zamienic sie w plame
-        $igla = @(
-            (New-Object Drawing.PointF([float](0*$m),     [float](-12.4*$m))),
-            (New-Object Drawing.PointF([float](-4.6*$m),  [float](3.0*$m))),
-            (New-Object Drawing.PointF([float](0*$m),     [float](0.6*$m))),
-            (New-Object Drawing.PointF([float](4.6*$m),   [float](3.0*$m)))
-        )
-        $g.FillPolygon($pedzelAnteny, $igla)
-    }
+    # Wskaznik kierunku - ta sama forma w kazdym rozmiarze.
+    $igla = @(
+        (New-Object Drawing.PointF([float](0*$m),     [float](-12.6*$m))),
+        (New-Object Drawing.PointF([float](-7.4*$m),  [float](5.6*$m))),
+        (New-Object Drawing.PointF([float](0*$m),     [float](1.6*$m))),
+        (New-Object Drawing.PointF([float](7.4*$m),   [float](5.6*$m)))
+    )
+    $g.FillPolygon($pedzelAnteny, $igla)
 
     $pedzelAnteny.Dispose()
     $g.ResetTransform()

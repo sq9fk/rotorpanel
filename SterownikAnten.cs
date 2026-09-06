@@ -1,4 +1,5 @@
 ﻿using System.Net.Http;
+using System.Net.Sockets;
 using System.Text.RegularExpressions;
 
 namespace RotorPanel;
@@ -11,15 +12,49 @@ public static class SterownikAnten
 {
     private static readonly HttpClient Klient = new() { Timeout = TimeSpan.FromSeconds(6) };
 
+    /// <summary>Rozdziela zapis host[:port] na skladniki; bez portu przyjmujemy 80.</summary>
+    public static bool Rozdziel(string adres, out string host, out int port)
+    {
+        host = Config.NormalizujHost(adres);
+        port = 80;
+        if (host.Length == 0) return false;
+
+        int dwukropek = host.LastIndexOf(':');
+        if (dwukropek > 0 && int.TryParse(host.Substring(dwukropek + 1), out int p) && p > 0 && p < 65536)
+        {
+            port = p;
+            host = host.Substring(0, dwukropek);
+        }
+
+        return host.Length > 0;
+    }
+
+    /// <summary>
+    /// Czy sterownik odpowiada. Sprawdzamy samo nawiazanie polaczenia TCP - jest tansze
+    /// niz pobieranie strony, a przy ukladzie na Arduino kazde zapytanie kosztuje.
+    /// </summary>
+    public static async Task<bool> Dostepny(string adres, int limitMs = 3000)
+    {
+        if (!Rozdziel(adres, out string host, out int port)) return false;
+
+        try
+        {
+            using var klient = new TcpClient();
+            var laczenie = klient.ConnectAsync(host, port);
+            if (await Task.WhenAny(laczenie, Task.Delay(limitMs)) != laczenie) return false;
+            await laczenie;
+            return klient.Connected;
+        }
+        catch { return false; }
+    }
+
     public static async Task<Dictionary<int, string>> PobierzNazwy(string adres)
     {
-        if (string.IsNullOrWhiteSpace(adres))
+        if (!Rozdziel(adres, out string host, out int port))
             throw new InvalidOperationException("Nie podano adresu sterownika anten.");
 
-        if (!adres.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-            adres = "http://" + adres;
-
-        string tresc = await Klient.GetStringAsync(adres);
+        string url = "http://" + host + (port == 80 ? "" : ":" + port) + "/";
+        string tresc = await Klient.GetStringAsync(url);
 
         var zJson = SprobujJson(tresc);
         if (zJson.Count > 0) return zJson;

@@ -53,6 +53,10 @@ zgłasza `HandleDestroyed`, więc `Close()` nie kończy pętli komunikatów. Pro
 **Jeden mostek na parę portów, nie na antenę.** Kilka anten na wspólnym maszcie wskazuje tę
 samą parę i dzieli jedno połączenie — inaczej dwa mostki biłyby się o ten sam port.
 
+**Adres sterownika anten trzymamy jako `host[:port]`, nie URL.** `Config.NormalizujHost`
+obcina schemat i ścieżkę przy wczytywaniu i zapisie, a `SterownikAnten.Rozdziel` rozbija to
+na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
+
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 

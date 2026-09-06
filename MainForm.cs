@@ -12,7 +12,12 @@ public partial class MainForm : Form
     private readonly Dictionary<int, Wiersz> _ui = new();
     private readonly System.Windows.Forms.Timer _timer = new();
     private Panel _lista;
-    private Label _podtytul, _stopka;
+    private Label _podtytul, _stopka, _opisSterownika;
+    private Led _diodaSterownika;
+    private readonly ToolTip _dymek = new();
+    private DateTime _nastepneSprawdzenie = DateTime.MinValue;
+    private bool _sprawdzanieTrwa;
+    private bool? _sterownikOsiagalny;
     private Button _polacz, _rozlacz, _ustawienia, _pary;
     private readonly Dictionary<string, string> _opisMostka = new();
 
@@ -45,6 +50,19 @@ public partial class MainForm : Form
         _podtytul = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
             new Point(22, 40), new Size(520, 18));
         Controls.Add(_podtytul);
+
+        _opisSterownika = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
+            new Point(296, 40), new Size(230, 18));
+        _opisSterownika.TextAlign = ContentAlignment.MiddleRight;
+        Controls.Add(_opisSterownika);
+
+        _diodaSterownika = new Led
+        {
+            Location = new Point(534, 40),
+            Size = new Size(16, 16),
+            BackColor = Theme.Tlo
+        };
+        Controls.Add(_diodaSterownika);
 
         _lista = new Panel
         {
@@ -114,10 +132,10 @@ public partial class MainForm : Form
         _ui.Clear();
         _lista.Controls.Clear();
 
-        string zrodlo = string.IsNullOrWhiteSpace(_cfg.SterownikAnten)
-            ? ""
-            : "   ·   sterownik anten " + _cfg.SterownikAnten;
-        _podtytul.Text = "ser2net na " + _cfg.PiIp + zrodlo;
+        _podtytul.Text = "ser2net na " + _cfg.PiIp;
+        _sterownikOsiagalny = null;
+        _nastepneSprawdzenie = DateTime.MinValue;
+        OdswiezSterownika();
 
         // Jeden mostek na pare portow - anteny na wspolnym maszcie dziela go.
         var wgPary = new Dictionary<string, Mostek>();
@@ -214,6 +232,59 @@ public partial class MainForm : Form
         return karta;
     }
 
+    /// <summary>
+    /// Stan lacznosci ze sterownikiem anten. Sprawdzamy rzadko i tylko nawiazaniem
+    /// polaczenia TCP - uklad na Arduino ma kilka gniazd i nie warto go meczyc.
+    /// </summary>
+    private void OdswiezSterownika()
+    {
+        string adres = (_cfg.SterownikAnten ?? "").Trim();
+
+        if (adres.Length == 0)
+        {
+            _diodaSterownika.Kolor = Theme.Szary;
+            _opisSterownika.Text = "sterownik anten: nie ustawiono";
+            _dymek.SetToolTip(_diodaSterownika, "Adres sterownika anten podasz w Ustawieniach.");
+            _dymek.SetToolTip(_opisSterownika, "Adres sterownika anten podasz w Ustawieniach.");
+            return;
+        }
+
+        _opisSterownika.Text = "sterownik anten: " + adres;
+
+        string stan = _sterownikOsiagalny switch
+        {
+            true  => "odpowiada",
+            false => "nie odpowiada",
+            _     => "sprawdzanie…"
+        };
+        _dymek.SetToolTip(_diodaSterownika, adres + " — " + stan);
+        _dymek.SetToolTip(_opisSterownika, adres + " — " + stan);
+
+        _diodaSterownika.Kolor = _sterownikOsiagalny switch
+        {
+            true  => Theme.Zielony,
+            false => Color.FromArgb(0xB3, 0x26, 0x1E),
+            _     => Theme.Pomarancz
+        };
+
+        if (_sprawdzanieTrwa || DateTime.UtcNow < _nastepneSprawdzenie) return;
+
+        _sprawdzanieTrwa = true;
+        SprawdzSterownika(adres);
+    }
+
+    private async void SprawdzSterownika(string adres)
+    {
+        bool osiagalny = await SterownikAnten.Dostepny(adres);
+
+        if (IsDisposed) return;
+
+        _sterownikOsiagalny = osiagalny;
+        _sprawdzanieTrwa = false;
+        // Po udanym sprawdzeniu wystarczy zagladac rzadziej niz po nieudanym.
+        _nastepneSprawdzenie = DateTime.UtcNow.AddSeconds(osiagalny ? 60 : 20);
+    }
+
     private static string Bajty(long n)
     {
         if (n < 1024) return n + " B";
@@ -287,6 +358,7 @@ public partial class MainForm : Form
             : Color.FromArgb(0xB3, 0x26, 0x1E);
 
         AktualizujTray();
+        OdswiezSterownika();
     }
 
     private static void UstawPrzycisk(Button b, string tekst, bool glowny)

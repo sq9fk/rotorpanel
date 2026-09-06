@@ -37,8 +37,8 @@ public class SettingsForm : Form
         _ip = Pole(cfg.PiIp, new Point(18, 34), 200);
         karta.Controls.Add(_ip);
 
-        karta.Controls.Add(Ui.Etykieta("Sterownik anten", Theme.Maly(), Theme.TekstSzary,
-            new Point(240, 16), new Size(200, 16)));
+        karta.Controls.Add(Ui.Etykieta("Sterownik anten — adres lub nazwa, opcjonalnie :port",
+            Theme.Maly(), Theme.TekstSzary, new Point(240, 16), new Size(300, 16)));
         _sterownik = Pole(cfg.SterownikAnten, new Point(240, 34), 220);
         karta.Controls.Add(_sterownik);
 
@@ -49,11 +49,17 @@ public class SettingsForm : Form
 
         karta.Controls.Add(Ui.Etykieta("Ścieżka do setupc.exe (com0com)", Theme.Maly(), Theme.TekstSzary,
             new Point(18, 66), new Size(260, 16)));
-        _setupc = Pole(cfg.Setupc, new Point(18, 84), 520);
+        _setupc = Pole(cfg.Setupc, new Point(18, 84), 468);
         karta.Controls.Add(_setupc);
 
-        var odswiezPary = Ui.Przycisk("Odśwież pary", 124);
-        odswiezPary.Location = new Point(546, 83);
+        var przegladaj = Ui.Przycisk("…", 34);
+        przegladaj.Location = new Point(492, 83);
+        przegladaj.Click += (_, _) => WybierzSetupc();
+        karta.Controls.Add(przegladaj);
+        new ToolTip().SetToolTip(przegladaj, "Wskaż plik setupc.exe w Eksploratorze");
+
+        var odswiezPary = Ui.Przycisk("Odśwież pary", 152);
+        odswiezPary.Location = new Point(532, 83);
         odswiezPary.Click += (_, _) => { WczytajPary(); _info.ForeColor = Theme.TekstSzary;
                                          _info.Text = "Lista par odświeżona."; };
         karta.Controls.Add(odswiezPary);
@@ -297,13 +303,53 @@ public class SettingsForm : Form
         }
     }
 
+    /// <summary>Wskazanie setupc.exe przez okno wyboru pliku.</summary>
+    private void WybierzSetupc()
+    {
+        using var okno = new OpenFileDialog
+        {
+            Title = "Wskaż plik setupc.exe ze sterownika com0com",
+            Filter = "setupc.exe|setupc.exe|Pliki wykonywalne (*.exe)|*.exe|Wszystkie pliki (*.*)|*.*",
+            FileName = "setupc.exe",
+            CheckFileExists = true
+        };
+
+        okno.InitialDirectory = KatalogStartowy();
+
+        if (okno.ShowDialog(this) != DialogResult.OK) return;
+
+        // W konfiguracji trzymamy sciezki z ukosnikami w przod.
+        _setupc.Text = okno.FileName.Replace((char)92, '/');
+    }
+
+    /// <summary>Katalog obecnej sciezki, a gdy jej nie ma - typowe miejsce instalacji com0com.</summary>
+    private string KatalogStartowy()
+    {
+        try
+        {
+            string katalog = Path.GetDirectoryName(Config.NaWindows(_setupc.Text.Trim()));
+            if (!string.IsNullOrEmpty(katalog) && Directory.Exists(katalog)) return katalog;
+        }
+        catch { /* sciezka moze byc bezsensowna - lecimy dalej */ }
+
+        foreach (var folder in new[] { Environment.SpecialFolder.ProgramFilesX86,
+                                       Environment.SpecialFolder.ProgramFiles })
+        {
+            string kandydat = Path.Combine(Environment.GetFolderPath(folder), "com0com");
+            if (Directory.Exists(kandydat)) return kandydat;
+        }
+
+        return "";
+    }
+
     private async Task PobierzNazwy()
     {
         _info.ForeColor = Theme.TekstSzary;
         _info.Text = "Pobieram…";
         try
         {
-            var nazwy = await SterownikAnten.PobierzNazwy(_sterownik.Text.Trim());
+            _sterownik.Text = Config.NormalizujHost(_sterownik.Text);
+            var nazwy = await SterownikAnten.PobierzNazwy(_sterownik.Text);
             int zmienione = 0;
 
             foreach (DataGridViewRow w in _siatka.Rows)
@@ -384,7 +430,7 @@ public class SettingsForm : Form
 
         _cfg.AutoPolacz     = _autoPolacz.Checked;
         _cfg.PiIp           = _ip.Text.Trim();
-        _cfg.SterownikAnten = _sterownik.Text.Trim();
+        _cfg.SterownikAnten = Config.NormalizujHost(_sterownik.Text);
         _cfg.Setupc         = _setupc.Text.Trim();
         _cfg.Anteny         = nowe;
 
