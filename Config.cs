@@ -43,6 +43,7 @@ public partial class Config
     public string Setupc         { get; set; } = "";
     public string SterownikAnten { get; set; } = "";
     public bool   AutoPolacz     { get; set; }
+    public bool   SprawdzajAktualizacje { get; set; } = true;
 
     public List<Rotor>  Rotory { get; set; } = new List<Rotor>();
     public List<Antena> Anteny { get; set; } = new List<Antena>();

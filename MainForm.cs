@@ -2,7 +2,7 @@
 
 public partial class MainForm : Form
 {
-    private const int WysokoscKarty = 64;
+    private const int WysokoscKarty = 72;
     private const int Odstep        = 8;
     private const int GoraListy     = 68;
     private const int SzerokoscOkna = 580;
@@ -93,6 +93,8 @@ public partial class MainForm : Form
         _timer.Interval = 700;
         _timer.Tick += (_, _) => Odswiez();
         _timer.Start();
+
+        SprawdzAktualizacjeWTle();
     }
 
     private Label EtykietaStanu(Point poz)

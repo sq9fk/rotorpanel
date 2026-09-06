@@ -98,6 +98,7 @@ JSON-em bez podwajania znaków.
 | `setupc` | ścieżka do `setupc.exe` z com0com |
 | `sterownikAnten` | adres sterownika anten w postaci `host` albo `host:port`, np. `192.168.1.101` |
 | `autoPolacz` | czy zestawiać mostki od razu po uruchomieniu |
+| `sprawdzajAktualizacje` | czy sprawdzać przy starcie, czy jest nowsze wydanie |
 | `rotory[].nr` | numer rotora, do którego odwołują się anteny |
 | `rotory[].nazwa` | nazwa własna, np. „maszt A” |
 | `rotory[].com` | port widoczny dla PstRotatora |
@@ -116,6 +117,26 @@ ten sam rotor; mostek powstaje jeden, bo fizycznie to jedno połączenie.
 
 Starsze konfiguracje, w których para i port były przypisane wprost do anteny, są przy wczytaniu
 zamieniane na ten model. Wystarczy raz zapisać ustawienia, żeby plik zapisał się w nowej postaci.
+
+---
+
+## Aktualizacje
+
+Kilka sekund po uruchomieniu program sprawdza, czy w [wydaniach](https://github.com/sq9fk/rotorpanel/releases)
+pojawiła się nowsza wersja. Jeśli tak, pokazuje panel i pyta, czy ją pobrać. Po zgodzie
+ściąga plik, podmienia się nim i uruchamia ponownie — bez instalatora i bez ręcznego
+kopiowania.
+
+Podmiana działa tak, że działający plik jest **przemianowywany** na `.old`: Windows nie
+pozwala nadpisać uruchomionego programu, ale pozwala zmienić mu nazwę. Gdyby kopiowanie
+nowego pliku się nie powiodło, poprzedni wraca na miejsce. Plik `.old` znika przy następnym
+uruchomieniu.
+
+Sprawdzanie można wyłączyć w Ustawieniach. Ręcznie wywołasz je z menu ikony w zasobniku,
+pozycją *Sprawdź aktualizacje* — wtedy program mówi też, gdy wersja jest już najnowsza.
+
+Jeśli program leży w katalogu wymagającym uprawnień, na przykład w `Program Files`, podmiana
+się nie uda i zobaczysz komunikat z podpowiedzią, żeby przenieść go w inne miejsce.
 
 ---
 
@@ -347,6 +368,8 @@ Klasy okien są dzielone na pliki częściowe, żeby żaden nie urósł ponad cz
 | `MainForm.Stan.cs` | karty anten i cykl odświeżania |
 | `MainForm.Siec.cs` | diody łączności oraz oznaczenia nadajników |
 | `MainForm.Tray.cs` | ikona w zasobniku, menu, chowanie i zamykanie |
+| `MainForm.Aktualizacja.cs` | pytanie o aktualizację i jej instalacja |
+| `Aktualizacja.cs` | odczyt wydań z GitHuba i podmiana pliku programu |
 | `SettingsForm.cs` | okno ustawień: nagłówek i przyciski |
 | `SettingsForm.Siatki.cs` | tabele rotorów i anten |
 | `SettingsForm.Akcje.cs` | pary, wybór pliku, pobieranie nazw, zapis |

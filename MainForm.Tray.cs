@@ -171,6 +171,8 @@ public partial class MainForm
         }
 
         _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add(new ToolStripMenuItem("Sprawdź aktualizacje", null,
+            async (_, _) => await SprawdzAktualizacje(recznie: true)));
         _menu.Items.Add(new ToolStripMenuItem("Zamknij", null, (_, _) => ZamknijNaprawde()));
     }
 

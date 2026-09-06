@@ -77,6 +77,12 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Aktualizacja podmienia plik przez przemianowanie.** Windows nie pozwala nadpisać
+uruchomionego programu, ale pozwala zmienić mu nazwę — stąd `.old`. Przed startem nowej kopii
+`Program.ZwolnijBlokade()` musi puścić muteks jednej instancji, inaczej nowa kopia uzna się za
+drugą i tylko obudzi tę kończącą pracę. Nowa kopia dostaje argument `--po-aktualizacji`
+i czeka do dziesięciu sekund na zwolnienie blokady.
+
 ## Pułapki, na które już wpadliśmy
 
 **`setupc` wymaga katalogu roboczego.** Szuka `com0com.inf` w katalogu bieżącym; wywołany
@@ -113,6 +119,10 @@ mimo że wyglądał poprawnie.
 
 **`System.Drawing` nie czyta wpisów PNG w ikonach.** Rozmiary do 64 px zapisujemy jako DIB,
 PNG zostaje dla 128 i 256.
+
+**Plik `.old` bywa zajęty tuż po starcie.** Poprzednia kopia kończy pracę już po
+uruchomieniu nowej, więc sprzątanie z `Program.Main` trafia na zablokowany plik. Dlatego
+`SprawdzAktualizacjeWTle` powtarza je po czterech sekundach.
 
 **Paczki com0com bez przyrostka `-signed` są niepodpisane.** Decyduje przyrostek, nie numer
 wersji — gałąź 2.2.2.0 ma zarówno warianty podpisane, jak i niepodpisane. W dokumentacji było

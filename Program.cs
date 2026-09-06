@@ -1,4 +1,6 @@
-﻿namespace RotorPanel;
+﻿using System.Net;
+
+namespace RotorPanel;
 
 internal static class Program
 {
@@ -7,10 +9,28 @@ internal static class Program
     private const string NazwaMutexu  = "RotorPanel.JednaInstancja";
     private const string NazwaSygnalu = "RotorPanel.PokazOkno";
 
+    /// <summary>Program uruchomiony ponownie po podmianie pliku czeka na zwolnienie blokady.</summary>
+    public const string ArgumentPoAktualizacji = "--po-aktualizacji";
+
+    private static Mutex _blokada;
+
     [STAThread]
     private static void Main()
     {
-        using var blokada = new Mutex(true, NazwaMutexu, out bool pierwszaInstancja);
+        bool poAktualizacji = Environment.GetCommandLineArgs()
+            .Any(a => string.Equals(a, ArgumentPoAktualizacji, StringComparison.OrdinalIgnoreCase));
+
+        _blokada = new Mutex(true, NazwaMutexu, out bool pierwszaInstancja);
+
+        // Poprzednia kopia moze jeszcze konczyc prace - dajemy jej chwile.
+        if (!pierwszaInstancja && poAktualizacji)
+        {
+            for (int i = 0; i < 40 && !pierwszaInstancja; i++)
+            {
+                Thread.Sleep(250);
+                try { pierwszaInstancja = _blokada.WaitOne(0); } catch { break; }
+            }
+        }
 
         if (!pierwszaInstancja)
         {
@@ -18,7 +38,6 @@ internal static class Program
             return;
         }
 
-        // Odpowiednik ApplicationConfiguration.Initialize() z .NET 6+.
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
@@ -26,6 +45,12 @@ internal static class Program
         // z ktorego trudno cokolwiek wyczytac.
         Application.ThreadException += (_, e) => PokazBlad(e.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => PokazBlad(e.ExceptionObject as Exception);
+
+        // Starsze wersje .NET Framework nie negocjuja TLS 1.2 samoczynnie,
+        // a bez niego GitHub odrzuca polaczenie.
+        try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { }
+
+        Aktualizacja.PosprzatajPoAktualizacji();
 
         try
         {
@@ -44,6 +69,18 @@ internal static class Program
                 + Environment.NewLine + Environment.NewLine + ex.Message,
                 "RotorPanel", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    /// <summary>Zwalnia blokade, zeby nowa kopia programu mogla ja przejac.</summary>
+    public static void ZwolnijBlokade()
+    {
+        try
+        {
+            _blokada?.ReleaseMutex();
+            _blokada?.Dispose();
+        }
+        catch { /* i tak zaraz konczymy prace */ }
+        finally { _blokada = null; }
     }
 
     /// <summary>Druga instancja tylko budzi pierwsza i konczy sie po cichu.</summary>

@@ -10,7 +10,8 @@ public partial class Config
             PiIp = "192.168.1.100",
             Setupc = "C:/Program Files (x86)/com0com/setupc.exe",
             SterownikAnten = "",
-            AutoPolacz = false
+            AutoPolacz = false,
+            SprawdzajAktualizacje = true
         };
         for (int i = 1; i <= 6; i++)
             cfg.Anteny.Add(new Antena { Nr = i, Nazwa = "ANT" + i });
@@ -34,7 +35,8 @@ public partial class Config
             PiIp           = Json.Tekst(korzen, "piIp", "127.0.0.1"),
             Setupc         = Json.Tekst(korzen, "setupc"),
             SterownikAnten = NormalizujHost(Json.Tekst(korzen, "sterownikAnten")),
-            AutoPolacz     = Json.Flaga(korzen, "autoPolacz", false)
+            AutoPolacz     = Json.Flaga(korzen, "autoPolacz", false),
+            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true)
         };
 
         CzytajRotory(cfg, korzen);
@@ -161,6 +163,7 @@ public partial class Config
         korzen.Dodaj("setupc", Setupc);
         korzen.Dodaj("sterownikAnten", SterownikAnten);
         korzen.Dodaj("autoPolacz", AutoPolacz);
+        korzen.Dodaj("sprawdzajAktualizacje", SprawdzajAktualizacje);
         korzen.Dodaj("rotory", rotory);
         korzen.Dodaj("anteny", anteny);
 

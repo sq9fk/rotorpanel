@@ -27,7 +27,7 @@ public partial class MainForm
             Promien = 8
         };
 
-        var dioda = new Led { Location = new Point(16, 22) };
+        var dioda = new Led { Location = new Point(16, 26) };
         karta.Controls.Add(dioda);
 
         string podpis = a.Nr + ".  " + a.Etykieta;
@@ -35,7 +35,7 @@ public partial class MainForm
             TextRenderer.MeasureText(podpis, Theme.Nazwa()).Width + 4, 170);
 
         karta.Controls.Add(Ui.Etykieta(podpis, Theme.Nazwa(), Theme.Tekst,
-            new Point(44, 8), new Size(szerokoscPodpisu, 20)));
+            new Point(44, 6), new Size(szerokoscPodpisu, 20)));
 
         // Oznaczenia nadajnikow stoja tuz za nazwa anteny, wiec nie odjezdzaja
         // od niej przy krotkich nazwach.
@@ -44,38 +44,34 @@ public partial class MainForm
         {
             znaczniki[i] = new Znacznik
             {
-                Location = new Point(44 + szerokoscPodpisu + 6 + i * 46, 9)
+                Location = new Point(44 + szerokoscPodpisu + 6 + i * 46, 7)
             };
             karta.Controls.Add(znaczniki[i]);
         }
 
-        string strzalka = " " + ((char)0x2192) + " ";
-        string trasa, dymek;
+        // Nazwa rotora i trasa dostaly osobne wiersze - razem nie miescily sie
+        // w jednej linijce i adres byl obcinany.
+        string nazwaRotora = rotor == null ? "bez rotora" : rotor.Etykieta;
+        karta.Controls.Add(Ui.Etykieta(nazwaRotora, Theme.Maly(),
+            rotor == null ? Theme.TekstSzary : Theme.Tekst,
+            new Point(44, 28), new Size(190, 16)));
 
-        if (rotor == null)
-        {
-            trasa = dymek = "bez rotora";
-        }
-        else
-        {
-            // Na karcie liczy sie trasa: skad dokad. Nazwa rotora jest w dymku,
-            // w menu zasobnika i w ustawieniach - tutaj wypchnelaby adres poza etykiete.
-            trasa = rotor.Com + strzalka + m.Adres + ":" + rotor.Port;
-            dymek = rotor.Etykieta + Environment.NewLine + trasa;
-        }
+        string trasa = rotor == null
+            ? ""
+            : rotor.Com + " " + ((char)0x2192) + " " + m.Adres + ":" + rotor.Port;
 
         var etykietaTrasy = Ui.Etykieta(trasa, Theme.Maly(), Theme.TekstSzary,
-            new Point(44, 30), new Size(190, 16));
+            new Point(44, 46), new Size(220, 16));
         karta.Controls.Add(etykietaTrasy);
-        _dymek.SetToolTip(etykietaTrasy, dymek);
+        if (rotor != null) _dymek.SetToolTip(etykietaTrasy, nazwaRotora + Environment.NewLine + trasa);
 
         var stan = Ui.Etykieta(rotor != null ? "zatrzymany" : "", Theme.Zwykly(), Theme.TekstSzary,
-            new Point(238, 8), new Size(162, 20));
+            new Point(238, 6), new Size(162, 20));
         stan.TextAlign = ContentAlignment.MiddleRight;
         karta.Controls.Add(stan);
 
         var ruch = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(240, 30), new Size(160, 16));
+            new Point(240, 28), new Size(160, 16));
         ruch.TextAlign = ContentAlignment.MiddleRight;
         karta.Controls.Add(ruch);
 
@@ -83,7 +79,7 @@ public partial class MainForm
         if (rotor != null)
         {
             przelacz = Ui.Przycisk("Połącz", 92, glowny: true);
-            przelacz.Location = new Point(408, 17);
+            przelacz.Location = new Point(408, 21);
             przelacz.Tag = m;
             przelacz.Click += (s, _) =>
             {

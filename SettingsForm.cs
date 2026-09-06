@@ -9,7 +9,7 @@ public partial class SettingsForm : Form
     private readonly Config _cfg;
 
     private TextBox _ip, _sterownik, _setupc;
-    private CheckBox _autoPolacz;
+    private CheckBox _autoPolacz, _sprawdzajAktualizacje;
     private Label _info;
 
     private DataGridView _siatkaRotorow, _siatkaAnten;
@@ -26,7 +26,7 @@ public partial class SettingsForm : Form
         _cfg = cfg;
 
         Text            = "Ustawienia";
-        ClientSize      = new Size(720, 636);
+        ClientSize      = new Size(720, 652);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -89,17 +89,29 @@ public partial class SettingsForm : Form
         };
         Controls.Add(_autoPolacz);
 
+        _sprawdzajAktualizacje = new CheckBox
+        {
+            Text = "Sprawdzaj aktualizacje przy starcie",
+            Checked = cfg.SprawdzajAktualizacje,
+            Location = new Point(266, 594),
+            Size = new Size(230, 22),
+            Font = Theme.Zwykly(),
+            ForeColor = Theme.Tekst,
+            BackColor = Color.Transparent
+        };
+        Controls.Add(_sprawdzajAktualizacje);
+
         _info = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(266, 598), new Size(200, 18));
+            new Point(20, 622), new Size(440, 18));
         Controls.Add(_info);
 
         var zapisz = Ui.Przycisk("Zapisz", 110, glowny: true);
-        zapisz.Location = new Point(478, 592);
+        zapisz.Location = new Point(478, 610);
         zapisz.Click += (_, _) => Zapisz();
         Controls.Add(zapisz);
 
         var anuluj = Ui.Przycisk("Anuluj", 96);
-        anuluj.Location = new Point(600, 592);
+        anuluj.Location = new Point(600, 610);
         anuluj.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         Controls.Add(anuluj);
 
