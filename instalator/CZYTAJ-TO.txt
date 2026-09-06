@@ -1,0 +1,138 @@
+RotorPanel - mostki rotorow do ser2net
+======================================
+
+Do czego to sluzy
+-----------------
+Sterowniki rotorow SPID Rot1Prog wisza na Raspberry Pi i sa wystawione po TCP
+przez ser2net. RotorPanel laczy je z portami COM na Windows, zeby PstRotator
+mogl z nich korzystac tak, jakby byly podlaczone lokalnie.
+
+    Rot1Prog --RS232--> /dev/ant* --ser2net:400x--> siec --RotorPanel--> COMxx --> PstRotator
+
+Program sam obsluguje transmisje - nie potrzebuje hub4com ani zadnego
+dodatkowego mostka.
+
+
+Czego wymaga
+------------
+1. Windows 10 lub 11 - program dziala na .NET Framework 4.8, ktory jest
+   czescia systemu. NIE trzeba niczego doinstalowywac.
+2. com0com 3.0.0.0 PODPISANY   - trzeba zainstalowac samemu, przed reszta:
+                                 https://com0com.sourceforge.net/
+                                 (wersja 2.2.2.0 jest niepodpisana i wymaga
+                                 wylaczania wymuszania podpisow - nie uzywac)
+
+
+Wersja przenosna
+----------------
+Sam plik app\RotorPanel.exe (okolo 65 KB) jest w pelni samowystarczalny.
+Mozna go skopiowac gdziekolwiek - na pendrive, do dowolnego katalogu - i
+uruchomic. Przy pierwszym starcie tworzy obok siebie rotory.json z ustawieniami
+domyslnymi. Jesli skopiujesz obok takze rotory.json, zabierze ze soba pelna
+konfiguracje.
+
+Do dzialania potrzebne sa jeszcze pary portow com0com - patrz utworz-pary.bat.
+
+
+Instalacja
+----------
+1. Zainstaluj com0com (jesli jeszcze go nie ma).
+   Podczas instalacji ODZNACZ tworzenie domyslnej pary CNCA0/CNCB0.
+
+2. Uruchom  install.bat
+   Skopiuje program do %LOCALAPPDATA%\RotorPanel i zrobi skroty.
+
+3. Uruchom  utworz-pary.bat
+   Sam poprosi o uprawnienia administratora. Zaklada trzy pary:
+
+       COM10 <-> CNCB10
+       COM11 <-> CNCB11
+       COM12 <-> CNCB12
+
+   Lewa strona jest dla PstRotatora, prawa dla RotorPanela.
+   To samo mozna zrobic pozniej w programie: Pary COM... -> Utworz pary.
+
+4. Uruchom RotorPanel i wejdz w Ustawienia:
+     - adres ser2net (domyslnie 192.168.6.3)
+     - adres sterownika anten (domyslnie http://192.168.6.6/)
+     - przycisk "Pobierz nazwy" zaciaga nazwy anten ze sterownika;
+       bez lacznosci zostaja ANT1..ANT6
+     - dla kazdej obracanej anteny zaznacz "Rotor", wybierz pare z listy
+       i wpisz port TCP wystawiony przez ser2net
+
+
+Domyslne przypisanie
+--------------------
+    antena 4   A3S         COM10 <-> CNCB10   port 4001
+    antena 5   10m 5el.    COM12 <-> CNCB12   port 4003
+    antena 6   15m 4el.    COM11 <-> CNCB11   port 4002
+
+UWAGA: to jest przypisanie dobrane po nazwach, nie odczytane ze sprzetu.
+Zweryfikuj je, obracajac kolejno kazdy rotor i patrzac, ktory maszt sie rusza.
+
+
+PstRotator
+----------
+Sterownik: Alfa SPID  RAK / Rot1Prog  (NIE Rot2Prog - ten czeka na 12 bajtow,
+a Rot1Prog odpowiada ramka 5-bajtowa i azymut sie nie pokaze).
+Port: COM10 / COM11 / COM12, 1200 8N1.
+
+Przy kilku rotorach potrzeba kilku instancji PstRotatora - kazda w osobnym
+katalogu i z innym portem "rotor" (12040, 12042, 12044).
+
+
+Praca w zasobniku
+-----------------
+Program startuje ZMINIMALIZOWANY, jako ikona przy zegarze. Kolor strzalki
+pokazuje stan zbiorczy:
+
+    szara         - zaden mostek nie dziala
+    pomaranczowa  - trwa laczenie
+    zielona       - przynajmniej jeden mostek polaczony
+
+Podpowiedz pod kursorem mowi ile mostkow jest polaczonych.
+
+    klikniecie lewym      - otwiera panel, a gdy juz jest otwarty - chowa go
+    prawy przycisk        - menu: otwarcie panelu, polaczenie lub rozlaczenie
+                            pojedynczego rotora, wszystkich naraz, oraz Zamknij
+    krzyzyk w oknie       - chowa program do zasobnika, NIE zamyka go
+
+Program konczy sie wylacznie przez pozycje "Zamknij" w menu ikony.
+
+Program moze dzialac tylko w jednej kopii. Ponowne uruchomienie - ze skrotu,
+z autostartu, czy z pliku exe - nie tworzy drugiej instancji, tylko wyciaga
+z zasobnika te juz dzialajaca.
+
+Po uruchomieniu program NIE laczy mostkow sam - czeka na decyzje. Mostki
+zestawia sie klikajac w menu ikony ("Polacz wszystkie" albo pojedynczy rotor)
+lub przyciskiem w panelu. Jesli wolisz, zeby laczyl sie sam, zaznacz w
+Ustawieniach pole "Lacz automatycznie po uruchomieniu".
+
+Autostart: uruchom autostart.bat - przelacza uruchamianie przy logowaniu.
+Ten sam plik wylacza autostart, gdy jest juz wlaczony.
+
+
+Na co uwazac
+------------
+- Kazdy port ser2net przyjmuje JEDNO polaczenie na raz. Nie uruchamiaj
+  rownolegle drugiego mostka ani PuTTY na tym samym porcie.
+- Po stronie Raspberry rotctld musi byc wylaczony dla tych urzadzen -
+  port szeregowy ma jednego wlasciciela.
+- Predkosc transmisji ustawia ser2net na Pi (1200 8N1). To, co wybierzesz
+  w PstRotatorze, nie ma znaczenia, bo para com0com nie ma prawdziwego UART-u.
+
+
+Diagnostyka
+-----------
+W oknie glownym kazda antena ma diode:
+    szara         - mostek zatrzymany
+    pomaranczowa  - laczenie albo ponawianie po zerwaniu
+    zielona       - polaczenie z ser2net zestawione
+
+Liczniki RX/TX pokazuja bajty, ktore faktycznie przeszly - jesli stoja na
+zerze przy zielonej diodzie, znaczy ze PstRotator nie odpytuje sterownika.
+
+Okno "Pary COM..." pokazuje, czy porty istnieja w systemie, oraz parametry
+kazdej pary. Wykrzyknik oznacza parametr odbiegajacy od domyslnego -
+zwlaszcza ExclusiveMode=1 potrafi sprawic, ze port COM w ogole sie nie
+pojawi, a EmuBR=1 dlawi transmisje.
