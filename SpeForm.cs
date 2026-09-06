@@ -17,9 +17,16 @@ public sealed class SpeForm : Form
     private readonly System.Windows.Forms.Timer _zegar, _puls;
     private DateTime _ostatniPuls = DateTime.MinValue;
 
-    // Puls wypadajacy tuz po klawiszu gubi ten klawisz, wiec na czas jego obslugi
-    // wstrzymujemy pulsowanie z zegara.
+    // Puls wypadajacy blisko klawisza gubi ten klawisz, wiec na czas obslugi i chwile
+    // po niej pulsowanie z zegara jest wstrzymane.
     private bool _klawiszWToku;
+    private DateTime _ostatniKlawisz = DateTime.MinValue;
+
+    // Kazdy zbedny puls kosztuje: przy takcie 1 s wzmacniacz odpowiadal kolejno po
+    // 218, 1150, 1055 i 2170 ms, a klawisz wyslany 100 ms po pulsie przepadal.
+    // Dlatego w tle pulsujemy rzadko, a po klawiszu robimy cisze.
+    private static readonly TimeSpan CiszaPoKlawiszu = TimeSpan.FromMilliseconds(1500);
+    private static readonly TimeSpan TaktSpoczynku   = TimeSpan.FromSeconds(3);
 
     // Klawisze, ktore zmieniaja stan nadawania albo zasilania - pytamy przed wyslaniem.
     private static readonly byte[] Ostrozne = { 0x09, 0x0A, 0x0B, 0x0D };
@@ -132,11 +139,11 @@ public sealed class SpeForm : Form
         _zegar.Start();
         Odswiez();
 
-        // Wzmacniacz nie przysyla ekranu sam z siebie - nawet po nacisnieciu klawisza.
-        // Swieza klatke wymusza dopiero przelaczenie RCU wylacz/wlacz, a od polecenia
-        // do ramki mija u niego okolo pol sekundy (zmierzone). Dlatego nie pulsujemy
-        // na sztywny takt, tylko zaraz po tym, jak przyjdzie poprzednia klatka.
-        _puls = new System.Windows.Forms.Timer { Interval = 120 };
+        // Wzmacniacz nie przysyla ekranu sam z siebie i jedna klatka zajmuje mu okolo
+        // pol sekundy. Kazdy puls w tle odbiera mu uwage: zmierzone przy takcie 250 ms
+        // przepadaly 3 klawisze na 6, przy 600 ms jeden, a bez pulsu w tle - zaden.
+        // Dlatego pulsujemy po klawiszu, a w tle dopiero gdy uzytkownik nic nie robi.
+        _puls = new System.Windows.Forms.Timer { Interval = 250 };
         _puls.Tick += async (_, _) => await PulsGdyTrzeba();
 
         Shown += async (_, _) =>
@@ -198,12 +205,28 @@ public sealed class SpeForm : Form
         // 60 ms to zmierzone minimum, ktore dziala. Na ten czas wstrzymujemy tez puls
         // z zegara, bo trafiony w zla chwile kasuje klawisz.
         _klawiszWToku = true;
+        _ostatniKlawisz = DateTime.UtcNow;
         try
         {
             await Task.Delay(60);
+
+            // Wzmacniacz czasem puls przemilcza i klatka nie przychodzi wcale.
+            // Zmierzone: potrafi tak zamilknac na ponad trzy sekundy, do nastepnego
+            // pulsu. Dlatego ponawiamy, zamiast czekac na zegar.
+            var przed = _mostek.Ekran;
             await Puls();
+
+            for (int proba = 0; proba < 2; proba++)
+            {
+                if (await PoczekajNaKlatke(przed, 700)) break;
+                await Puls();
+            }
         }
-        finally { _klawiszWToku = false; }
+        finally
+        {
+            _ostatniKlawisz = DateTime.UtcNow;
+            _klawiszWToku = false;
+        }
     }
 
     /// <summary>
@@ -221,20 +244,33 @@ public sealed class SpeForm : Form
         await _mostek.WyslijKlawisz(EkranSpe.RcuWlacz, CancellationToken.None);
     }
 
+    /// <summary>Czeka na nowa klatke, najwyzej podany czas. Zwraca, czy przyszla.</summary>
+    private async Task<bool> PoczekajNaKlatke(EkranSpe przed, int milisekund)
+    {
+        var koniec = DateTime.UtcNow.AddMilliseconds(milisekund);
+
+        while (DateTime.UtcNow < koniec)
+        {
+            if (!ReferenceEquals(_mostek.Ekran, przed)) return true;
+            await Task.Delay(30);
+        }
+
+        return false;
+    }
+
     /// <summary>
-    /// Pulsuje dopiero wtedy, gdy poprzednia klatka juz przyszla - inaczej polecenia
-    /// pietrzylyby sie szybciej, niz wzmacniacz zdazy odpowiedziec. Po sekundzie bez
-    /// odpowiedzi probujemy mimo wszystko, zeby podglad nie zamarl na dobre.
+    /// Puls z zegara. Wstrzymany tylko na czas obslugi klawisza, bo trafiony zaraz
+    /// po nim kasuje ten klawisz.
     /// </summary>
     private async Task PulsGdyTrzeba()
     {
         if (_klawiszWToku) return;
 
-        var ekran = _mostek.Ekran;
-        bool klatkaPoPulsie = ekran is not null && ekran.Kiedy > _ostatniPuls;
-        bool czekamyZaDlugo = DateTime.UtcNow - _ostatniPuls > TimeSpan.FromSeconds(1);
+        var teraz = DateTime.UtcNow;
+        if (teraz - _ostatniKlawisz < CiszaPoKlawiszu) return;
+        if (teraz - _ostatniPuls < TaktSpoczynku) return;
 
-        if (klatkaPoPulsie || czekamyZaDlugo) await Puls();
+        await Puls();
     }
 
     private void PokazEkran()
@@ -261,9 +297,11 @@ public sealed class SpeForm : Form
 
         if (!swiezy)
         {
-            _stan.Text = _mostek.Stan == StanMostka.Polaczony
-                ? "czekam na odczyt stanu…"
-                : "mostek rozłączony";
+            // Przy otwartym podgladzie nie odpytujemy o status, zeby nie odbierac
+            // wzmacniaczowi czasu na klatki - wszystko widac na samym ekranie.
+            _stan.Text = _mostek.Stan != StanMostka.Polaczony ? "mostek rozłączony"
+                       : status is not null ? status.Opis
+                       : "stan czytany z ekranu poniżej";
             _stan.ForeColor = Theme.TekstSzary;
             return;
         }

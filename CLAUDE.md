@@ -110,6 +110,23 @@ Sprawdzian koncowy to zdjecia ekranow w instrukcji Experta 1.3K-FA - renderowani
 z nimi co do znaku. Jesli kiedys nie bedzie sie zgadzac, porownaj z `obraz-12.jpg`
 (SET ANTENNA ON BANK "A") wyciagnietym z tego PDF-a.
 
+**Zapis do pary com0com potrafi zablokowac cala pompe.** Gdy po drugiej stronie pary nikt
+nie czyta, `WriteAsync` na porcie stoi - zmierzone **2,77 sekundy na szesc bajtow**. Robiony
+wprost w pompie zatrzymywal odbior z sieci, wiec ramki ekranu czekaly w buforze i podglad
+chodzil po 1-2 sekundy zamiast po 600 ms. Dlatego kierunek siec-do-portu idzie przez kolejke
+(`Mostek.Oddaj` i `PisarzPortu`): odbior nigdy nie czeka na zapis, a gdy kolejka rosnie ponad
+256 porcji, znaczy to, ze odbiorcy nie ma, i najstarsze dane odpadaja. Nie wracaj do zapisu
+wprost w pompie.
+
+**Odpytywanie o status przy otwartym podgladzie trzeba wylaczyc.** Zapytanie `0x90` wciskajace
+sie miedzy puls a klatke opoznialo ja o ponad sekunde. Przy `TrybEkranu` petla `OdpytujSpe`
+tylko spi - stan i tak widac na ekranie wzmacniacza.
+
+**Wzmacniacz czasem przemilcza puls.** Potrafi nie odpowiedziec przez ponad trzy sekundy, do
+nastepnego pulsu z zegara. Dlatego po klawiszu czekamy 700 ms na klatke i ponawiamy puls
+(dwie proby). Po tych trzech poprawkach zmierzone: typowo **850-950 ms** od klikniecia do
+zmiany obrazu, sporadycznie do 2,4 s, bez gubienia klawiszy.
+
 **Puls tuz po klawiszu kasuje ten klawisz.** Zmierzone na Expercie 1.3K-FA: przy zwloce 0
 i 20 ms miedzy klawiszem a przelaczeniem RCU wzmacniacz nie zmienia ekranu **w ogole**, przy
 60 ms nowa klatka jest po ~550 ms, przy 200 ms po ~720 ms. Stad `SpeForm` czeka 60 ms po

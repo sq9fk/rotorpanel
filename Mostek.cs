@@ -27,6 +27,8 @@ public sealed class Mostek : IDisposable
     private readonly SemaphoreSlim _bramka = new SemaphoreSlim(1, 1);
     private volatile StatusSpe _status;
     private volatile CzytnikSpe _czytnikSpe;
+    private System.Collections.Concurrent.ConcurrentQueue<byte[]> _kolejkaPortu;
+    private SemaphoreSlim _budzikPortu;
     private bool _trybEkranu;
 
     // Strumien do urzadzenia, zeby okno klawiatury mialo gdzie wyslac kod klawisza.
@@ -134,12 +136,16 @@ public sealed class Mostek : IDisposable
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
                 _czytnikSpe = czytnik;
 
+                _kolejkaPortu = new System.Collections.Concurrent.ConcurrentQueue<byte[]>();
+                _budzikPortu = new SemaphoreSlim(0);
+                var pisarz = PisarzPortu(port, ct);
+
                 var wGore = Pompa(port, siec, zPortu: true,  null, ct);
                 var wDol  = Pompa(siec, port, zPortu: false, czytnik, ct);
                 var pytania = czytnik is null ? Task.Delay(Timeout.Infinite, ct)
                                               : OdpytujSpe(siec, czytnik, ct);
 
-                await Task.WhenAny(wGore, wDol, pytania);
+                await Task.WhenAny(wGore, wDol, pytania, pisarz);
             }
             catch (OperationCanceledException) { break; }
             catch (ObjectDisposedException) { break; }
@@ -215,8 +221,7 @@ public sealed class Mostek : IDisposable
                 Interlocked.Add(ref _rx, dalej.Length);
                 if (dalej.Length == 0) continue;
 
-                await dokad.WriteAsync(dalej, 0, dalej.Length, ct);
-                await dokad.FlushAsync(ct);
+                Oddaj(dokad, dalej, ct);
                 continue;
             }
 
@@ -232,9 +237,43 @@ public sealed class Mostek : IDisposable
             }
             else
             {
-                await dokad.WriteAsync(bufor, 0, n, ct);
-                await dokad.FlushAsync(ct);
+                var kopia = new byte[n];
+                Array.Copy(bufor, kopia, n);
+                Oddaj(dokad, kopia, ct);
             }
+        }
+    }
+
+    /// <summary>
+    /// Wklada dane do kolejki zapisu na port. Zapis do pary com0com potrafi stanac
+    /// na sekundy, gdy po drugiej stronie nikt nie czyta - zmierzone 2,77 s na szesc
+    /// bajtow. Robiony wprost w pompie zatrzymywal odbior z sieci, wiec klatki ekranu
+    /// czekaly w buforze. Kolejka trzyma odbior wolnym; gdy sie przepelni, znaczy to,
+    /// ze odbiorcy nie ma, i najstarsze dane odpadaja.
+    /// </summary>
+    private void Oddaj(Stream port, byte[] dane, CancellationToken ct)
+    {
+        if (_kolejkaPortu is null) return;
+        if (_kolejkaPortu.Count > 256) _kolejkaPortu.TryDequeue(out _);
+        _kolejkaPortu.Enqueue(dane);
+        _budzikPortu.Release();
+    }
+
+    private async Task PisarzPortu(Stream port, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await _budzikPortu.WaitAsync(ct);
+            if (!_kolejkaPortu.TryDequeue(out var dane)) continue;
+
+            try
+            {
+                await port.WriteAsync(dane, 0, dane.Length, ct);
+                await port.FlushAsync(ct);
+            }
+            catch (OperationCanceledException) { return; }
+            catch (ObjectDisposedException) { return; }
+            catch { /* port zniknal - petla mostka to zauwazy */ }
         }
     }
 
@@ -279,6 +318,15 @@ public sealed class Mostek : IDisposable
 
         while (!ct.IsCancellationRequested)
         {
+            // Przy otwartym podgladzie ekranu w ogole nie pytamy o status. Zmierzone:
+            // zapytanie wciskajace sie miedzy puls a klatke opoznialo ja o ponad sekunde,
+            // a stan i tak widac wtedy na samym ekranie wzmacniacza.
+            if (_trybEkranu)
+            {
+                await Task.Delay(500, ct);
+                continue;
+            }
+
             await _bramka.WaitAsync(ct);
             try
             {
@@ -287,9 +335,8 @@ public sealed class Mostek : IDisposable
             }
             finally { _bramka.Release(); }
 
-            // Przy otwartym podgladzie ekranu odpytujemy rzadziej - wzmacniacz ma wtedy
-            // wiecej czasu na klatki, a stan i tak widac na samym ekranie.
-            await Task.Delay(_trybEkranu ? 3000 : 1000, ct);
+
+            await Task.Delay(1000, ct);
         }
     }
 
