@@ -5,11 +5,16 @@
   "setupc": "C:/Program Files (x86)/com0com/setupc.exe",
   "sterownikAnten": "192.168.1.101",
   "autoPolacz": false,
+  "sprawdzajAktualizacje": true,
 
   "rotory": [
-    { "nr": 1, "nazwa": "Rotor 1", "com": "COM10", "dev": "CNCB10", "ip": "", "port": 4001 },
-    { "nr": 2, "nazwa": "Rotor 2", "com": "COM11", "dev": "CNCB11", "ip": "", "port": 4002 },
-    { "nr": 3, "nazwa": "Rotor 3", "com": "COM12", "dev": "CNCB12", "ip": "", "port": 4003 }
+    { "nr": 1, "nazwa": "Rotor 1", "com": "COM10", "dev": "CNCB10", "ip": "", "port": 4001, "protokol": "surowy" },
+    { "nr": 2, "nazwa": "Rotor 2", "com": "COM11", "dev": "CNCB11", "ip": "", "port": 4002, "protokol": "surowy" },
+    { "nr": 3, "nazwa": "Rotor 3", "com": "COM12", "dev": "CNCB12", "ip": "", "port": 4003, "protokol": "surowy" }
+  ],
+
+  "urzadzenia": [
+    { "nr": 1, "nazwa": "Wzmacniacz", "com": "COM13", "dev": "CNCB13", "ip": "192.168.1.120", "port": 4001, "protokol": "rfc2217" }
   ],
 
   "anteny": [

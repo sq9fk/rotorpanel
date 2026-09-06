@@ -18,14 +18,50 @@ public partial class MainForm
         _sterownikOsiagalny = null;
     }
 
-    private Karta BudujKarte(Antena a, Rotor rotor, Mostek m, int y)
+    /// <summary>Wspolny szkielet karty - reszte dokladaja metody nizej.</summary>
+    private Karta PustaKarta(int y)
+        => new Karta { Location = new Point(0, y), Size = new Size(516, WysokoscKarty), Promien = 8 };
+
+    private Button PrzyciskPrzelaczania(Karta karta, Mostek m)
     {
-        var karta = new Karta
+        var przelacz = Ui.Przycisk("Połącz", 92, glowny: true);
+        przelacz.Location = new Point(408, 21);
+        przelacz.Tag = m;
+        przelacz.Click += (s, _) =>
         {
-            Location = new Point(0, y),
-            Size = new Size(516, WysokoscKarty),
-            Promien = 8
+            var mostek = (Mostek)((Button)s).Tag;
+            if (mostek.Stan == StanMostka.Zatrzymany) mostek.Start();
+            else mostek.Stop();
+            Odswiez();
         };
+        karta.Controls.Add(przelacz);
+        return przelacz;
+    }
+
+    private Label EtykietaStanuKarty(Karta karta, bool aktywna)
+    {
+        var stan = Ui.Etykieta(aktywna ? "zatrzymany" : "", Theme.Zwykly(), Theme.TekstSzary,
+            new Point(238, 6), new Size(162, 20));
+        stan.TextAlign = ContentAlignment.MiddleRight;
+        karta.Controls.Add(stan);
+        return stan;
+    }
+
+    private Label EtykietaRuchu(Karta karta)
+    {
+        var ruch = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
+            new Point(240, 28), new Size(160, 16));
+        ruch.TextAlign = ContentAlignment.MiddleRight;
+        karta.Controls.Add(ruch);
+        return ruch;
+    }
+
+    private string OpisTrasy(Polaczenie p, Mostek m)
+        => p.Com + " " + ((char)0x2192) + " " + m.Adres + ":" + p.Port;
+
+    private Karta BudujKarteAnteny(Antena a, Rotor rotor, Mostek m, int y)
+    {
+        var karta = PustaKarta(y);
 
         var dioda = new Led { Location = new Point(16, 26) };
         karta.Controls.Add(dioda);
@@ -49,52 +85,55 @@ public partial class MainForm
             karta.Controls.Add(znaczniki[i]);
         }
 
-        // Nazwa rotora i trasa dostaly osobne wiersze - razem nie miescily sie
-        // w jednej linijce i adres byl obcinany.
-        string nazwaRotora = rotor == null ? "bez rotora" : rotor.Etykieta;
-        karta.Controls.Add(Ui.Etykieta(nazwaRotora, Theme.Maly(),
+        karta.Controls.Add(Ui.Etykieta(rotor == null ? "bez rotora" : rotor.Etykieta, Theme.Maly(),
             rotor == null ? Theme.TekstSzary : Theme.Tekst,
             new Point(44, 28), new Size(190, 16)));
 
-        string trasa = rotor == null
-            ? ""
-            : rotor.Com + " " + ((char)0x2192) + " " + m.Adres + ":" + rotor.Port;
-
+        string trasa = rotor == null ? "" : OpisTrasy(rotor, m);
         var etykietaTrasy = Ui.Etykieta(trasa, Theme.Maly(), Theme.TekstSzary,
             new Point(44, 46), new Size(220, 16));
         karta.Controls.Add(etykietaTrasy);
-        if (rotor != null) _dymek.SetToolTip(etykietaTrasy, nazwaRotora + Environment.NewLine + trasa);
+        if (rotor != null) _dymek.SetToolTip(etykietaTrasy, rotor.Etykieta + Environment.NewLine + trasa);
 
-        var stan = Ui.Etykieta(rotor != null ? "zatrzymany" : "", Theme.Zwykly(), Theme.TekstSzary,
-            new Point(238, 6), new Size(162, 20));
-        stan.TextAlign = ContentAlignment.MiddleRight;
-        karta.Controls.Add(stan);
+        var stan = EtykietaStanuKarty(karta, rotor != null);
+        var ruch = EtykietaRuchu(karta);
+        Button przelacz = rotor == null ? null : PrzyciskPrzelaczania(karta, m);
 
-        var ruch = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(240, 28), new Size(160, 16));
-        ruch.TextAlign = ContentAlignment.MiddleRight;
-        karta.Controls.Add(ruch);
-
-        Button przelacz = null;
-        if (rotor != null)
-        {
-            przelacz = Ui.Przycisk("Połącz", 92, glowny: true);
-            przelacz.Location = new Point(408, 21);
-            przelacz.Tag = m;
-            przelacz.Click += (s, _) =>
-            {
-                var mostek = (Mostek)((Button)s).Tag;
-                if (mostek.Stan == StanMostka.Zatrzymany) mostek.Start();
-                else mostek.Stop();
-                Odswiez();
-            };
-            karta.Controls.Add(przelacz);
-        }
-
-        _ui[a.Nr] = new Wiersz
+        _ui["a" + a.Nr] = new Wiersz
         {
             Mostek = m, Dioda = dioda, Stan = stan, Ruch = ruch,
             Przelacz = przelacz, Trx = znaczniki
+        };
+        return karta;
+    }
+
+    private Karta BudujKarteUrzadzenia(Urzadzenie u, Mostek m, int y)
+    {
+        var karta = PustaKarta(y);
+
+        var dioda = new Led { Location = new Point(16, 26) };
+        karta.Controls.Add(dioda);
+
+        karta.Controls.Add(Ui.Etykieta(u.Etykieta, Theme.Nazwa(), Theme.Tekst,
+            new Point(44, 6), new Size(230, 20)));
+
+        karta.Controls.Add(Ui.Etykieta(u.NazwaProtokolu, Theme.Maly(), Theme.TekstSzary,
+            new Point(44, 28), new Size(190, 16)));
+
+        string trasa = OpisTrasy(u, m);
+        var etykietaTrasy = Ui.Etykieta(trasa, Theme.Maly(), Theme.TekstSzary,
+            new Point(44, 46), new Size(220, 16));
+        karta.Controls.Add(etykietaTrasy);
+        _dymek.SetToolTip(etykietaTrasy, u.Etykieta + Environment.NewLine + trasa +
+                          Environment.NewLine + "protokół: " + u.NazwaProtokolu);
+
+        var stan = EtykietaStanuKarty(karta, true);
+        var ruch = EtykietaRuchu(karta);
+        var przelacz = PrzyciskPrzelaczania(karta, m);
+
+        _ui["u" + u.Nr] = new Wiersz
+        {
+            Mostek = m, Dioda = dioda, Stan = stan, Ruch = ruch, Przelacz = przelacz
         };
         return karta;
     }
@@ -163,7 +202,7 @@ public partial class MainForm
                               kropka + u.Szybkosc.ToString("0") + " B/s";
             }
 
-            if (!string.IsNullOrEmpty(m.Blad)) ostatniBlad = m.Rotor.Etykieta + ": " + m.Blad;
+            if (!string.IsNullOrEmpty(m.Blad)) ostatniBlad = m.Punkt.Etykieta + ": " + m.Blad;
         }
 
         _stopka.Text = ostatniBlad;

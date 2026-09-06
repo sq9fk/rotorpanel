@@ -6,6 +6,17 @@ public partial class SettingsForm
     private bool _przebudowaList;
 
     /// <summary>
+    /// Wiersze obu tabel z parami. Rotor i urzadzenie nie moga wskazywac tej samej
+    /// pary, wiec listy wyboru licza sie wspolnie.
+    /// </summary>
+    private List<DataGridViewRow> WierszePolaczen()
+    {
+        var lista = _siatkaRotorow.Rows.Cast<DataGridViewRow>().ToList();
+        if (_siatkaUrzadzen != null) lista.AddRange(_siatkaUrzadzen.Rows.Cast<DataGridViewRow>());
+        return lista;
+    }
+
+    /// <summary>
     /// Kazdy wiersz dostaje wlasna liste par: bez tych zajetych przez inne rotory.
     /// Wlasny wybor zostaje na liscie, zeby dalo sie go zobaczyc i zmienic.
     /// </summary>
@@ -16,14 +27,16 @@ public partial class SettingsForm
 
         try
         {
-            foreach (DataGridViewRow w in _siatkaRotorow.Rows)
+            var wszystkie = WierszePolaczen();
+
+            foreach (var w in wszystkie)
             {
                 if (!(w.Cells[RPara] is DataGridViewComboBoxCell komorka)) continue;
 
                 string wlasna = Kom(w, RPara);
 
                 var zajete = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (DataGridViewRow inny in _siatkaRotorow.Rows)
+                foreach (var inny in wszystkie)
                 {
                     if (ReferenceEquals(inny, w)) continue;
                     string cudza = Kom(inny, RPara);
@@ -176,10 +189,10 @@ public partial class SettingsForm
     private void BudujSekcjeAnten()
     {
         Controls.Add(Ui.Etykieta("Anteny — przypisanie rotora",
-            Theme.Nazwa(), Theme.Tekst, new Point(20, 362), new Size(400, 20)));
+            Theme.Nazwa(), Theme.Tekst, new Point(20, 550), new Size(400, 20)));
 
         // Szesc wierszy plus naglowek, zeby lista anten nigdy sie nie przewijala.
-        _siatkaAnten = NowaSiatka(new Point(18, 386), new Size(684, 6 * 28 + 32));
+        _siatkaAnten = NowaSiatka(new Point(18, 574), new Size(684, 6 * 28 + 32));
 
         var kolNr = new DataGridViewTextBoxColumn
         {

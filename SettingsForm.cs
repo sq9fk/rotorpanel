@@ -12,13 +12,13 @@ public partial class SettingsForm : Form
     private CheckBox _autoPolacz, _sprawdzajAktualizacje;
     private Label _info;
 
-    private DataGridView _siatkaRotorow, _siatkaAnten;
-    private DataGridViewComboBoxColumn _kolPara, _kolRotor;
+    private DataGridView _siatkaRotorow, _siatkaUrzadzen, _siatkaAnten;
+    private DataGridViewComboBoxColumn _kolPara, _kolParaU, _kolProtokol, _kolRotor;
 
     private const string Brak = "— brak —";
     private readonly Dictionary<string, ParaPortow> _mapaPar = new();
 
-    private const int RNr = 0, RNazwa = 1, RPara = 2, RIp = 3, RPort = 4;
+    private const int RNr = 0, RNazwa = 1, RPara = 2, RIp = 3, RPort = 4, RProtokol = 5;
     private const int ANr = 0, ANazwa = 1, ARotor = 2;
 
     public SettingsForm(Config cfg)
@@ -26,7 +26,7 @@ public partial class SettingsForm : Form
         _cfg = cfg;
 
         Text            = "Ustawienia";
-        ClientSize      = new Size(720, 660);
+        ClientSize      = new Size(720, 852);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -75,13 +75,14 @@ public partial class SettingsForm : Form
         karta.Controls.Add(odswiezPary);
 
         BudujSekcjeRotorow();
+        BudujSekcjeUrzadzen();
         BudujSekcjeAnten();
 
         _autoPolacz = new CheckBox
         {
             Text = "Łącz automatycznie po uruchomieniu",
             Checked = cfg.AutoPolacz,
-            Location = new Point(20, 590),
+            Location = new Point(20, 782),
             Size = new Size(234, 22),
             Font = Theme.Zwykly(),
             ForeColor = Theme.Tekst,
@@ -93,7 +94,7 @@ public partial class SettingsForm : Form
         {
             Text = "Sprawdzaj aktualizacje przy starcie",
             Checked = cfg.SprawdzajAktualizacje,
-            Location = new Point(262, 590),
+            Location = new Point(262, 782),
             Size = new Size(212, 22),
             Font = Theme.Zwykly(),
             ForeColor = Theme.Tekst,
@@ -102,21 +103,22 @@ public partial class SettingsForm : Form
         Controls.Add(_sprawdzajAktualizacje);
 
         _info = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(20, 618), new Size(440, 18));
+            new Point(20, 810), new Size(440, 18));
         Controls.Add(_info);
 
         var zapisz = Ui.Przycisk("Zapisz", 110, glowny: true);
-        zapisz.Location = new Point(478, 614);
+        zapisz.Location = new Point(478, 806);
         zapisz.Click += (_, _) => Zapisz();
         Controls.Add(zapisz);
 
         var anuluj = Ui.Przycisk("Anuluj", 96);
-        anuluj.Location = new Point(600, 614);
+        anuluj.Location = new Point(600, 806);
         anuluj.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         Controls.Add(anuluj);
 
         WczytajPary();
         WypelnijRotory();
+        WypelnijUrzadzenia();
         OdswiezListyPar();
         OdswiezListeRotorow();
         WypelnijAnteny();

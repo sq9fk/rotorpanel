@@ -158,12 +158,12 @@ public static class Com0Com
 
         sb.AppendLine("Porty z konfiguracji");
         sb.AppendLine("--------------------");
-        foreach (var r in cfg.Rotory.Where(x => x.Gotowy))
+        foreach (var p in cfg.WszystkiePolaczenia.Where(x => x.Gotowy))
         {
             sb.AppendLine(
-                "  " + r.Etykieta.PadRight(12) +
-                r.Com.PadRight(7) + PortIo.Opis(r.Com).PadRight(18) +
-                r.Dev.PadRight(9) + PortIo.Opis(r.Dev));
+                "  " + p.Etykieta.PadRight(20) +
+                p.Com.PadRight(7) + PortIo.Opis(p.Com).PadRight(18) +
+                p.Dev.PadRight(9) + PortIo.Opis(p.Dev));
         }
 
         sb.AppendLine();

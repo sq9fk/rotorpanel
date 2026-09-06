@@ -61,6 +61,14 @@ jest istotne; potraktowanie ich tak samo albo zapętli program, albo zerwie dzia
 zgłasza `HandleDestroyed`, więc `Close()` nie kończy pętli komunikatów. Program wychodzi przez
 `Application.Exit()` po posprzątaniu, nie przez `Close()`.
 
+**RFC 2217 to Telnet, nie surowy strumień.** Bajt 255 jest znacznikiem polecenia i w danych
+musi być podwojony, a serwer przy połączeniu negocjuje opcje. `StrumienTelnet` rozpakowuje te
+sekwencje i odpowiada na negocjację; bez tego dane byłyby losowo psute. Warstwa włącza się
+polem `protokol` przy połączeniu, wspólnym dla rotorów i urządzeń.
+
+**`Polaczenie` jest wspólną podstawą rotora i urządzenia.** `Mostek` pracuje na niej, więc
+nowy rodzaj punktu końcowego wystarczy wyprowadzić z tej klasy — nie dubluj logiki mostka.
+
 **Rotor jest bytem osobnym od anteny.** `Rotor` trzyma parę portów i punkt `ser2net`, a `Antena`
 tylko numer rotora. Kilka anten na wspólnym maszcie wskazuje ten sam rotor i dzieli jedno
 połączenie — inaczej dwa mostki biłyby się o ten sam port. Starszy format, w którym para i port

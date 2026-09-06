@@ -50,7 +50,7 @@ public partial class MainForm
         foreach (var rotor in rotory)
         {
             string adres = _cfg.AdresDla(rotor);
-            var mostek = _mostki.FirstOrDefault(m => m.Rotor.Nr == rotor.Nr);
+            var mostek = _mostki.FirstOrDefault(m => ReferenceEquals(m.Punkt, rotor));
 
             bool ok;
             string skad;
@@ -145,12 +145,14 @@ public partial class MainForm
     /// <summary>Oznaczenia nadajnikow przy nazwach anten.</summary>
     private void OdswiezZnaczniki()
     {
-        foreach (var wpis in _ui)
+        foreach (var antena in _cfg.Anteny)
         {
-            var znaczniki = wpis.Value.Trx;
+            if (!_ui.TryGetValue("a" + antena.Nr, out var wiersz)) continue;
+
+            var znaczniki = wiersz.Trx;
             if (znaczniki == null) continue;
 
-            var nadajniki = _stanSterownika?.TrxNaAntenie(wpis.Key) ?? new List<int>();
+            var nadajniki = _stanSterownika?.TrxNaAntenie(antena.Nr) ?? new List<int>();
 
             for (int i = 0; i < znaczniki.Length; i++)
             {

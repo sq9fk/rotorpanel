@@ -9,7 +9,7 @@ public partial class MainForm : Form
 
     private Config _cfg;
     private readonly List<Mostek> _mostki = new();
-    private readonly Dictionary<int, Wiersz> _ui = new();
+    private readonly Dictionary<string, Wiersz> _ui = new();
     private readonly Dictionary<string, string> _opisMostka = new();
     private readonly System.Windows.Forms.Timer _timer = new();
     private readonly ToolTip _dymek = new();
@@ -126,7 +126,7 @@ public partial class MainForm : Form
         BudujListe();
     }
 
-    /// <summary>Okno dopasowuje wysokosc do liczby anten - lista nigdy sie nie przewija.</summary>
+    /// <summary>Okno dopasowuje wysokosc do zawartosci - lista nigdy sie nie przewija.</summary>
     private void BudujListe()
     {
         foreach (var m in _mostki) m.Dispose();
@@ -134,25 +134,9 @@ public partial class MainForm : Form
         _ui.Clear();
         _lista.Controls.Clear();
 
-        // Jeden mostek na rotor - anteny wskazujace ten sam rotor dziela polaczenie.
-        var wgRotora = new Dictionary<int, Mostek>();
         int y = 0;
-
-        foreach (var a in _cfg.Anteny.OrderBy(x => x.Nr))
-        {
-            var rotor = _cfg.RotorAnteny(a);
-            Mostek mostek = null;
-
-            if (rotor != null && !wgRotora.TryGetValue(rotor.Nr, out mostek))
-            {
-                mostek = new Mostek(_cfg, rotor);
-                wgRotora[rotor.Nr] = mostek;
-                _mostki.Add(mostek);
-            }
-
-            _lista.Controls.Add(BudujKarte(a, rotor, mostek, y));
-            y += WysokoscKarty + Odstep;
-        }
+        y = BudujAnteny(y);
+        y = BudujUrzadzenia(y);
 
         _opisMostka.Clear();
         foreach (var grupa in _cfg.Anteny.Where(x => _cfg.RotorAnteny(x) != null)
@@ -173,5 +157,50 @@ public partial class MainForm : Form
 
         ZerujStanySieci();
         Odswiez();
+    }
+
+    private int BudujAnteny(int y)
+    {
+        // Jeden mostek na rotor - anteny wskazujace ten sam rotor dziela polaczenie.
+        var wgRotora = new Dictionary<int, Mostek>();
+
+        foreach (var a in _cfg.Anteny.OrderBy(x => x.Nr))
+        {
+            var rotor = _cfg.RotorAnteny(a);
+            Mostek mostek = null;
+
+            if (rotor != null && !wgRotora.TryGetValue(rotor.Nr, out mostek))
+            {
+                mostek = new Mostek(_cfg, rotor);
+                wgRotora[rotor.Nr] = mostek;
+                _mostki.Add(mostek);
+            }
+
+            _lista.Controls.Add(BudujKarteAnteny(a, rotor, mostek, y));
+            y += WysokoscKarty + Odstep;
+        }
+
+        return y;
+    }
+
+    private int BudujUrzadzenia(int y)
+    {
+        var urzadzenia = _cfg.Urzadzenia.Where(u => u.Gotowy).OrderBy(u => u.Nr).ToList();
+        if (urzadzenia.Count == 0) return y;
+
+        y += 8;
+        _lista.Controls.Add(Ui.Etykieta("Urządzenia", Theme.Nazwa(), Theme.Tekst,
+            new Point(2, y), new Size(300, 20)));
+        y += 26;
+
+        foreach (var u in urzadzenia)
+        {
+            var mostek = new Mostek(_cfg, u);
+            _mostki.Add(mostek);
+            _lista.Controls.Add(BudujKarteUrzadzenia(u, mostek, y));
+            y += WysokoscKarty + Odstep;
+        }
+
+        return y;
     }
 }

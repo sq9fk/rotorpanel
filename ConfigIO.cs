@@ -40,6 +40,7 @@ public partial class Config
         };
 
         CzytajRotory(cfg, korzen);
+        CzytajUrzadzenia(cfg, korzen);
         CzytajAnteny(cfg, korzen);
         Uporzadkuj(cfg);
 
@@ -61,7 +62,37 @@ public partial class Config
                 Com   = Json.Tekst(o, "com"),
                 Dev   = Json.Tekst(o, "dev"),
                 Ip    = Json.Tekst(o, "ip"),
-                Port  = Json.Liczba(o, "port")
+                Port  = Json.Liczba(o, "port"),
+                Protokol = ZTekstu(Json.Tekst(o, "protokol"))
+            });
+        }
+    }
+
+    private static Protokol ZTekstu(string t)
+        => string.Equals((t ?? "").Trim(), "rfc2217", StringComparison.OrdinalIgnoreCase)
+            ? Protokol.Rfc2217
+            : Protokol.Surowy;
+
+    private static string NaTekst(Protokol p)
+        => p == Protokol.Rfc2217 ? "rfc2217" : "surowy";
+
+    private static void CzytajUrzadzenia(Config cfg, Dictionary<string, object> korzen)
+    {
+        if (!korzen.TryGetValue("urzadzenia", out object lista) || !(lista is List<object> tablica)) return;
+
+        foreach (var element in tablica)
+        {
+            if (!(element is Dictionary<string, object> o)) continue;
+
+            cfg.Urzadzenia.Add(new Urzadzenie
+            {
+                Nr       = Json.Liczba(o, "nr"),
+                Nazwa    = Json.Tekst(o, "nazwa"),
+                Com      = Json.Tekst(o, "com"),
+                Dev      = Json.Tekst(o, "dev"),
+                Ip       = Json.Tekst(o, "ip"),
+                Port     = Json.Liczba(o, "port"),
+                Protokol = ZTekstu(Json.Tekst(o, "protokol"))
             });
         }
     }
@@ -128,6 +159,9 @@ public partial class Config
         for (int i = 0; i < cfg.Rotory.Count; i++)
             if (cfg.Rotory[i].Nr == 0) cfg.Rotory[i].Nr = i + 1;
 
+        for (int i = 0; i < cfg.Urzadzenia.Count; i++)
+            if (cfg.Urzadzenia[i].Nr == 0) cfg.Urzadzenia[i].Nr = i + 1;
+
         // Odwolania do nieistniejacych rotorow czyscimy, zeby nie zostawaly puste karty.
         foreach (var a in cfg.Anteny)
             if (a.Rotor != 0 && cfg.ZnajdzRotor(a.Rotor) == null) a.Rotor = 0;
@@ -145,7 +179,22 @@ public partial class Config
             wpis.Dodaj("dev", r.Dev);
             wpis.Dodaj("ip", r.Ip);
             wpis.Dodaj("port", r.Port);
+            wpis.Dodaj("protokol", NaTekst(r.Protokol));
             rotory.Add(wpis);
+        }
+
+        var urzadzenia = new List<object>();
+        foreach (var u in Urzadzenia)
+        {
+            var wpis = new JsonObiekt();
+            wpis.Dodaj("nr", u.Nr);
+            wpis.Dodaj("nazwa", u.Nazwa);
+            wpis.Dodaj("com", u.Com);
+            wpis.Dodaj("dev", u.Dev);
+            wpis.Dodaj("ip", u.Ip);
+            wpis.Dodaj("port", u.Port);
+            wpis.Dodaj("protokol", NaTekst(u.Protokol));
+            urzadzenia.Add(wpis);
         }
 
         var anteny = new List<object>();
@@ -165,6 +214,7 @@ public partial class Config
         korzen.Dodaj("autoPolacz", AutoPolacz);
         korzen.Dodaj("sprawdzajAktualizacje", SprawdzajAktualizacje);
         korzen.Dodaj("rotory", rotory);
+        korzen.Dodaj("urzadzenia", urzadzenia);
         korzen.Dodaj("anteny", anteny);
 
         File.WriteAllText(Sciezka, Json.Zapisz(korzen));

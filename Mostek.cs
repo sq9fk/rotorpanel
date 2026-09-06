@@ -17,22 +17,22 @@ public sealed class Mostek : IDisposable
     private int _stan = (int)StanMostka.Zatrzymany;
     private volatile string _blad = "";
 
-    public Rotor Rotor { get; }
-    public string Adres => _cfg.AdresDla(Rotor);
+    public Polaczenie Punkt { get; }
+    public string Adres => _cfg.AdresDla(Punkt);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
     public long Rx => Interlocked.Read(ref _rx);
     public long Tx => Interlocked.Read(ref _tx);
     public string Blad => _blad;
 
-    public Mostek(Config cfg, Rotor rotor)
+    public Mostek(Config cfg, Polaczenie punkt)
     {
         _cfg = cfg;
-        Rotor = rotor;
+        Punkt = punkt;
     }
 
     public void Start()
     {
-        if (!Rotor.Gotowy) return;
+        if (!Punkt.Gotowy) return;
         if (_petla is { IsCompleted: false }) return;
         Interlocked.Exchange(ref _rx, 0);
         Interlocked.Exchange(ref _tx, 0);
@@ -57,17 +57,31 @@ public sealed class Mostek : IDisposable
             {
                 Volatile.Write(ref _stan, (int)StanMostka.Laczenie);
 
-                using var port = PortIo.Otworz(Rotor.Dev);
+                using var port = PortIo.Otworz(Punkt.Dev);
                 using var klient = new TcpClient();
-                await PolaczAsync(klient, Adres, Rotor.Port, ct);
-                using var siec = klient.GetStream();
+                await PolaczAsync(klient, Adres, Punkt.Port, ct);
+
+                Stream siec = klient.GetStream();
+
+                // Serwer RFC 2217 mowi Telnetem - bez rozpakowania sekwencji IAC
+                // trafialyby one do danych.
+                if (Punkt.Protokol == Protokol.Rfc2217)
+                {
+                    var telnet = new StrumienTelnet(siec);
+                    await telnet.Przywitaj(ct);
+                    siec = telnet;
+                }
 
                 _blad = "";
                 Volatile.Write(ref _stan, (int)StanMostka.Polaczony);
 
-                var wGore = Pompa(port, siec, zPortu: true,  ct);
-                var wDol  = Pompa(siec, port, zPortu: false, ct);
-                await Task.WhenAny(wGore, wDol);
+                try
+                {
+                    var wGore = Pompa(port, siec, zPortu: true,  ct);
+                    var wDol  = Pompa(siec, port, zPortu: false, ct);
+                    await Task.WhenAny(wGore, wDol);
+                }
+                finally { siec.Dispose(); }
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) { _blad = ex.Message; }

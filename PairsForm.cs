@@ -123,8 +123,8 @@ public class PairsForm : Form
                 wiersz.SubItems[2].Text = "osierocony";
                 wiersz.SubItems[4].Text = "osierocony";
             }
-            else if (_cfg.Rotory.Any(r => r.Gotowy &&
-                    string.Equals(r.Dev, para.B, StringComparison.OrdinalIgnoreCase)))
+            else if (_cfg.WszystkiePolaczenia.Any(p => p.Gotowy &&
+                    string.Equals(p.Dev, para.B, StringComparison.OrdinalIgnoreCase)))
             {
                 wiersz.Font = new Font(_lista.Font, FontStyle.Bold);
             }
@@ -173,9 +173,9 @@ public class PairsForm : Form
         if (_lista.SelectedItems.Count == 0) return;
         if (_lista.SelectedItems[0].Tag is not ParaPortow para) return;
 
-        var uzywajace = _cfg.Rotory
-            .Where(r => r.Gotowy && string.Equals(r.Dev, para.B, StringComparison.OrdinalIgnoreCase))
-            .Select(r => r.Etykieta)
+        var uzywajace = _cfg.WszystkiePolaczenia
+            .Where(p => p.Gotowy && string.Equals(p.Dev, para.B, StringComparison.OrdinalIgnoreCase))
+            .Select(p => p.Etykieta)
             .ToList();
 
         string ostrzezenie = uzywajace.Count > 0

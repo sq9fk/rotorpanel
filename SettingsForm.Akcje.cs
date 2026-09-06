@@ -98,6 +98,7 @@ public partial class SettingsForm
     private void Zapisz()
     {
         _siatkaRotorow.EndEdit();
+        _siatkaUrzadzen.EndEdit();
         _siatkaAnten.EndEdit();
 
         var rotory = new List<Rotor>();
@@ -141,6 +142,42 @@ public partial class SettingsForm
             return;
         }
 
+        var urzadzenia = new List<Urzadzenie>();
+        foreach (DataGridViewRow w in _siatkaUrzadzen.Rows)
+        {
+            var u = UrzadzenieZWiersza(w);
+            if (u.Nr <= 0) continue;
+
+            if (urzadzenia.Any(x => string.Equals(x.Etykieta, u.Etykieta, StringComparison.OrdinalIgnoreCase)))
+            {
+                Ostrzez("Dwa urządzenia nazywają się „" + u.Etykieta + "”. Nazwy muszą być różne.");
+                return;
+            }
+
+            if (!u.Gotowy && (!string.IsNullOrWhiteSpace(u.Dev) || u.Port > 0))
+            {
+                Ostrzez(u.Etykieta + " ma tylko część danych — potrzebna jest para portów " +
+                        "oraz port TCP.");
+                return;
+            }
+
+            urzadzenia.Add(u);
+        }
+
+        // Para moze nalezec tylko do jednego punktu, niezaleznie od tego, czy to
+        // rotor czy urzadzenie - inaczej dwa mostki bilyby sie o ten sam port.
+        var zajete = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in rotory.Cast<Polaczenie>().Concat(urzadzenia).Where(x => x.Gotowy))
+        {
+            if (zajete.TryGetValue(p.KluczPary, out string kto))
+            {
+                Ostrzez("Para " + p.Dev + " jest przypisana do dwóch pozycji: " +
+                        kto + " oraz " + p.Etykieta + ".");
+                return;
+            }
+            zajete[p.KluczPary] = p.Etykieta;
+        }
+
         var anteny = new List<Antena>();
         foreach (DataGridViewRow w in _siatkaAnten.Rows)
         {
@@ -157,6 +194,7 @@ public partial class SettingsForm
         _cfg.SterownikAnten = Config.NormalizujHost(_sterownik.Text);
         _cfg.Setupc         = _setupc.Text.Trim();
         _cfg.Rotory         = rotory;
+        _cfg.Urzadzenia     = urzadzenia;
         _cfg.Anteny         = anteny;
 
         try

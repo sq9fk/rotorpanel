@@ -1,29 +1,50 @@
 ﻿namespace RotorPanel;
 
-/// <summary>
-/// Rotor to para portow com0com plus punkt koncowy ser2net. Anteny wskazuja rotor
-/// numerem, wiec kilka anten na wspolnym maszcie po prostu wskazuje ten sam.
-/// </summary>
-public class Rotor
+/// <summary>Sposob rozmowy z drugim koncem: surowy strumien albo Telnet z RFC 2217.</summary>
+public enum Protokol
 {
-    public int    Nr    { get; set; }
-    public string Nazwa { get; set; } = "";
-    public string Com   { get; set; } = "";
-    public string Dev   { get; set; } = "";
-    public string Ip    { get; set; } = "";
-    public int    Port  { get; set; }
+    Surowy,
+    Rfc2217
+}
+
+/// <summary>
+/// Wspolna czesc rotora i urzadzenia: para portow com0com plus punkt koncowy w sieci.
+/// </summary>
+public abstract class Polaczenie
+{
+    public int      Nr       { get; set; }
+    public string   Nazwa    { get; set; } = "";
+    public string   Com      { get; set; } = "";
+    public string   Dev      { get; set; } = "";
+    public string   Ip       { get; set; } = "";
+    public int      Port     { get; set; }
+    public Protokol Protokol { get; set; } = Protokol.Surowy;
 
     /// <summary>Ma komplet danych potrzebnych do zestawienia mostka.</summary>
     public bool Gotowy => !string.IsNullOrWhiteSpace(Dev) && Port > 0;
 
     public string KluczPary => (Dev ?? "").Trim().ToUpperInvariant();
 
-    public string Etykieta => string.IsNullOrWhiteSpace(Nazwa) ? "Rotor " + Nr : Nazwa;
+    protected abstract string DomyslnaNazwa { get; }
 
-    /// <summary>Opis do list wyboru: nazwa wraz z trasa.</summary>
-    public string Opis => Gotowy
-        ? Etykieta + "   (" + Com + " " + ((char)0x2192) + " :" + Port + ")"
-        : Etykieta + "   (niekompletny)";
+    public string Etykieta => string.IsNullOrWhiteSpace(Nazwa) ? DomyslnaNazwa : Nazwa;
+
+    public string NazwaProtokolu => Protokol == Protokol.Rfc2217 ? "RFC 2217" : "surowy";
+}
+
+/// <summary>Rotor obracajacy antena. Anteny wskazuja go numerem.</summary>
+public class Rotor : Polaczenie
+{
+    protected override string DomyslnaNazwa => "Rotor " + Nr;
+}
+
+/// <summary>
+/// Inne urzadzenie na porcie szeregowym - wzmacniacz, sterownik, cokolwiek.
+/// Nie jest przypisane do anteny, stad osobna lista.
+/// </summary>
+public class Urzadzenie : Polaczenie
+{
+    protected override string DomyslnaNazwa => "Urządzenie " + Nr;
 }
 
 public class Antena
@@ -45,8 +66,9 @@ public partial class Config
     public bool   AutoPolacz     { get; set; }
     public bool   SprawdzajAktualizacje { get; set; } = true;
 
-    public List<Rotor>  Rotory { get; set; } = new List<Rotor>();
-    public List<Antena> Anteny { get; set; } = new List<Antena>();
+    public List<Rotor>      Rotory     { get; set; } = new List<Rotor>();
+    public List<Urzadzenie> Urzadzenia { get; set; } = new List<Urzadzenie>();
+    public List<Antena>     Anteny     { get; set; } = new List<Antena>();
 
     private static string _sciezka;
 
@@ -83,8 +105,8 @@ public partial class Config
         catch { return false; }
     }
 
-    /// <summary>Adres ser2net dla rotora - wlasny, a gdy pusty to domyslny.</summary>
-    public string AdresDla(Rotor r) => string.IsNullOrWhiteSpace(r.Ip) ? PiIp : r.Ip.Trim();
+    /// <summary>Adres punktu koncowego - wlasny, a gdy pusty to domyslny.</summary>
+    public string AdresDla(Polaczenie p) => string.IsNullOrWhiteSpace(p.Ip) ? PiIp : p.Ip.Trim();
 
     public Rotor ZnajdzRotor(int nr) => nr <= 0 ? null : Rotory.FirstOrDefault(r => r.Nr == nr);
 
@@ -94,6 +116,10 @@ public partial class Config
         var r = ZnajdzRotor(a.Rotor);
         return r != null && r.Gotowy ? r : null;
     }
+
+    /// <summary>Wszystkie punkty koncowe - rotory i urzadzenia razem.</summary>
+    public IEnumerable<Polaczenie> WszystkiePolaczenia =>
+        Rotory.Cast<Polaczenie>().Concat(Urzadzenia);
 
     public int WolnyNumerRotora()
     {

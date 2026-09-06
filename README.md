@@ -105,6 +105,8 @@ JSON-em bez podwajania znaków.
 | `rotory[].dev` | druga strona pary, używana przez mostek |
 | `rotory[].ip` | adres `ser2net` dla tego rotora; puste znaczy `piIp` |
 | `rotory[].port` | port TCP wystawiony przez `ser2net` |
+| `rotory[].protokol` | `surowy` albo `rfc2217` |
+| `urzadzenia[]` | urządzenia inne niż rotory; te same pola co przy rotorze |
 | `anteny[].nr` | numer wyjścia w przełącznicy antenowej |
 | `anteny[].nazwa` | nazwa anteny, pobierana ze sterownika |
 | `anteny[].rotor` | numer przypisanego rotora; zero oznacza antenę bez rotora |
@@ -117,6 +119,30 @@ ten sam rotor; mostek powstaje jeden, bo fizycznie to jedno połączenie.
 
 Starsze konfiguracje, w których para i port były przypisane wprost do anteny, są przy wczytaniu
 zamieniane na ten model. Wystarczy raz zapisać ustawienia, żeby plik zapisał się w nowej postaci.
+
+---
+
+## Urządzenia inne niż rotory
+
+Osobna sekcja — w oknie głównym pod antenami, w Ustawieniach jako własna tabela — obsługuje
+wszystko, co siedzi na porcie szeregowym, a rotorem nie jest: wzmacniacz, sterownik,
+transceiver. Takie urządzenie nie jest przypisane do anteny, więc ma tylko parę portów,
+adres, port i protokół.
+
+### RFC 2217
+
+Konwertery szeregowo-sieciowe, na przykład microBit RC-1216H, wystawiają port jako **RFC 2217**,
+czyli Telnet z opcjami sterowania portem. To nie jest surowy strumień: bajt 255 jest tam
+znacznikiem polecenia i w danych występuje podwojony, a przy nawiązaniu połączenia obie strony
+negocjują opcje. Pompowanie bajtów bez zmian wpuściłoby te sekwencje do danych i popsuło
+transmisję — dlatego protokół wybiera się przy urządzeniu.
+
+Program zgłasza gotowość do trybu binarnego, rozpakowuje sekwencje sterujące i podwaja bajt 255
+przy wysyłaniu. **Parametrów transmisji nie wysyła** — prędkość i format ramki ustawia się po
+stronie urządzenia, tak jak przy `ser2net`.
+
+Ten sam wybór jest dostępny przy rotorach, gdyby `ser2net` był u kogoś skonfigurowany
+z akcepterem `telnet` zamiast `tcp`.
 
 ---
 
@@ -364,6 +390,7 @@ Klasy okien są dzielone na pliki częściowe, żeby żaden nie urósł ponad cz
 | `Json.cs`, `JsonZapis.cs` | własny czytnik i zapisywacz JSON — brak zależności zewnętrznych |
 | `PortIo.cs` | dostęp do portu szeregowego przez Win32 |
 | `Mostek.cs` | mostek dwukierunkowy port ⇄ TCP, ponawianie, liczniki |
+| `StrumienTelnet.cs` | warstwa Telnet dla serwerów RFC 2217 |
 | `MainForm.cs` | okno główne: budowa listy i układ |
 | `MainForm.Stan.cs` | karty anten i cykl odświeżania |
 | `MainForm.Siec.cs` | diody łączności oraz oznaczenia nadajników |
@@ -372,6 +399,7 @@ Klasy okien są dzielone na pliki częściowe, żeby żaden nie urósł ponad cz
 | `Aktualizacja.cs` | odczyt wydań z GitHuba i podmiana pliku programu |
 | `SettingsForm.cs` | okno ustawień: nagłówek i przyciski |
 | `SettingsForm.Siatki.cs` | tabele rotorów i anten |
+| `SettingsForm.Urzadzenia.cs` | tabela urządzeń |
 | `SettingsForm.Akcje.cs` | pary, wybór pliku, pobieranie nazw, zapis |
 | `PairsForm.cs` | lista par com0com, zakładanie i usuwanie |
 | `NewPairForm.cs` | okienko nowej pary z walidacją nazw |
