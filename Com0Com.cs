@@ -135,6 +135,23 @@ public static class Com0Com
         return false;
     }
 
+    /// <summary>Sciezka w rejestrze do jednej strony pary, w formacie polecenia "reg".</summary>
+    public static string SciezkaRejestruPary(string strona, string numer)
+        => "HKLM" + (char)92 +
+           Klucz("SYSTEM", "CurrentControlSet", "services", "com0com", "Parameters") +
+           (char)92 + strona + numer;
+
+    /// <summary>Gotowa linia wsadowa wywolujaca setupc z podanym poleceniem.</summary>
+    public static string LiniaSetupc(Config cfg, string polecenie)
+        => Cudzyslow(Config.NaWindows(cfg.Setupc)) + " " + polecenie;
+
+    /// <summary>Linie kasujace osierocone wpisy rejestru po usunietej parze.</summary>
+    public static IEnumerable<string> LinieSprzatajaceRejestr(string numer)
+    {
+        yield return "reg delete " + Cudzyslow(SciezkaRejestruPary("CNCA", numer)) + " /f >nul 2>&1";
+        yield return "reg delete " + Cudzyslow(SciezkaRejestruPary("CNCB", numer)) + " /f >nul 2>&1";
+    }
+
     public static string Raport(Config cfg)
     {
         var sb = new StringBuilder();
@@ -244,6 +261,13 @@ public static class Com0Com
 
     /// <summary>Uruchamia setupc z podanymi poleceniami w oknie podniesionym przez UAC.</summary>
     public static bool Wykonaj(Config cfg, IEnumerable<string> polecenia, string tytul, IWin32Window wlasciciel)
+        => WykonajLinie(cfg, polecenia.Select(x => LiniaSetupc(cfg, x)), tytul, wlasciciel);
+
+    /// <summary>
+    /// Uruchamia gotowe linie wsadowe w oknie podniesionym przez UAC. Pozwala mieszac
+    /// wywolania setupc z innymi poleceniami, na przyklad sprzataniem rejestru.
+    /// </summary>
+    public static bool WykonajLinie(Config cfg, IEnumerable<string> polecenia, string tytul, IWin32Window wlasciciel)
     {
         if (!File.Exists(cfg.Setupc))
         {
@@ -255,8 +279,7 @@ public static class Com0Com
         string bat = Path.Combine(Path.GetTempPath(),
             "rotorpanel_" + Guid.NewGuid().ToString("N") + ".bat");
 
-        string exe = Config.NaWindows(cfg.Setupc);
-        string katalog = Path.GetDirectoryName(exe) ?? "";
+        string katalog = Path.GetDirectoryName(Config.NaWindows(cfg.Setupc)) ?? "";
 
         // setupc szuka com0com.inf w katalogu biezacym - bez tego "install" konczy sie
         // bledem "SetupOpenInfFile ... ERROR: 2".
@@ -266,7 +289,7 @@ public static class Com0Com
             "title " + tytul,
             "cd /d " + Cudzyslow(katalog)
         };
-        foreach (var p in polecenia) linie.Add(Cudzyslow(exe) + " " + p);
+        linie.AddRange(polecenia);
         linie.Add("echo.");
         linie.Add("echo Gotowe. Zamknij to okno.");
         linie.Add("pause");

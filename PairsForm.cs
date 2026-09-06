@@ -184,15 +184,25 @@ public class PairsForm : Form
               ". Po usunięciu te rotory przestaną działać, dopóki nie wskażesz im innej pary."
             : "";
 
-        var odp = MessageBox.Show(this,
-            "Usunąć parę " + para.A + " ⇄ " + para.B + " ?" + ostrzezenie,
+        string co = para.Istnieje
+            ? "Usunąć parę " + para.A + " ⇄ " + para.B + " ?"
+            : "Usunąć osierocony wpis po parze " + para.A + " ⇄ " + para.B + " ?";
+
+        var odp = MessageBox.Show(this, co + ostrzezenie,
             "RotorPanel", MessageBoxButtons.YesNo,
             uzywajace.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Question);
 
         if (odp != DialogResult.Yes) return;
 
+        // setupc kasuje urzadzenia, ale zostawia wpisy w rejestrze - bez ich usuniecia
+        // po kazdym skasowaniu pary zostawalby duch.
+        var linie = new List<string>();
+        if (para.Istnieje) linie.Add(Com0Com.LiniaSetupc(_cfg, "remove " + para.Numer));
+        linie.AddRange(Com0Com.LinieSprzatajaceRejestr(para.Numer));
+        linie.Add(Com0Com.LiniaSetupc(_cfg, "list"));
+
         _przedZmiana();
-        Com0Com.Wykonaj(_cfg, new[] { "remove " + para.Numer, "list" },
+        Com0Com.WykonajLinie(_cfg, linie,
             "Usuwanie pary " + para.A + " - " + para.B, this);
         Odswiez();
     }
@@ -205,8 +215,14 @@ public class PairsForm : Form
             "RotorPanel", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
         if (odp != DialogResult.Yes) return;
 
+        var numery = Com0Com.Pary().Select(x => x.Numer).Distinct().ToList();
+
+        var linie = new List<string> { Com0Com.LiniaSetupc(_cfg, "uninstall") };
+        foreach (var numer in numery) linie.AddRange(Com0Com.LinieSprzatajaceRejestr(numer));
+        linie.Add(Com0Com.LiniaSetupc(_cfg, "list"));
+
         _przedZmiana();
-        Com0Com.Wykonaj(_cfg, new[] { "uninstall", "list" }, "Usuwanie wszystkich par com0com", this);
+        Com0Com.WykonajLinie(_cfg, linie, "Usuwanie wszystkich par com0com", this);
         Odswiez();
     }
 }

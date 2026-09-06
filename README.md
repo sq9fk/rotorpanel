@@ -166,9 +166,13 @@ konfigurację anten.
 - **Usuń wszystkie** czyści wszystkie pary com0com w systemie, także cudze — stąd osobne
   ostrzeżenie.
 
-Wiersze wyszarzone i opisane jako *osierocony* to pozostałości w rejestrze po usuniętych
-parach. `setupc remove` kasuje urządzenia, ale nie sprząta wpisów. Program ich nie proponuje
-przy wyborze pary i nie liczy zajmowanych przez nie numerów.
+Usuwanie sprząta też rejestr. `setupc remove` kasuje urządzenia, ale zostawia po sobie wpisy —
+program dokłada ich skasowanie do tej samej operacji, więc po usunięciu pary nie zostaje żaden
+ślad. Dotyczy to również przycisku *Usuń wszystkie*.
+
+Gdyby mimo to trafił się wiersz wyszarzony i opisany jako *osierocony* — na przykład po parze
+usuniętej wcześniej z wiersza poleceń — można go zaznaczyć i usunąć tym samym przyciskiem.
+Takie wpisy nie są proponowane przy wyborze pary i nie blokują numerów COM.
 
 ---
 
