@@ -53,22 +53,27 @@ Instalacja
    To samo mozna zrobic pozniej w programie: Pary COM... -> Utworz pary.
 
 4. Uruchom RotorPanel i wejdz w Ustawienia:
-     - adres ser2net (domyslnie 192.168.6.3)
-     - adres sterownika anten (domyslnie http://192.168.6.6/)
+     - adres serwera ser2net w Twojej sieci
+     - adres sterownika anten, np. http://192.168.1.101/
      - przycisk "Pobierz nazwy" zaciaga nazwy anten ze sterownika;
        bez lacznosci zostaja ANT1..ANT6
      - dla kazdej obracanej anteny zaznacz "Rotor", wybierz pare z listy
        i wpisz port TCP wystawiony przez ser2net
 
 
-Domyslne przypisanie
---------------------
-    antena 4   A3S         COM10 <-> CNCB10   port 4001
-    antena 5   10m 5el.    COM12 <-> CNCB12   port 4003
-    antena 6   15m 4el.    COM11 <-> CNCB11   port 4002
+Przypisanie anten do rotorow
+----------------------------
+Program NIE MA skad wiedziec, ktora antena siedzi na ktorym rotorze - to fakt
+o okablowaniu na maszcie, niewidoczny ani z przelacznicy, ani ze sterownika
+rotora. Przypisanie ustawiasz sam w Ustawieniach, na przyklad tak:
 
-UWAGA: to jest przypisanie dobrane po nazwach, nie odczytane ze sprzetu.
-Zweryfikuj je, obracajac kolejno kazdy rotor i patrzac, ktory maszt sie rusza.
+    antena 4   COM10 <-> CNCB10   port 4001
+    antena 5   COM11 <-> CNCB11   port 4002
+    antena 6   COM12 <-> CNCB12   port 4003
+
+Zweryfikuj je w praktyce: zadaj obrot i zobacz, ktory maszt sie rusza.
+Kilka anten na wspolnym maszcie moze wskazywac te sama pare - dziela wtedy
+jeden mostek.
 
 
 PstRotator
