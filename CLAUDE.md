@@ -71,6 +71,11 @@ wypadek, gdyby firmware kiedyś taki endpoint dostał — nie usuwaj jej, ale ni
 dopiero po otwarciu drugiej strony pary, więc w systemie go nie widać mimo wpisu w rejestrze.
 `EmuBR=1` dławi transmisję. Okno *Pary COM* oznacza takie parametry wykrzyknikiem.
 
+**`setupc remove` zostawia wpisy w rejestrze.** Usuwa urządzenia, ale podklucze `CNCAn`
+i `CNCBn` z `PortName` zostają. Lista par czytana z rejestru pokazywałaby przez to duchy,
+dlatego `ParaPortow.Istnieje` sprawdza, czy choć jedna strona jest obecna w systemie.
+Osieroconych par nie proponujemy przy wyborze i nie liczymy jako zajmujących numery COM.
+
 **Rot1Prog odpowiada ramką 5-bajtową**, nie 12-bajtową jak Rot2Prog. Format: `57 H1 H2 H3 20`,
 azymut = `H1*100 + H2*10 + H3 − 360`.
 

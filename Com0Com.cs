@@ -8,8 +8,17 @@ namespace RotorPanel;
 /// <summary>Jedna para portow com0com: strona A (dla aplikacji) i strona B (dla mostka).</summary>
 public sealed class ParaPortow
 {
+    /// <summary>Numer pary w sterowniku - potrzebny do "setupc remove".</summary>
+    public string Numer { get; set; } = "";
+
     public string A { get; set; } = "";
     public string B { get; set; } = "";
+
+    /// <summary>
+    /// Czy para faktycznie istnieje w systemie. "setupc remove" kasuje urzadzenia,
+    /// ale zostawia wpisy w rejestrze - takie osierocone pary trzeba odsiac.
+    /// </summary>
+    public bool Istnieje { get; set; }
 
     public string Opis => A + "  ⇄  " + B;
     public override string ToString() => Opis;
@@ -49,12 +58,81 @@ public static class Com0Com
             {
                 string numer = wpis.Substring(4);
                 if (!nazwy.TryGetValue("CNCB" + numer, out string b)) continue;
-                wynik.Add(new ParaPortow { A = nazwy[wpis], B = b });
+                string a = nazwy[wpis];
+                bool istnieje = PortIo.Opis(a) != "nie istnieje"
+                             || PortIo.Opis(b) != "nie istnieje";
+
+                wynik.Add(new ParaPortow { Numer = numer, A = a, B = b, Istnieje = istnieje });
             }
         }
         catch { /* brak sterownika albo brak dostepu */ }
 
         return wynik;
+    }
+
+    /// <summary>
+    /// Numery COM zajete w systemie - z arbitra nazw, z listy portow oraz z samych par
+    /// com0com. Arbiter zna tez numery zarezerwowane przez urzadzenia obecnie odlaczone.
+    /// </summary>
+    public static SortedSet<int> ZajeteNumeryCom()
+    {
+        var zajete = new SortedSet<int>();
+
+        try
+        {
+            using var k = Registry.LocalMachine.OpenSubKey(
+                Klucz("SYSTEM", "CurrentControlSet", "Control", "COM Name Arbiter"));
+            if (k?.GetValue("ComDB") is byte[] db)
+                for (int i = 0; i < db.Length; i++)
+                    for (int b = 0; b < 8; b++)
+                        if ((db[i] & (1 << b)) != 0) zajete.Add(i * 8 + b + 1);
+        }
+        catch { /* brak dostepu - trudno */ }
+
+        try
+        {
+            using var k = Registry.LocalMachine.OpenSubKey(
+                Klucz("HARDWARE", "DEVICEMAP", "SERIALCOMM"));
+            if (k != null)
+                foreach (var wartosc in k.GetValueNames())
+                    Dodaj(zajete, k.GetValue(wartosc) as string);
+        }
+        catch { /* jak wyzej */ }
+
+        foreach (var para in Pary().Where(p => p.Istnieje))
+        {
+            Dodaj(zajete, para.A);
+            Dodaj(zajete, para.B);
+        }
+
+        return zajete;
+    }
+
+    private static void Dodaj(SortedSet<int> zbior, string nazwaPortu)
+    {
+        if (string.IsNullOrEmpty(nazwaPortu)) return;
+        if (!nazwaPortu.StartsWith("COM", StringComparison.OrdinalIgnoreCase)) return;
+        if (int.TryParse(nazwaPortu.Substring(3), out int nr)) zbior.Add(nr);
+    }
+
+    /// <summary>Pierwszy numer COM niezajety w systemie, poczawszy od podanego.</summary>
+    public static int PierwszyWolnyNumer(int od = 10)
+    {
+        var zajete = ZajeteNumeryCom();
+        int n = Math.Max(od, 1);
+        while (zajete.Contains(n) && n < 256) n++;
+        return n;
+    }
+
+    /// <summary>Czy nazwa portu jest juz uzywana przez ktoras ze stron istniejacych par.</summary>
+    public static bool NazwaZajetaPrzezPare(string nazwa)
+    {
+        if (string.IsNullOrWhiteSpace(nazwa)) return false;
+        foreach (var para in Pary().Where(p => p.Istnieje))
+            if (string.Equals(para.A, nazwa, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(para.B, nazwa, StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
     }
 
     public static string Raport(Config cfg)

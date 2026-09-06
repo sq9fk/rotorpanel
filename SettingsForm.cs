@@ -118,7 +118,8 @@ public class SettingsForm : Form
         _kolPara.Items.Clear();
         _kolPara.Items.Add(Brak);
 
-        foreach (var para in Com0Com.Pary())
+        // Osierocone wpisy po usunietych parach nie trafiaja na liste wyboru.
+        foreach (var para in Com0Com.Pary().Where(p => p.Istnieje))
         {
             if (_mapaPar.ContainsKey(para.Opis)) continue;
             _mapaPar[para.Opis] = para;

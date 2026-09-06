@@ -154,9 +154,21 @@ Tabela anten: numer, checkbox **Rotor**, nazwa, para portów z listy rozwijanej,
 
 ### Pary COM
 
-Podgląd stanu portów (`wolny`, `zajęty`, `nie istnieje`, albo konkretny kod błędu Win32),
-lista par z rejestru wraz z ich parametrami, oraz przyciski tworzenia i usuwania par.
-Wykrzyknik przy parze oznacza parametr odbiegający od domyślnego.
+Lista par istniejących w systemie, z osobnym stanem każdej strony (`wolny`, `zajęty`,
+`nie istnieje`, albo konkretny kod błędu Win32). Pogrubione są pary używane przez
+konfigurację anten.
+
+- **Nowa para…** zakłada parę o dowolnych nazwach. Numery są podpowiadane z pierwszego
+  wolnego, ustalanego z arbitra nazw COM, listy portów systemu i istniejących par.
+  Strona dla PstRotatora musi nazywać się `COMxx`, druga może mieć dowolną nazwę.
+- **Usuń zaznaczoną** kasuje jedną parę. Jeśli używa jej konfiguracja, program mówi
+  których anten dotyczy, zanim cokolwiek zrobi.
+- **Usuń wszystkie** czyści wszystkie pary com0com w systemie, także cudze — stąd osobne
+  ostrzeżenie.
+
+Wiersze wyszarzone i opisane jako *osierocony* to pozostałości w rejestrze po usuniętych
+parach. `setupc remove` kasuje urządzenia, ale nie sprząta wpisów. Program ich nie proponuje
+przy wyborze pary i nie liczy zajmowanych przez nie numerów.
 
 ---
 
