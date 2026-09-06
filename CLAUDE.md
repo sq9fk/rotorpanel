@@ -134,6 +134,17 @@ stronie urządzenia jest zamknięty. Dlatego `StrumienTelnet.UstawParametry` wys
 połączenia komplet SET-BAUDRATE / SET-DATASIZE / SET-PARITY / SET-STOPSIZE, a parametry są
 w konfiguracji urządzenia. Przy `Predkosc = 0` nie wysyłamy nic — to tryb „z urządzenia”.
 
+**Zerowy licznik RX nie musi znaczyć, że coś jest nie tak z programem.** Przy SPE Expert
+za RC-1216H okazało się, że wzmacniacz był wyłączony: kontroler na własnej stronie
+(`http://<ip>/ampdta.srv?d=N1D<czas>`, pole 11) raportował `Off/Unknown`, a temperatury `--`.
+Zanim zaczniesz szukać błędu w warstwie Telnetu, sprawdź ten endpoint — jest tylko do odczytu.
+Poleceń `ampcmd?c=` nie ruszaj, one sterują wzmacniaczem.
+
+**Sondy do RFC 2217 warto trzymać osobno.** RC-1216H przyjmuje **jednego klienta TCP** — przy
+podłączonym programie druga sesja jest natychmiast zrywana. Sondy w `scratchpad` (`sonda` —
+sama negocjacja, `most` — mostek na prawdziwych klasach z licznikami) wymagają rozłączenia
+programu.
+
 **com0com nie przenosi ustawień portu na drugą stronę pary.** Pomiar `GetCommState` na obu
 stronach dał domyślne `1200 7-E-1` niezależnie od tego, co ustawił program po stronie aplikacji.
 Nie da się więc odczytać parametrów z pary i podać ich dalej przez RFC 2217 — stąd jawne listy

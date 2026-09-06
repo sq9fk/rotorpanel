@@ -151,6 +151,10 @@ COM-PORT-OPTION (SET-BAUDRATE, SET-DATASIZE, SET-PARITY, SET-STOPSIZE).
 Wybór `z urządzenia` w kolumnie Prędkość nie wysyła niczego i zostawia urządzeniu jego własne
 ustawienia — tak działa `ser2net`, gdzie format ramki jest w konfiguracji serwera.
 
+Razem z parametrami program podnosi **DTR i RTS** i wyłącza sterowanie przepływem
+(SET-CONTROL). Windows otwiera port szeregowy z podniesionymi liniami, a serwer RFC 2217 trzyma
+je opuszczone, dopóki klient ich nie podniesie — bez tego część urządzeń milczy.
+
 Na karcie w oknie głównym format widać obok nazwy protokołu, na przykład `RFC 2217 · 115200 8N1`.
 Dla SPE Expert 1.3K-FA za konwerterem właściwe jest **115200 8N1**.
 

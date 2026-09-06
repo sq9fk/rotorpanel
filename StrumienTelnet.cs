@@ -8,8 +8,8 @@
 /// negocjuja opcje. Bez rozpakowania tych sekwencji trafialyby one do danych
 /// i psuly transmisje.
 ///
-/// Nie wysylamy polecen ustawiajacych parametry portu - predkosc i format ramki
-/// konfiguruje sie po stronie urzadzenia.
+/// Po nawiazaniu polaczenia wysylamy parametry portu: predkosc, format ramki oraz
+/// stan linii DTR i RTS. Urzadzenie trzyma swoj port zamkniety, dopoki ich nie pozna.
 /// </summary>
 public sealed class StrumienTelnet : Stream
 {
@@ -28,6 +28,11 @@ public sealed class StrumienTelnet : Stream
     private const byte PolecBityDanych = 2;
     private const byte PolecParzystosc = 3;
     private const byte PolecBityStopu  = 4;
+    private const byte PolecSterowanie = 5;
+
+    private const byte BezPrzeplywu = 1;    // SET-CONTROL: brak sterowania przeplywem
+    private const byte DtrWlacz     = 8;
+    private const byte RtsWlacz     = 11;
 
     private enum Stan { Dane, PoIac, Negocjacja, Podnegocjacja, PodnegocjacjaIac }
 
@@ -75,6 +80,13 @@ public sealed class StrumienTelnet : Stream
         polecenia.AddRange(Podnegocjacja(PolecBityDanych, (byte)p.BityDanych));
         polecenia.AddRange(Podnegocjacja(PolecParzystosc, NaKodParzystosci(p.Parzystosc)));
         polecenia.AddRange(Podnegocjacja(PolecBityStopu,  NaKodBitowStopu(p.BityStopu)));
+
+        // Windows otwiera port szeregowy z podniesionym DTR i RTS, a czesc urzadzen
+        // (m.in. SPE Expert) bez nich nie odzywa sie ani slowem. Serwer RFC 2217 trzyma
+        // te linie opuszczone, dopoki klient ich nie podniesie - stad te trzy polecenia.
+        polecenia.AddRange(Podnegocjacja(PolecSterowanie, BezPrzeplywu));
+        polecenia.AddRange(Podnegocjacja(PolecSterowanie, DtrWlacz));
+        polecenia.AddRange(Podnegocjacja(PolecSterowanie, RtsWlacz));
 
         var tablica = polecenia.ToArray();
         await _siec.WriteAsync(tablica, 0, tablica.Length, ct);
