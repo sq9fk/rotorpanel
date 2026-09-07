@@ -254,8 +254,8 @@ widać, gdzie się stoi.
 
 Zostaje **logo**: wzmacniacz składa je z kafelków mapy bitowej (bajty `0xB0`–`0xDF`), gdzie każdy
 bajt to inny wycinek obrazka. Samych pikseli w ramce nie ma, więc bez tablicy znaków wyświetlacza
-nie da się ich odtworzyć — w tym miejscu program rysuje prostokąt z napisem SPE o tych samych
-wymiarach, żeby ekran miał układ jak na panelu. To znak zastępczy, nie kopia.
+nie da się ich odtworzyć — te komórki zostają puste. Żeby narysować logo naprawdę, trzeba nauczyć
+program kafelków: dopasować zdjęcie ekranu do siatki 40×8 i wyciąć z niego każdą komórkę.
 
 Wiedza o ramce `0x6A` i o komendach RCU pochodzi z projektu
 [vu2cpl/macexpert-spe](https://github.com/vu2cpl/macexpert-spe), gdzie ten protokół został
