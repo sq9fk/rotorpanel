@@ -243,6 +243,14 @@ z wyliczeniem; gdy trafi sie zdjecie z wypelniona linijka, `ucz-z-instrukcji.py`
 Reszty rodziny (`0x87`, `0x89`, `0x8A`, `0x8C` - inne stopnie wypelnienia i prawa zaslepka)
 nie widzielismy w zadnej ramce; **nie dopisuj ich na wyczucie**.
 
+**Linijka podswietlenia i kontrastu ma inna rodzine kodow niz mierniki.** Na ekranie ustawien
+DISPLAY suwaki ida bajtami `0x92`-`0x98`, a nie `0x81`-`0x8B` jak mierniki PA - czyli wzmacniacz
+ma co najmniej dwa zestawy kafelkow linijki. Rozpisane w `macexpert-spe` (`RCUFrame.swift`):
+lewa zaslepka `0x92`-`0x97` to rosnace wypelnienie, prawa `0x94`-`0x98` rosnaca pustka, `0x93`
+komorka pusta w srodku, a `0x96` to kursor edycji, ktory potrafi stanac w srodku paska. Oni
+z tego wyliczaja tylko poziom 0-9 i nic nie rysuja; my bedziemy potrzebowac ksztaltow. Dobra
+wiadomosc: ten ekran da sie zlapac Ctrl+S **bez nadawania**.
+
 **Kolejnosc uruchamiania narzedzi ma znaczenie.** `ucz-kafelki.py` pisze `KafelkiSpe.cs` od
 zera, a `ucz-z-instrukcji.py` tylko dopisuje. Po kazdej zmianie w tym pierwszym trzeba wiec
 przeliczyc wszystko po kolei:
@@ -253,9 +261,13 @@ ucz-z-instrukcji.py operate.raw 734 211 2936 operate.bin 3.5  9.0  3.00  81 82 8
 ucz-z-instrukcji.py setcat.raw  719 202 2876 setup.bin   0.75 5.80 3.03  99 9A 9B 9C
 ```
 
-**Znaku `0xAE` nadal nie znamy.** Stoi w wierszu "FAN SPINNING: --:--" ekranu V PA, po dwie
-komorki z kazdej strony dwukropka. Zadne zdjecie w instrukcji tego ekranu nie pokazuje, wiec
-komorki zostaja puste.
+**`0xAE` to znacznik "zaznaczone" - znaczenie znamy, ksztaltu nie.** Stoi w wierszu
+"FAN SPINNING: --:--" ekranu V PA, po dwie komorki z kazdej strony dwukropka. Czym jest, mowi
+`macexpert-spe`: w dekoderze stanu konfiguracji `filled(i) = bytes[i] == 0xAE` sluzy do odczytu
+pol wyboru (BNK A/B, REMOTE ANT SWITCH, SO2R MATRIX, COMBINER), czyli to wypelniony znacznik.
+Znaczenie nie wystarczy do narysowania - zadne zdjecie w instrukcji tego znaku nie pokazuje na
+tyle jednoznacznie, wiec komorki zostaja puste. Ekran z polami wyboru (OTHER SETTINGS) jest
+w instrukcji jako `manual/obraz-14.jpg`; brakuje tylko ramki z tego ekranu.
 
 **Do nauki znakow potrzebne sa dwie rzeczy naraz: obraz i ramka.** Ramka mowi, jakim kodem
 wzmacniacz prosi o komorke, obraz mowi, jak ta komorka wyglada - jedno bez drugiego jest
@@ -286,6 +298,15 @@ samo; `EkranSpe.Rozbierz` przyjmuje dlugosc, zamiast jej zakladac.
 i rysuje wlasny interfejs z szescioma dekoderami kursora per ekran. My renderujemy siatke znakow
 w `PodgladLcd` - mniej kodu, a menu wyglada tak jak na panelu i dziala dla ekranow, ktorych nikt
 nie rozbieral.
+
+**U nich nie ma ani jednej mapy bitowej - i dlatego nie ma tam czego szukac.** Sprawdzone
+w zrodlach: `LCDText.swift` zamienia kazdy znak wlasny wyswietlacza na kropke (z komentarzem,
+ze chodzi o zachowanie wyrownania bajt-do-znaku przy wyszukiwaniu), wiec linijki, logo, ramki
+i strzalki sa u nich kropkami. Liczby na wskaznikach biora nie z wyswietlacza, tylko z **ramki
+statusu `0x43`** - `SPEProtocol.swift` czyta z CSV pola 10-14 (moc, SWR na ATU, SWR na antenie,
+napiecie, prad drenu) i rysuje na tym wlasne kontrolki. Ekran sluzy im tylko do rozpoznania,
+gdzie stoi wzmacniacz, i do menu. Jesli szukasz ksztaltow kafelkow, to nie tam - trzeba ich
+uczyc ze zdjec, tak jak robimy.
 
 **Ramki od wzmacniacza rozbieraj po kolei, nie po rodzaju.** Pierwsza wersja `CzytnikSpe`
 szukała najpierw ramek ekranu w całym buforze i oddawała klientowi wszystko, co leżało przed
