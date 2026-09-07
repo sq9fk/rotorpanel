@@ -5,8 +5,9 @@
 /// z rozebranych pol - pokazuje to, co wzmacniacz naprawde ma na ekranie, zeby
 /// menu wygladalo tak samo jak na panelu.
 ///
-/// Kazda komorka idzie z mapy bitowej: znaki z <see cref="CzcionkaSpe"/>, a logo,
-/// kreski i ramki z <see cref="KafelkiSpe"/>. Zaznaczona pozycja idzie w negatywie.
+/// Kazda komorka idzie z mapy bitowej w <see cref="CzcionkaSpe"/> - tekst i znaki
+/// wlasne panelu z jednej tablicy, bo taki jest font ROM sterownika wyswietlacza.
+/// Zaznaczona pozycja idzie w negatywie.
 /// Rysowanie tekstu czcionka systemowa dawalo obraz z dwoch swiatow - grafika
 /// pikselowa, litery wygladzone i rozstrzelone, bo zaden krok czcionki nie pasuje
 /// do szesciopikselowej komorki panelu.
@@ -32,8 +33,8 @@ public sealed class PodgladLcd : Control
     /// <summary>Ile pikseli ekranu na jeden piksel wyswietlacza.</summary>
     public const int Skala = 2;
 
-    private const int SzerokoscZnaku  = KafelkiSpe.Szerokosc * Skala;
-    private const int WysokoscWiersza = KafelkiSpe.Wysokosc * Skala;
+    private const int SzerokoscZnaku  = CzcionkaSpe.Szerokosc * Skala;
+    private const int WysokoscWiersza = CzcionkaSpe.Wysokosc * Skala;
 
     public PodgladLcd()
     {
@@ -119,10 +120,10 @@ public sealed class PodgladLcd : Control
         var obraz = new Bitmap(SzerokoscZnaku, WysokoscWiersza);
         Color tusz = negatyw ? TloEkranu : Litery;
 
-        for (int y = 0; y < KafelkiSpe.Wysokosc && y < mapa.Length; y++)
-            for (int x = 0; x < KafelkiSpe.Szerokosc; x++)
+        for (int y = 0; y < CzcionkaSpe.Wysokosc && y < mapa.Length; y++)
+            for (int x = 0; x < CzcionkaSpe.Szerokosc; x++)
             {
-                if ((mapa[y] >> (KafelkiSpe.Szerokosc - 1 - x) & 1) == 0) continue;
+                if ((mapa[y] >> (CzcionkaSpe.Szerokosc - 1 - x) & 1) == 0) continue;
 
                 // Kazdy piksel panelu to kwadrat Skala na Skala - powiekszenie robimy
                 // sami, bo GDI+ przy skalowaniu obrazu wygladzilby krawedzie.
@@ -135,16 +136,8 @@ public sealed class PodgladLcd : Control
         return obraz;
     }
 
-    /// <summary>
-    /// Mapa bitowa komorki: najpierw znaki wlasne wyswietlacza, potem czcionka.
-    /// Kod znaku to bajt plus 0x20 - i to dla calego zakresu, nie tylko dla liter.
-    /// </summary>
-    private static byte[] Mapa(byte kod)
-    {
-        if (KafelkiSpe.Mapy.TryGetValue(kod, out var kafelek)) return kafelek;
-        if (kod < CzcionkaSpe.Glify.Length) return CzcionkaSpe.Glify[kod];
-        return null;
-    }
+    /// <summary>Mapa bitowa komorki wprost z fontu ROM - jest w nim kazdy kod.</summary>
+    private static byte[] Mapa(byte kod) => CzcionkaSpe.Glify[kod];
 
     protected override void Dispose(bool zwalniamy)
     {

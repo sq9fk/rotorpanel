@@ -1,0 +1,38 @@
+RotorPanel
+Copyright (C) 2026 SQ9FK
+
+Ten program jest wolnym oprogramowaniem na licencji GNU General Public License
+w wersji 3 — patrz plik LICENSE.
+
+Do wersji 1.8.9 włącznie program był wydawany na licencji MIT. Zmiana na GPL-3.0
+nastąpiła w wersji 1.9.0, gdy do programu trafił font ROM sterownika wyświetlacza
+wzmacniacza SPE Expert.
+
+
+Pochodzenie fontu wyświetlacza
+------------------------------
+
+Plik CzcionkaSpe.cs jest wygenerowany z tablicy src/gui/SpeLcdFontRom.inc
+projektu AetherSDR:
+
+    https://github.com/aethersdr/AetherSDR
+    Copyright (C) autorzy AetherSDR
+    GNU General Public License v3.0
+
+Tablica opisuje generator znaków sterownika wyświetlacza wzmacniacza SPE Expert:
+256 glifów po osiem linii, sześć bitów szerokości, najstarszy bit z lewej.
+Autorzy AetherSDR podają, że wyciągnęli ją z aplikacji sterującej jednego ze
+współautorów projektu.
+
+Zanim tablica trafiła tutaj, została zestawiona z odwzorowaniem, które powstało
+w tym projekcie niezależnie — przez uczenie map bitowych ze zdjęć panelu
+i z ilustracji w instrukcji Experta 1.3K-FA. Zgodność:
+
+  * 67 z 68 kafelków graficznych — co do bitu,
+  * wszystkie 35 znaków zmierzonych ze zrzutu panelu — co do bitu,
+  * różnice wyłącznie tam, gdzie w tym projekcie zgadywano: jeden kafelek
+    wyprowadzony rachunkiem (0x86, o kolumnę za szeroki) i dwanaście znaków
+    wpisanych z klasycznej czcionki 5x7.
+
+Narzędzia, którymi to odwzorowanie powstało, zostają w katalogu narzedzia/ jako
+niezależny sprawdzian tablicy.

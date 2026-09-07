@@ -1,5 +1,9 @@
 """Uczy map bitowych ze zdjecia ekranu w instrukcji, zwiazanego z ramka z panelu.
 
+UWAGA: program nie uzywa juz tego wyniku - mapy bitowe bierze z pelnego fontu ROM
+(patrz `wczytaj-rom.py` i NOTICE). Skrypt zostaje jako niezalezny sprawdzian i pisze
+do `obj/`.
+
 Ekrany inne niz glowny maja wlasne symbole - linijki miernikow w trybie Operate,
 strzalki w podpowiedziach SET - a nauczyc ich sie mozna tylko z pary: obraz mowi,
 jak komorka wyglada, ramka mowi, jakim kodem wzmacniacz o nia prosi.
@@ -146,7 +150,7 @@ if not nowe:
     sys.exit(0)
 
 # Dopisanie do KafelkiSpe.cs: kody uczone tutaj sa oznaczone zrodlem.
-plik = os.path.join(K, "..", "KafelkiSpe.cs")
+plik = os.path.join(K, "..", "obj", "KafelkiSpe.sprawdzenie.cs")
 tresc = io.open(plik, encoding="utf-8-sig").read()
 for kod, mapa in sorted(nowe.items()):
     wiersz = "        { 0x%02X, new byte[] { %s } },   // z instrukcji\n" % (

@@ -267,60 +267,24 @@ Rysowane jest **wszystko z map bitowych, tekst też**. Czcionka systemowa dawał
 światów: grafika pikselowa, a litery wygładzone i rozstrzelone, bo żaden krok czcionki nie
 pasuje do sześciopikselowej komórki.
 
-Skąd te mapy, skoro w ramce `0x6A` są same kody komórek, a pikseli nie ma:
+Skąd te mapy: program ma **cały font ROM sterownika wyświetlacza** — 256 glifów po
+osiem linii, sześć bitów szerokości. Tekst i znaki własne panelu siedzą w jednej tablicy
+(`CzcionkaSpe.cs`), bo tak są w samym sterowniku. Tablica pochodzi z projektu
+[AetherSDR](https://github.com/aethersdr/AetherSDR) — szczegóły w [NOTICE](NOTICE).
 
-* `narzedzia/ucz-kafelki.py` bierze zrzut ekranu wyświetlacza i ramkę `0x6A` z tego samego
-  ekranu, dopasowuje zrzut do siatki 40×8 i wycina każdą komórkę, wiążąc ją z kodem z ramki.
-  Wynik to `KafelkiSpe.cs` — znaki własne panelu, od `0x80` w górę.
-* `narzedzia/ucz-czcionke.py` robi to samo dla tekstu i zapisuje `CzcionkaSpe.cs` — 96 znaków
-  6 na 8.
+Zanim tablica tu trafiła, odwzorowanie powstawało w tym projekcie od zera: `narzedzia/`
+uczą map bitowych ze zdjęcia panelu zestawionego z ramką `0x6A` z tej samej chwili — obraz
+mówi, jak komórka wygląda, ramka mówi, jakim kodem wzmacniacz o nią prosi. Zestawienie obu
+źródeł wypadło tak:
 
-Siatkę zrzutu wyznacza zasięg tuszu: górna krawędź ramki i wiersz kresek biegną przez całą
-szerokość, a separatory sięgają samego dołu. Dopasowanie do pionowych separatorów wychodziło
-o pół piksela obok, bo separator `0x8F` nie stoi przy krawędzi komórki, tylko w jej kolumnie 3.
-Same komórki próbkujemy po odcieniach z wagami brzegów — zrzut jest powiększeniem w skali
-ułamkowej, więc progowanie najpierw na czarno-białe dawało ten sam znak raz tak, raz inaczej,
-zależnie od tego, w którym miejscu rastra wypadła komórka. Sprawdzian, że siatka jest trafiona:
-**wszystkie 57 kodów graficznych i 35 sprawdzalnych liter wychodzą z każdego wystąpienia
-identycznie**.
+* 67 z 68 kafelków graficznych — zgodne co do bitu,
+* wszystkie 35 znaków zmierzonych ze zrzutu panelu — zgodne co do bitu,
+* różnice wyłącznie tam, gdzie zgadywano: jeden kafelek wyliczony rachunkiem (`0x86`,
+  o kolumnę za szeroki) i dwanaście znaków wpisanych z klasycznej czcionki 5×7.
 
-Ekrany inne niż główny mają własne symbole, których na głównym nie ma. Żeby dało się je
-nauczyć, okno sterowania zapisuje na **Ctrl+S** bieżącą ramkę `0x6A` do podkatalogu `ekrany`
-obok pliku programu. Sama ramka nie wystarczy — mówi tylko, jakim kodem wzmacniacz prosi
-o daną komórkę — więc drugim źródłem są zdjęcia ekranów z instrukcji 1.3K-FA, a wiąże je
-`narzedzia/ucz-z-instrukcji.py`. Tak powstały linijki mierników `PA OUT` i `I PA` w trybie
-Operate (`0x81`–`0x84`) oraz strzałki `[◁▲][▽▷]` w podpowiedziach menu SET (`0x99`–`0x9C`).
-
-Dowód, że zdjęcie z instrukcji i ramka z własnego wzmacniacza opisują ten sam układ, jest
-w samym wyniku: przy dobrym dopasowaniu komórki, których kod już znamy, muszą wyjść ze
-zdjęcia co do piksela takie same. W wierszu podpowiedzi zgodziły się 24 komórki z 28,
-a niezgodne były **dokładnie te cztery strzałki**, o które chodziło.
-
-Wypełnienie linijki to osobna rodzina kodów — widać ją w ramce ekranu V PA (Operate, potem
-DISPLAY): `0x85` wypełniona zaślepka, `0x88` wypełniony odcinek, `0x8B` wypełniona podziałka,
-`0x86` komórka na końcu belki. Te cztery kafelki są **wyprowadzone, nie zmierzone**, bo zdjęcia
-z wypełnioną linijką nie ma w żadnej wersji instrukcji. Trzy wynikają wprost z geometrii: puste
-kafelki rysują pudełko z krawędziami w wierszach 3 i 6, więc wypełnienie to ten sam kafelek
-z zamalowanym środkiem. Czwarty wyliczyłem ze skali — podziałki stoją co pięć komórek, co daje
-dwie kolumny pikseli na wolt, a odczyt 33,7 V wypada w komórce 18 na jej czwartej kolumnie.
-Niepewność to jedna kolumna. W `KafelkiSpe.cs` są oznaczone jako `wyprowadzony`; zdjęcie ekranu
-z wypełnioną linijką zastąpi je zmierzonymi.
-
-Nieznany zostaje `0xAE` z wiersza „FAN SPINNING" na tym samym ekranie — żadne zdjęcie
-w instrukcji go nie pokazuje, więc te komórki są puste.
-
-Nie wszystko da się zmierzyć i to jest zapisane w wynikach:
-
-* Ze zrzutu wolno wyciąć tylko komórki, o których wiadomo, że pokazują to samo co zapisana
-  ramka — nazwę modelu i opisy pól paska stanu. Wyszło z tego 35 znaków. Aż 32 zgodziły się co
-  do piksela z klasyczną czcionką 5×7 układów znakowych, a różniły się `D`, `t` i kropka; przy
-  takiej zgodności resztę tablicy można było wziąć stamtąd. Zmierzone zawsze wygrywają, więc
-  zrzut z nowymi znakami po prostu ich dołoży.
-* Strzałki `0x99`–`0x9C` są narysowane ręcznie, bo nie ma ich na ekranie głównym i nie było
-  czym ich zmierzyć. W `KafelkiSpe.cs` są tak oznaczone.
-
-Dzięki temu ekran główny wygląda jak na panelu: logo SPE, ramka wokół napisów i linie działowe
-są rysowane naprawdę, a nie zastępowane czymkolwiek.
+Narzędzia zostają jako niezależny sprawdzian tablicy — piszą do `obj/`, nie do źródeł
+programu. Zapisywanie ramek z panelu (**Ctrl+S** w oknie sterowania, podkatalog `ekrany`)
+też zostaje: przydaje się przy każdej pracy nad protokołem.
 
 Wiedza o ramce `0x6A` i o komendach RCU pochodzi z projektu
 [vu2cpl/macexpert-spe](https://github.com/vu2cpl/macexpert-spe), gdzie ten protokół został
@@ -600,18 +564,23 @@ Klasy okien są dzielone na pliki częściowe, żeby żaden nie urósł ponad cz
 | `CzytnikSpe.cs` | wyjmowanie ramek statusu i ekranu ze strumienia do klienta |
 | `EkranSpe.cs` | rozbiór ramki `0x6A` na siatkę 40×8 i flagi kursora |
 | `PodgladLcd.cs` | rysowanie wyświetlacza z map bitowych |
-| `KafelkiSpe.cs`, `CzcionkaSpe.cs` | mapy bitowe znaków panelu — **generowane**, patrz `narzedzia/` |
-| `narzedzia/` | skrypty uczące map bitowych ze zrzutu wyświetlacza |
+| `CzcionkaSpe.cs` | font ROM wyświetlacza, 256 glifów — **generowany**, patrz `narzedzia/wczytaj-rom.py` |
+| `narzedzia/` | generator tablicy z ROM-u i skrypty uczące map bitowych ze zdjęć — niezależny sprawdzian |
 | `Theme.cs`, `Ui.cs` | paleta oraz kontrolki własne: karta, dioda, znacznik |
 | `instalator/` | skrypty instalacyjne i skrypt składania paczki |
 | `ikona/` | generator ikony i gotowy plik `.ico` |
 
 ## Licencja
 
-MIT — patrz [LICENSE](LICENSE).
+**GPL-3.0** — patrz [LICENSE](LICENSE) i [NOTICE](NOTICE).
+
+Do wersji 1.8.9 włącznie program był na licencji MIT. Zmiana nastąpiła w 1.9.0, gdy
+do programu trafił font ROM sterownika wyświetlacza SPE, wzięty z projektu
+[AetherSDR](https://github.com/aethersdr/AetherSDR) wydawanego na GPL-3.0.
 
 ## Powiązane projekty
 
+- [AetherSDR](https://github.com/aethersdr/AetherSDR) — klient dla FlexRadio ze wsparciem dla SPE; stamtąd pochodzi font wyświetlacza
 - [ant-sw-2x6](https://github.com/sq9fk/ant-sw-2x6) — przełącznica antenowa 6x2, źródło nazw anten
 - [k3ng_controler_nano_light](https://github.com/sq9fk/k3ng_controler_nano_light) — firmware sterownika rotora
 - [rotator_wifi_bridge](https://github.com/sq9fk/rotator_wifi_bridge) — mostek WiFi dla rotora

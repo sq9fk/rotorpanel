@@ -158,6 +158,28 @@ czekanie na nastepny naglowek opoznialo podglad o cale odpytanie, bo kolejna ram
 dopiero przy nastepnym pulsie. `CzytnikSpe` bierze wiec typowa dlugosc (367 bajtow), gdy juz ja
 ma, a na synchronizacje czeka tylko wtedy, gdy ramka jest krotsza.
 
+**Mamy caly font ROM wyswietlacza - i to on jest zrodlem prawdy.** `CzcionkaSpe.cs` to
+256 glifow po osiem linii, po jednym na kazdy kod z ramki `0x6A`: tekst i znaki wlasne panelu
+w jednej tablicy, bo tak siedza w sterowniku. Generuje ja `narzedzia/wczytaj-rom.py`
+z tablicy projektu AetherSDR - pochodzenie i licencja w [NOTICE](NOTICE). **Nie dopisuj do niej
+niczego recznie** i nie zgaduj glifow; jesli czegos brakuje, brakuje tego w ROM-ie.
+
+`KafelkiSpe.cs` juz nie istnieje - byl drugim zrodlem tych samych ksztaltow, wiec poszedl.
+Poszedl tez `ucz-czcionke.py`: jego tablica klasycznej czcionki 5x7 sluzyla do zalepiania dziur
+i wlasnie tam sie mylila.
+Skrypty `ucz-kafelki.py` i `ucz-z-instrukcji.py` zostaja jako **niezalezny sprawdzian** ROM-u
+i pisza do `obj/`, nie do zrodel. Warto ich uzyc, gdy pojawi sie podejrzenie, ze tablica nie
+pasuje do konkretnego egzemplarza wzmacniacza.
+
+**Odwzorowanie ze zdjec wyszlo prawie identycznie jak ROM - i to jest miara metody.** Zanim
+tablica trafila do programu, zestawilismy ja z tym, co sami odtworzylismy: **67 z 68 kafelkow
+graficznych i wszystkie 35 znakow zmierzonych ze zrzutu zgadzalo sie co do bitu**. Roznice byly
+wylacznie tam, gdzie zgadywalismy - `0x86` wyliczony rachunkiem wyszedl o kolumne za szeroki
+(0x3C zamiast 0x38, czyli dokladnie w podanej niepewnosci), a dwanascie znakow wpisanych
+z klasycznej czcionki 5x7 (`! " , 7 Y g j p q | ~` i `0x5F`) bylo nietrafionych. Wniosek na
+przyszlosc: **mierzenie ze zdjec dziala, zgadywanie nie** - i to nawet wtedy, gdy zgadywany
+wzorzec wyglada rozsadnie.
+
 **Wyświetlacz ma 240 na 64 piksele, czyli komórka to 6 na 8.** To jest klucz do
 wszystkiego, co dotyczy rysowania. Przez długi czas uczyłem kafelków w 12 na 22 i skalowałem
 je ułamkowo — stąd brały się wszystkie skargi na wygląd: kreski raz jedno-, raz dwupikselowe,
@@ -181,21 +203,11 @@ zaczernienia z wagami brzegów usuwa to bez reszty: **wszystkie 57 kodów grafic
 sprawdzalnych liter wychodzą z każdego wystąpienia identycznie**. To jest dobry sprawdzian
 po każdej zmianie w `narzedzia/ucz-kafelki.py`.
 
-**Cały ekran idzie z map bitowych — tekst też.** `CzcionkaSpe` (generuje ją
-`narzedzia/ucz-czcionke.py`) trzyma 96 znaków 6 na 8, `KafelkiSpe` znaki własne panelu.
-`PodgladLcd` rysuje jedno i drugie tak samo. Wcześniej tekst szedł Consolas i obraz był
+**Cały ekran idzie z map bitowych — tekst też.** `PodgladLcd` rysuje każdą komórkę tak samo,
+bez znaczenia, czy to litera, kreska czy kafelek logo. Wcześniej tekst szedł Consolas i obraz był
 z dwóch światów: grafika pikselowa, litery wygładzone i rozstrzelone, bo żaden krok czcionki
 nie pasuje do sześciopikselowej komórki. Czcionka systemowa została tylko do napisu
 zastępczego.
-
-**Czcionka jest w części zmierzona, w części dopełniona — i to jest zapisane w wyniku.**
-Ze zrzutu da się wyciąć tylko te komórki, o których wiadomo, że pokazują to samo co zapisana
-ramka: nazwa modelu, opisy pól paska stanu. Wyszło 35 znaków. Aż 32 zgodziły się co do
-piksela z klasyczną czcionką 5x7 układów znakowych, a różniły się `D`, `t` i kropka — i te
-wpisane są w tablicy w skrypcie. Taka zgodność wystarczy, żeby resztę wziąć stamtąd. Każde
-uruchomienie skryptu wypisuje, które znaki się różnią; **zmierzone zawsze wygrywają**, więc
-zrzut z nowymi znakami po prostu ich dołoży. Strzałki `0x99`-`0x9C` są rysowane ręcznie
-(nie ma ich na ekranie głównym, nie ma czym zmierzyć) i tak oznaczone w `KafelkiSpe.cs`.
 
 **Ramka ekranu glownego jest w danych, logo tez - ale jako kody kafelkow.** Odczytane z ulozenia bajtow: `0x9F` gora
 ramki, `0xA0` dol, `0xA1` bok, `0xA2` i `0xA3` rogi, `0x8E` trojnik nad separatorem kolumny.
@@ -248,12 +260,11 @@ DISPLAY suwaki ida bajtami `0x92`-`0x98`, a nie `0x81`-`0x8B` jak mierniki PA - 
 ma co najmniej dwa zestawy kafelkow linijki. Rozpisane w `macexpert-spe` (`RCUFrame.swift`):
 lewa zaslepka `0x92`-`0x97` to rosnace wypelnienie, prawa `0x94`-`0x98` rosnaca pustka, `0x93`
 komorka pusta w srodku, a `0x96` to kursor edycji, ktory potrafi stanac w srodku paska. Oni
-z tego wyliczaja tylko poziom 0-9 i nic nie rysuja; my bedziemy potrzebowac ksztaltow. Dobra
-wiadomosc: ten ekran da sie zlapac Ctrl+S **bez nadawania**.
+z tego wyliczaja tylko poziom 0-9 i nic nie rysuja - my mamy ksztalty z ROM-u i rysujemy je
+jak kazdy inny znak.
 
-**Kolejnosc uruchamiania narzedzi ma znaczenie.** `ucz-kafelki.py` pisze `KafelkiSpe.cs` od
-zera, a `ucz-z-instrukcji.py` tylko dopisuje. Po kazdej zmianie w tym pierwszym trzeba wiec
-przeliczyc wszystko po kolei:
+**Sprawdzian ROM-u odtwarza sie tak.** Skrypty pisza do `obj/`, a `ucz-kafelki.py` zaczyna od
+zera i `ucz-z-instrukcji.py` tylko dopisuje, wiec kolejnosc ma znaczenie:
 
 ```
 ucz-kafelki.py zrzut.raw ekran.bin 385 107 1540
@@ -261,22 +272,17 @@ ucz-z-instrukcji.py operate.raw 734 211 2936 operate.bin 3.5  9.0  3.00  81 82 8
 ucz-z-instrukcji.py setcat.raw  719 202 2876 setup.bin   0.75 5.80 3.03  99 9A 9B 9C
 ```
 
-**`0xAE` to znacznik "zaznaczone" - znaczenie znamy, ksztaltu nie.** Stoi w wierszu
-"FAN SPINNING: --:--" ekranu V PA, po dwie komorki z kazdej strony dwukropka. Czym jest, mowi
-`macexpert-spe`: w dekoderze stanu konfiguracji `filled(i) = bytes[i] == 0xAE` sluzy do odczytu
-pol wyboru (BNK A/B, REMOTE ANT SWITCH, SO2R MATRIX, COMBINER), czyli to wypelniony znacznik.
-Znaczenie nie wystarczy do narysowania - zadne zdjecie w instrukcji tego znaku nie pokazuje na
-tyle jednoznacznie, wiec komorki zostaja puste. Ekran z polami wyboru (OTHER SETTINGS) jest
-w instrukcji jako `manual/obraz-14.jpg`; brakuje tylko ramki z tego ekranu.
+**`0xAE` to ptaszek z pol wyboru.** Stoi tez w wierszu "FAN SPINNING: --:--" ekranu V PA.
+Znaczenie potwierdza `macexpert-spe` - w dekoderze stanu konfiguracji `filled(i) =
+bytes[i] == 0xAE` czyta pola wyboru (BNK A/B, REMOTE ANT SWITCH, SO2R MATRIX, COMBINER) -
+a ksztalt jest w ROM-ie i zgadza sie ze zdjeciem `[✓]` z `manual/obraz-14.jpg`.
 
 **Do nauki znakow potrzebne sa dwie rzeczy naraz: obraz i ramka.** Ramka mowi, jakim kodem
 wzmacniacz prosi o komorke, obraz mowi, jak ta komorka wyglada - jedno bez drugiego jest
-bezuzyteczne. Ekran glowny mielismy w obu postaciach i stad `KafelkiSpe`. Ekrany Operate
-i SET maja wlasne symbole (linijki miernikow `PA OUT` i `I PA`, strzalki w podpowiedziach),
-ktorych na glownym nie ma, wiec wychodza puste. Dlatego okno sterowania zapisuje ramke na
-**Ctrl+S** do podkatalogu `ekrany`, a `EkranSpe.Surowe` trzyma ja w calosci. Obrazy tych
-ekranow sa w instrukcji 1.3K-FA (`manual/obraz-09.jpg` to Operate z pustymi linijkami).
-Nie zgaduj tych map bitowych - bez pary obraz-ramka nie da sie zwiazac ksztaltu z kodem.
+bezuzyteczne. Dzis to juz tylko sprawdzian ROM-u, ale zasada zostaje na wypadek, gdyby ktorys
+egzemplarz mial inny generator znakow. Dlatego okno sterowania zapisuje ramke na **Ctrl+S**
+do podkatalogu `ekrany`, a `EkranSpe.Surowe` trzyma ja w calosci; obrazy ekranow sa
+w instrukcji 1.3K-FA (`manual/obraz-09.jpg` to Operate z pustymi linijkami).
 
 **Kursor to jeden bajt na kolumne, bit wskazuje wiersz.** 40 bajtow zaraz za siatka
 (`EkranSpe.PoczatekFlag`), potem dwubajtowa suma kontrolna. Zmierzone przez porownanie ramek

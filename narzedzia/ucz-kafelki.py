@@ -1,5 +1,11 @@
 """Buduje slownik kafelkow wyswietlacza SPE: kod bajtu -> mapa bitowa 6x8.
 
+UWAGA: program nie uzywa juz tego wyniku. Mapy bitowe bierze z pelnego fontu ROM
+(`CzcionkaSpe.cs`, patrz `wczytaj-rom.py` i NOTICE). Ten skrypt zostaje jako
+**niezalezny sprawdzian** tamtej tablicy - uczy sie od zera ze zdjecia panelu
+i pisze do `obj/`, zeby dalo sie porownac. Kiedy oba zrodla porownano, zgadzalo sie
+67 z 68 kafelkow i wszystkie 35 zmierzonych znakow.
+
 Wzmacniacz przysyla w ramce 0x6A same kody komorek, a nie piksele. Znaki wlasne
 (logo, kreski, ramki, strzalki) trzeba wiec skads wziac - uczymy sie ich ze zrzutu
 ekranu dopasowanego do siatki 40 na 8.
@@ -25,7 +31,7 @@ K = os.path.dirname(os.path.abspath(__file__))
 ZRZUT = sys.argv[1]
 RAMKA = sys.argv[2]
 SZER, WYS, STRIDE = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
-WYJSCIE = sys.argv[6] if len(sys.argv) > 6 else os.path.join(K, "..", "KafelkiSpe.cs")
+WYJSCIE = sys.argv[6] if len(sys.argv) > 6 else os.path.join(K, "..", "obj", "KafelkiSpe.sprawdzenie.cs")
 KOLUMN, WIERSZY = 40, 8
 
 # Natywna rozdzielczosc komorki wyswietlacza: 240x64 piksele na 40x8 znakow.
