@@ -91,6 +91,29 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Kontrolka, ktora niczego nie przyjmuje, nie moze brac fokusu.** `Control` jest domyslnie
+zaznaczalny, wiec `PasekLed` i `Led` stawaly sie `ActiveControl` okna. Przewijane okno nie
+pozwala wyprowadzic aktywnej kontrolki poza widok, wiec okno stanu przewijalo sie **tylko do
+gornej krawedzi pierwszej linijki i ani piksela dalej** - ostatni wiersz tabeli (temperatura
+sumatora) byl nieosiagalny. Zmierzone na osobnym stanowisku: przy tresci 666 px i oknie 430 px
+przewijanie zatrzymywalo sie na 120 px, czyli dokladnie tam, gdzie pierwsza linijka dotyka gory;
+po `SetStyle(ControlStyles.Selectable, false)` dochodzi do 256 px, czyli do konca. Ten sam goly
+formularz z pustymi panelami w tej samej geometrii przewijal sie od poczatku poprawnie - roznica
+byla wylacznie w kontrolkach. Kazda nowa kontrolka czysto pokazowa ma dostac ten sam styl
+i `TabStop = false`.
+
+**Wymiary okien licz z pomiaru napisow, nie ze stalych.** Czcionki podajemy w punktach, wiec
+przy powiekszeniu ekranu 150% rosna o polowe, a wspolrzedne w pikselach nie - wiersz wysokosci
+18 px obcinal wtedy tekst. `UkladStanu` liczy wszystko z `Font.Height` i `TextRenderer.MeasureText`,
+przez co ten sam kod daje przy 100% wiersz 22 px, a przy 200% - 42 px. Sprawdzone dla powiekszen
+1,0 / 1,25 / 1,5 / 2,0 na pieciu rozmiarach ekranu.
+
+**Tabela stanu przechodzi na dwie kolumny, gdy nie miesci sie w wysokosci.** Czternascie wierszy
+w jednej kolumnie to 699 px z rama - na ekranie GPD (1280x720) nie ma na to miejsca. `UkladStanu`
+sklada wtedy tabele po siedem wierszy w dwoch kolumnach: 585x545, czyli miesci sie bez
+przewijania. Jesli i to nie starczy szerokosci, zostaje jedna kolumna i przewijanie. Kolejnosc
+prob jest wazna: **przewijanie to ostatnia deska ratunku, nie sposob na codzienna prace**.
+
 **Menu zasobnika buduj przed `Show`, nie w zdarzeniu `Opening`.** Pozycje dodawane
 w `Opening` przychodza za pozno: w chwili wywolania `Show` menu jest puste, wiec WinForms
 go nie pokazuje - i trzeba kliknac prawym drugi raz. Zmierzone w osobnym programie:

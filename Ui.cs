@@ -40,6 +40,10 @@ public class Led : Control
 
     public Led()
     {
+        // Dioda tylko pokazuje stan - patrz PasekLed: zaznaczalna kontrolka blokuje
+        // przewijanie okna, bo nie da sie jej wyprowadzic poza widok.
+        SetStyle(ControlStyles.Selectable, false);
+        TabStop = false;
         DoubleBuffered = true;
         Size = new Size(20, 20);
         BackColor = Theme.Karta;
@@ -112,6 +116,14 @@ public sealed class PasekLed : Control
     {
         SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+
+        // Miernik niczego nie przyjmuje, wiec nie moze brac fokusu. Control domyslnie
+        // jest zaznaczalny i staje sie ActiveControl okna, a przewijane okno nie
+        // pozwala wyprowadzic aktywnej kontrolki poza widok - przez to okno stanu
+        // przewijalo sie tylko do gornej krawedzi pierwszej linijki i ostatni wiersz
+        // tabeli byl nieosiagalny.
+        SetStyle(ControlStyles.Selectable, false);
+        TabStop = false;
         BackColor = Theme.Karta;
         Height = 14;
     }
@@ -282,10 +294,16 @@ public static class Ui
         var rama = new Size(okno.Width - okno.ClientSize.Width,
                             okno.Height - okno.ClientSize.Height);
 
-        okno.MaximumSize = new Size(tresc.Width + rama.Width, tresc.Height + rama.Height);
+        // Gdy w pionie zabraknie miejsca, pojawi sie pionowy pasek przewijania i zwezi
+        // obszar roboczy okna - bez tego zapasu wyskakuje jeszcze poziomy pasek, mimo
+        // ze w poziomie wszystko sie miesci.
+        int mieszczaSie = obszar.Height - rama.Height;
+        int zapas = tresc.Height > mieszczaSie ? SystemInformation.VerticalScrollBarWidth : 0;
+
+        okno.MaximumSize = new Size(tresc.Width + zapas + rama.Width, tresc.Height + rama.Height);
         okno.ClientSize = new Size(
-            Math.Max(320, Math.Min(tresc.Width, obszar.Width - rama.Width)),
-            Math.Max(240, Math.Min(tresc.Height, obszar.Height - rama.Height)));
+            Math.Max(320, Math.Min(tresc.Width + zapas, obszar.Width - rama.Width)),
+            Math.Max(240, Math.Min(tresc.Height, mieszczaSie)));
 
         if (!okno.IsHandleCreated) return;
 

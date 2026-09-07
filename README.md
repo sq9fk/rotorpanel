@@ -197,6 +197,10 @@ Na karcie wzmacniacza widać **linijkę mocy nadawania** — segmentowy miernik 
 trzymanym przez półtorej sekundy, bo moc przy modulacji skacze i bez tego nie da się odczytać
 wartości szczytowej. Zakres bierze się z modelu podanego przez sam wzmacniacz.
 
+Okno dopasowuje się do ekranu: na niskim ekranie tabela układa się w **dwie kolumny**, żeby
+wszystko było widać bez przewijania, a wysokości wierszy biorą się z rzeczywistego rozmiaru
+napisów — więc przy powiększeniu ekranu innym niż 100% tekst się nie obcina.
+
 Przycisk **Stan…** otwiera pełny widok: mierniki mocy, prądu PA, napięcia PA i SWR oraz
 wszystkie pola ramki statusu — model, tryb, pasmo, wejście, bank, antena nadawcza i odbiorcza,
 stan ATU, poziom mocy, SWR na antenie i na ATU oraz trzy temperatury (górna, dolna, sumatora).
@@ -612,6 +616,7 @@ Klasy okien są dzielone na pliki częściowe, żeby żaden nie urósł ponad cz
 | `SterownikAnten.cs` | odczyt nazw anten i przypisania nadajników ze sterownika |
 | `SpeForm.cs` | okno sterowania wzmacniaczem SPE: klawiatura i podgląd |
 | `StatusForm.cs` | okno stanu wzmacniacza: mierniki i pełna tabela pól ramki |
+| `StatusForm.Uklad.cs` | wymiary okna stanu liczone z pomiaru napisów, wybór liczby kolumn |
 | `StatusSpe.cs` | rozbiór odpowiedzi na `0x90` — model, pasmo, moc, temperatura |
 | `CzytnikSpe.cs` | wyjmowanie ramek statusu i ekranu ze strumienia do klienta |
 | `EkranSpe.cs` | rozbiór ramki `0x6A` na siatkę 40×8 i flagi kursora |

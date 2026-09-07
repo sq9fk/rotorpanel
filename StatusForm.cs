@@ -14,6 +14,7 @@ public sealed class StatusForm : Form
     private readonly System.Windows.Forms.Timer _zegar;
 
     private readonly Label _naglowek, _stanDanych, _klopot;
+    private readonly UkladStanu _uklad;
     private readonly PasekLed _pasekMocy, _pasekPradu, _pasekNapiecia, _pasekSwr;
     private readonly Label _opisMocy, _opisPradu, _opisNapiecia, _opisSwr;
     private readonly Dictionary<string, Label> _pola = new();
@@ -38,43 +39,70 @@ public sealed class StatusForm : Form
         => OknaMostka.Pokaz(mostek, () => new StatusForm(mostek, tytul));
 
     public StatusForm(Mostek mostek, string tytul)
+        : this(mostek, tytul, Screen.FromPoint(Cursor.Position).WorkingArea.Size) { }
+
+    /// <summary>
+    /// Rozmiar ekranu jest parametrem, bo od niego zalezy uklad tabeli - a przez to
+    /// daje sie sprawdzic dla ekranow, ktorych akurat nie ma pod reka.
+    /// </summary>
+    public StatusForm(Mostek mostek, string tytul, Size ekran)
     {
         _mostek = mostek;
 
+        var maly = Theme.Maly();
+        var zwykly = Theme.Zwykly();
+        var nazwa = Theme.Nazwa();
+
+        // Wymiary licza sie z pomiaru napisow, nie ze stalych - patrz UkladStanu.
+        var u = _uklad = UkladStanu.Policz(maly, zwykly, nazwa, Wiersze, ekran, UkladStanu.RamaOkna());
+
         Text            = tytul;
-        ClientSize      = new Size(460, 470);
+        ClientSize      = new Size(u.SzerokoscOkna, u.WysokoscOkna);
         StartPosition   = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox     = true;
         MaximizeBox     = false;
         ShowInTaskbar   = true;
         BackColor       = Theme.Tlo;
-        Font            = Theme.Zwykly();
+        Font            = zwykly;
 
-        var karta = new Karta { Location = new Point(16, 14), Size = new Size(428, 66) };
+        int odstep = u.Margines / 2;
+        int szerNaglowka = u.SzerokoscKarty - 2 * u.Margines;
+
+        var karta = new Karta
+        {
+            Location = new Point(u.Margines, u.Margines),
+            Size = new Size(u.SzerokoscKarty, u.WysokoscNaglowka)
+        };
         Controls.Add(karta);
 
-        _naglowek = Ui.Etykieta("", Theme.Nazwa(), Theme.Tekst,
-            new Point(16, 8), new Size(396, 22));
+        int yn = odstep;
+        _naglowek = Ui.Etykieta("", nazwa, Theme.Tekst,
+            new Point(u.Margines, yn), new Size(szerNaglowka, Math.Max(nazwa.Height, u.WysokoscTekstu)));
         karta.Controls.Add(_naglowek);
+        yn += _naglowek.Height;
 
-        _klopot = Ui.Etykieta("", Theme.Maly(), Color.FromArgb(0xB3, 0x26, 0x1E),
-            new Point(16, 30), new Size(396, 16));
+        _klopot = Ui.Etykieta("", maly, Color.FromArgb(0xB3, 0x26, 0x1E),
+            new Point(u.Margines, yn), new Size(szerNaglowka, maly.Height));
         karta.Controls.Add(_klopot);
+        yn += maly.Height;
 
-        _stanDanych = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(16, 46), new Size(396, 16));
+        _stanDanych = Ui.Etykieta("", maly, Theme.TekstSzary,
+            new Point(u.Margines, yn), new Size(szerNaglowka, maly.Height));
         karta.Controls.Add(_stanDanych);
 
-        var mierniki = new Karta { Location = new Point(16, 90), Size = new Size(428, 206) };
+        var mierniki = new Karta
+        {
+            Location = new Point(u.Margines, u.Margines + u.WysokoscNaglowka + u.Margines),
+            Size = new Size(u.SzerokoscKarty, u.WysokoscMiernikow)
+        };
         Controls.Add(mierniki);
 
-        int y = 12;
+        int y = odstep;
         (_pasekMocy, _opisMocy)         = Miernik(mierniki, "Moc wyjściowa", ref y);
         (_pasekPradu, _opisPradu)       = Miernik(mierniki, "Prąd PA", ref y);
         (_pasekNapiecia, _opisNapiecia) = Miernik(mierniki, "Napięcie PA", ref y);
         (_pasekSwr, _opisSwr)           = Miernik(mierniki, "SWR anteny", ref y);
-        mierniki.Height = y + 4;
 
         _pasekPradu.Maksimum = MaksPrad;
         _pasekNapiecia.Maksimum = MaksNapiecie;
@@ -87,23 +115,34 @@ public sealed class StatusForm : Form
         _pasekSwr.ProgPomaranczowy = 0.5;   // SWR 1,5
         _pasekSwr.ProgCzerwony = 0.67;      // SWR 2,0
 
-        y = mierniki.Bottom + 12;
-        var tabela = new Karta { Location = new Point(16, y), Size = new Size(428, 24 * Wiersze.Length + 12) };
+        var tabela = new Karta
+        {
+            Location = new Point(u.Margines, mierniki.Bottom + u.Margines),
+            Size = new Size(u.SzerokoscKarty, u.WysokoscTabeli)
+        };
         Controls.Add(tabela);
 
+        int szerKolumny = u.SzerokoscOpisu + u.SzerokoscWartosci;
         for (int i = 0; i < Wiersze.Length; i++)
         {
-            tabela.Controls.Add(Ui.Etykieta(Wiersze[i], Theme.Maly(), Theme.TekstSzary,
-                new Point(16, 10 + i * 24), new Size(190, 18)));
+            int kolumna = i / u.WierszyWKolumnie;
+            int wiersz  = i % u.WierszyWKolumnie;
+            int x = u.Margines + kolumna * (szerKolumny + u.Margines);
+            int wy = odstep + wiersz * u.Wiersz;
 
-            var wartosc = Ui.Etykieta("—", Theme.Zwykly(), Theme.Tekst,
-                new Point(210, 8 + i * 24), new Size(202, 18));
+            tabela.Controls.Add(Ui.Etykieta(Wiersze[i], maly, Theme.TekstSzary,
+                new Point(x, wy + (u.WysokoscTekstu - maly.Height) / 2),
+                new Size(u.SzerokoscOpisu, maly.Height)));
+
+            var wartosc = Ui.Etykieta("—", zwykly, Theme.Tekst,
+                new Point(x + u.SzerokoscOpisu, wy),
+                new Size(u.SzerokoscWartosci, u.WysokoscTekstu));
             tabela.Controls.Add(wartosc);
             _pola[Wiersze[i]] = wartosc;
         }
 
-        int wysokosc = y + tabela.Height + 20;
-        ClientSize = new Size(460, wysokosc);
+        var tresc = new Size(u.SzerokoscOkna, tabela.Bottom + u.Margines);
+        ClientSize = tresc;
 
         // Status przychodzi najwyzej raz na sekunde, a przy otwartym podgladzie
         // wyswietlacza wcale, wiec czestsze odswiezanie to sama praca na watku
@@ -117,28 +156,32 @@ public sealed class StatusForm : Form
         // idzie takze przy wlaczonym podgladzie wyswietlacza.
         _mostek.TrybStanu = true;
         FormClosed += (_, _) => { _mostek.TrybStanu = false; _zegar.Dispose(); };
-        Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(460, wysokosc));
+        Load += (_, _) => Ui.DopasujDoEkranu(this, tresc);
     }
 
     /// <summary>Linijka z podpisem i odczytem liczbowym po prawej.</summary>
     private (PasekLed, Label) Miernik(Control rodzic, string podpis, ref int y)
     {
+        var u = _uklad;
+        int szerokosc = u.SzerokoscKarty - 2 * u.Margines;
+        int polowa = szerokosc / 2;
+
         rodzic.Controls.Add(Ui.Etykieta(podpis, Theme.Maly(), Theme.TekstSzary,
-            new Point(16, y), new Size(200, 16)));
+            new Point(u.Margines, y), new Size(polowa, u.WysokoscTekstu)));
 
         var odczyt = Ui.Etykieta("—", Theme.Zwykly(), Theme.Tekst,
-            new Point(216, y - 2), new Size(196, 18));
+            new Point(u.Margines + polowa, y), new Size(szerokosc - polowa, u.WysokoscTekstu));
         odczyt.TextAlign = ContentAlignment.MiddleRight;
         rodzic.Controls.Add(odczyt);
 
         var pasek = new PasekLed
         {
-            Location = new Point(16, y + 18),
-            Size = new Size(396, 14)
+            Location = new Point(u.Margines, y + u.WysokoscTekstu),
+            Size = new Size(szerokosc, u.WysokoscLinijki)
         };
         rodzic.Controls.Add(pasek);
 
-        y += 50;
+        y += u.OdstepMiernika;
         return (pasek, odczyt);
     }
 
