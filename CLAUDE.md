@@ -223,10 +223,39 @@ to `[◁▲]`, a pozioma belka pod trojkatem siega jedna kolumne w lewa komorke,
 ramka i jej rogi, `0xAA` stopien przy temperaturze - na panelu to kwadracik 2 na 2 piksele,
 nie kolko, dlatego znak `°` z czcionki wygladal obco. `0xB0`-`0xDF` to kafelki logo.
 
-**Wypelnienia linijki przy nadawaniu sa wciaz nieznane.** Ramke Operate mamy z postoju, wiec
-linijki byly puste i wyszly z niej tylko kody tla. Kody, ktorymi wzmacniacz rysuje slupek przy
-nadawaniu, poznamy dopiero z ramki zlapanej w trakcie TX. Do tego czasu te komorki beda puste -
-nie zgaduj ich ksztaltu.
+**Wypelnienie linijki to osobna rodzina kodow.** Widac to w ramce ekranu V PA (Operate,
+potem DISPLAY): przy pustej linijce idzie `81 82 82 82 82 83 ...`, a przy wypelnionej do 33,7 V
+`85 88 88 88 88 8B 88 88 88 88 8B 86 82 82 82 83 ...`. Czyli `0x85` wypelniona zaslepka,
+`0x88` wypelniony odcinek, `0x8B` wypelniona podzialka, `0x86` komorka na koncu belki; dalej
+wracaja kody puste. Pozycje sie zgadzaja: podzialki stoja w komorkach 12, 17 i 22, a wypelnione
+sa dwie pierwsze.
+
+**Cztery kafelki wypelnienia sa wyprowadzone, nie zmierzone - i tak sa oznaczone.** Zdjecia
+z wypelniona linijka nie ma: w obu wersjach instrukcji wszystkie czternascie zdjec ekranu jest
+z postoju. Trzy z nich wynikaja wprost z geometrii - puste kafelki rysuja pudelko z gorna
+krawedzia w wierszu 3 i dolna w wierszu 6, wiec wypelnienie to ten sam kafelek z zamalowanymi
+wierszami 4 i 5; tu nie ma pola do zgadywania. Czwarty, `0x86`, wyliczylem: podzialki maja
+kreske w kolumnie 2 komorki i stoja w komorkach 7, 12, 17, 22, 27, wiec 0 V wypada w kolumnie
+44 siatki, 60 V w kolumnie 164 - dwie kolumny na wolt. Odczyt 33,7 V daje koniec belki
+w kolumnie 111,4, a komorka 18 zaczyna sie w 108, czyli zamalowane sa **cztery kolumny**,
+z niepewnoscia jednej kolumny. Wszystko to siedzi w `WYPROWADZONE` w `ucz-kafelki.py`
+z wyliczeniem; gdy trafi sie zdjecie z wypelniona linijka, `ucz-z-instrukcji.py` je nadpisze.
+Reszty rodziny (`0x87`, `0x89`, `0x8A`, `0x8C` - inne stopnie wypelnienia i prawa zaslepka)
+nie widzielismy w zadnej ramce; **nie dopisuj ich na wyczucie**.
+
+**Kolejnosc uruchamiania narzedzi ma znaczenie.** `ucz-kafelki.py` pisze `KafelkiSpe.cs` od
+zera, a `ucz-z-instrukcji.py` tylko dopisuje. Po kazdej zmianie w tym pierwszym trzeba wiec
+przeliczyc wszystko po kolei:
+
+```
+ucz-kafelki.py zrzut.raw ekran.bin 385 107 1540
+ucz-z-instrukcji.py operate.raw 734 211 2936 operate.bin 3.5  9.0  3.00  81 82 83 84
+ucz-z-instrukcji.py setcat.raw  719 202 2876 setup.bin   0.75 5.80 3.03  99 9A 9B 9C
+```
+
+**Znaku `0xAE` nadal nie znamy.** Stoi w wierszu "FAN SPINNING: --:--" ekranu V PA, po dwie
+komorki z kazdej strony dwukropka. Zadne zdjecie w instrukcji tego ekranu nie pokazuje, wiec
+komorki zostaja puste.
 
 **Do nauki znakow potrzebne sa dwie rzeczy naraz: obraz i ramka.** Ramka mowi, jakim kodem
 wzmacniacz prosi o komorke, obraz mowi, jak ta komorka wyglada - jedno bez drugiego jest

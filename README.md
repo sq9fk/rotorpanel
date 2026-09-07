@@ -296,9 +296,18 @@ w samym wyniku: przy dobrym dopasowaniu komórki, których kod już znamy, musz�
 zdjęcia co do piksela takie same. W wierszu podpowiedzi zgodziły się 24 komórki z 28,
 a niezgodne były **dokładnie te cztery strzałki**, o które chodziło.
 
-Czego wciąż nie ma: wypełnienia linijki przy nadawaniu. Ramka Operate została złapana na
-postoju, więc słupki były puste; kody, którymi wzmacniacz rysuje wypełnienie, pokaże dopiero
-ramka z trakcie nadawania.
+Wypełnienie linijki to osobna rodzina kodów — widać ją w ramce ekranu V PA (Operate, potem
+DISPLAY): `0x85` wypełniona zaślepka, `0x88` wypełniony odcinek, `0x8B` wypełniona podziałka,
+`0x86` komórka na końcu belki. Te cztery kafelki są **wyprowadzone, nie zmierzone**, bo zdjęcia
+z wypełnioną linijką nie ma w żadnej wersji instrukcji. Trzy wynikają wprost z geometrii: puste
+kafelki rysują pudełko z krawędziami w wierszach 3 i 6, więc wypełnienie to ten sam kafelek
+z zamalowanym środkiem. Czwarty wyliczyłem ze skali — podziałki stoją co pięć komórek, co daje
+dwie kolumny pikseli na wolt, a odczyt 33,7 V wypada w komórce 18 na jej czwartej kolumnie.
+Niepewność to jedna kolumna. W `KafelkiSpe.cs` są oznaczone jako `wyprowadzony`; zdjęcie ekranu
+z wypełnioną linijką zastąpi je zmierzonymi.
+
+Nieznany zostaje `0xAE` z wiersza „FAN SPINNING" na tym samym ekranie — żadne zdjęcie
+w instrukcji go nie pokazuje, więc te komórki są puste.
 
 Nie wszystko da się zmierzyć i to jest zapisane w wynikach:
 

@@ -31,14 +31,29 @@ KOLUMN, WIERSZY = 40, 8
 # Natywna rozdzielczosc komorki wyswietlacza: 240x64 piksele na 40x8 znakow.
 KOM_SZER, KOM_WYS = 6, 8
 
-# Strzalki z podpowiedzi klawiszy. Nie ma ich na ekranie glownym, wiec nie ma czym
-# ich zmierzyc - rysuje je recznie jako trojkaty w kolumnach 1-4. Gdy trafi sie
-# zrzut ekranu, ktory je pokazuje, nauczone wartosci je przykryja.
-RECZNE = {
-    0x99: (0x00, 0x02, 0x06, 0x0E, 0x06, 0x02, 0x00, 0x00),   # w lewo
-    0x9A: (0x00, 0x00, 0x04, 0x0E, 0x1F, 0x00, 0x00, 0x00),   # w gore
-    0x9B: (0x00, 0x00, 0x1F, 0x0E, 0x04, 0x00, 0x00, 0x00),   # w dol
-    0x9C: (0x00, 0x10, 0x18, 0x1C, 0x18, 0x10, 0x00, 0x00),   # w prawo
+# Wypelnienie linijki miernikow. Tych kodow nie da sie na razie nauczyc ze zdjecia:
+# w obu wersjach instrukcji wszystkie czternascie zdjec ekranu jest z postoju, z pusta
+# linijka, a wlasnego zdjecia z wypelniona nie mamy. Sa za to **wyprowadzone z ksztaltow
+# zmierzonych**, a nie zgadniete z powietrza - i tym sie roznia od reszty.
+#
+# Puste kafelki linijki (nauczone ze zdjecia) rysuja pudelko: gorna krawedz w wierszu 3,
+# dolna w wierszu 6, srodek pusty. Wypelnienie to ten sam kafelek z zamalowanym srodkiem,
+# czyli wierszami 4 i 5 - geometria nie zostawia tu wyboru:
+#     0x81 lewa zaslepka  -> 0x85     0x82 odcinek -> 0x88     0x83 podzialka -> 0x8B
+#
+# Inaczej jest z 0x86, komorka na koncu belki. Ile ma zamalowanych kolumn, wyliczylem
+# z ramki ekranu V PA: podzialki 0x83 i zaslepki 0x81/0x84 maja kreske w kolumnie 2,
+# a stoja w komorkach 7, 12, 17, 22 i 27, czyli 0 V wypada w kolumnie 44 siatki pikseli,
+# 60 V w kolumnie 164 - dwie kolumny na wolt. Odczyt 33,7 V daje koniec belki w kolumnie
+# 111,4, a komorka 18 zaczyna sie w kolumnie 108, wiec zamalowane sa cztery kolumny.
+# Niepewnosc to jedna kolumna w kazda strone (nie wiadomo, jak wzmacniacz zaokragla),
+# czyli okolo poł wolta na tej skali. Gdy trafi sie zdjecie ekranu z wypelniona linijka,
+# `ucz-z-instrukcji.py` nadpisze te cztery kafelki zmierzonymi.
+WYPROWADZONE = {
+    0x85: (0x08, 0x08, 0x08, 0x0F, 0x0F, 0x0F, 0x0F, 0x00),   # zaslepka, srodek zamalowany
+    0x86: (0x00, 0x00, 0x08, 0x3F, 0x3C, 0x3C, 0x3F, 0x00),   # koniec belki, cztery kolumny
+    0x88: (0x00, 0x00, 0x08, 0x3F, 0x3F, 0x3F, 0x3F, 0x00),   # odcinek zamalowany
+    0x8B: (0x08, 0x08, 0x08, 0x3F, 0x3F, 0x3F, 0x3F, 0x00),   # podzialka zamalowana
 }
 
 dane = open(ZRZUT, "rb").read()
@@ -154,7 +169,7 @@ for kod, lista in zebrane.items():
     if any(najczestszy):                      # pomijamy puste
         kafelki[kod] = (najczestszy, len(lista), ile)
 
-for kod, mapa in RECZNE.items():
+for kod, mapa in WYPROWADZONE.items():
     kafelki.setdefault(kod, (mapa, 0, 0))
 
 print("kodow ze zrzutu: %d" % len(kafelki))
@@ -172,7 +187,7 @@ if "-p" in sys.argv:
 linie = []
 for kod in sorted(kafelki):
     wiersze = kafelki[kod][0]
-    skad = "recznie" if kafelki[kod][1] == 0 else "ze zrzutu"
+    skad = "wyprowadzony" if kafelki[kod][1] == 0 else "ze zrzutu"
     linie.append("        { 0x%02X, new byte[] { %s } },   // %s" % (
         kod, ", ".join("0x%02X" % w for w in wiersze), skad))
 
