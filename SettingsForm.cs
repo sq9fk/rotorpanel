@@ -29,7 +29,7 @@ public partial class SettingsForm : Form
         Text            = "Ustawienia";
         ClientSize      = new Size(1000, 852);
         StartPosition   = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox     = false;
         MaximizeBox     = false;
         BackColor       = Theme.Tlo;
@@ -123,6 +123,9 @@ public partial class SettingsForm : Form
         OdswiezListyPar();
         OdswiezListeRotorow();
         WypelnijAnteny();
+
+        Ui.DopasujDoEkranu(this, new Size(1000, 852));
+        Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(1000, 852));
     }
 
     private static TextBox Pole(string tekst, Point poz, int szerokosc) => new()

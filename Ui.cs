@@ -94,6 +94,43 @@ public class Znacznik : Label
 
 public static class Ui
 {
+    /// <summary>
+    /// Mniejsze z dwojga: rozmiar tresci albo tyle, ile daje ekran. Gdy tresc sie nie
+    /// miesci, okno dostaje paski przewijania zamiast wystawac poza krawedz.
+    ///
+    /// Okna maja polozenia kontrolek wpisane na sztywno, wiec na malym ekranie dolne
+    /// przyciski Ustawien (1000 na 852 punkty) wychodzily pod krawedz pulpitu i nie
+    /// dalo sie zapisac zmian - a przy oknie wyzszym niz ekran samo wysrodkowanie
+    /// wypychalo jeszcze pasek tytulu nad gorna krawedz.
+    /// </summary>
+    public static void DopasujDoEkranu(Form okno, Size tresc)
+    {
+        okno.AutoScroll = true;
+        okno.AutoScrollMinSize = tresc;
+
+        // Bez uchwytu Screen.FromControl wymusilby jego utworzenie, a MainForm
+        // startuje do zasobnika i nie chcemy tego przyspieszac.
+        var obszar = (okno.IsHandleCreated
+            ? Screen.FromControl(okno)
+            : Screen.FromPoint(Cursor.Position)).WorkingArea;
+
+        var rama = new Size(okno.Width - okno.ClientSize.Width,
+                            okno.Height - okno.ClientSize.Height);
+
+        okno.MaximumSize = new Size(tresc.Width + rama.Width, tresc.Height + rama.Height);
+        okno.ClientSize = new Size(
+            Math.Max(320, Math.Min(tresc.Width, obszar.Width - rama.Width)),
+            Math.Max(240, Math.Min(tresc.Height, obszar.Height - rama.Height)));
+
+        if (!okno.IsHandleCreated) return;
+
+        // Po zmniejszeniu okno bywa juz wysrodkowane pod stary rozmiar - wciagamy je
+        // z powrotem w obszar roboczy, zeby pasek tytulu zostal na widoku.
+        okno.Location = new Point(
+            Math.Max(obszar.Left, Math.Min(okno.Left, obszar.Right - okno.Width)),
+            Math.Max(obszar.Top, Math.Min(okno.Top, obszar.Bottom - okno.Height)));
+    }
+
     public static Button Przycisk(string tekst, int szerokosc, bool glowny = false)
     {
         var b = new Button

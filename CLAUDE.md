@@ -118,6 +118,18 @@ chodzil po 1-2 sekundy zamiast po 600 ms. Dlatego kierunek siec-do-portu idzie p
 256 porcji, znaczy to, ze odbiorcy nie ma, i najstarsze dane odpadaja. Nie wracaj do zapisu
 wprost w pompie.
 
+**Nie blokuj watku interfejsu na zadaniach mostka.** `SpeForm.FormClosing` czekal na
+wyslanie RCU OFF przez `GetAwaiter().GetResult()`. Zapis czeka na semafor `_bramka`, a jego
+kontynuacja wracala na watek interfejsu - czyli na ten sam watek, ktory wlasnie stal na
+`GetResult`. Klasyczny zakleszczenie: okno nie dawalo sie zamknac, zasobnik przestawal
+odpowiadac i zostawalo zabicie procesu z menedzera zadan. Objawilo sie dopiero wtedy, gdy
+`TrybEkranu = false` zaczelo isc **przed** zapisem, bo to odblokowuje `OdpytujSpe`, ktore
+potrafi zabrac semafor pierwsze. Poprawka jest dwuczesciowa i obie czesci sa potrzebne:
+`Mostek.WyslijKlawisz` uzywa `ConfigureAwait(false)`, wiec jego kontynuacje nie potrzebuja
+juz watku interfejsu, a `FormClosing` niczego nie czeka - RCU wylacza w tle i dopiero po
+wyslaniu gasi `TrybEkranu`. Nie wracaj do blokowania; jesli kiedys naprawde trzeba poczekac
+na mostek z poziomu okna, zrob to `async void` na zdarzeniu, nie synchronicznie.
+
 **Odpytywanie o status przy otwartym podgladzie trzeba wylaczyc.** Zapytanie `0x90` wciskajace
 sie miedzy puls a klatke opoznialo ja o ponad sekunde. Przy `TrybEkranu` petla `OdpytujSpe`
 tylko spi - stan i tak widac na ekranie wzmacniacza.
@@ -243,6 +255,17 @@ trafią na drugą stronę pary portów. Klient (SPE Term) o nie nie prosił, wi�
 dostać. Do gniazda piszą wtedy dwie strony — pompa i odpytywanie — stąd semafor `_bramka`;
 bez niego ramki potrafiłyby się przepleść w połowie.
 
+**Okna musza sie miescic na ekranie, na ktorym stoja.** Polozenia kontrolek sa wpisane na
+sztywno, wiec Ustawienia maja 1000 na 852 punkty - na laptopie z ekranem 1366 na 768 dolny
+pasek z przyciskiem *Zapisz* wychodzil pod krawedz pulpitu, a wysrodkowanie wypychalo jeszcze
+pasek tytulu nad gorna krawedz. `Ui.DopasujDoEkranu` wlacza `AutoScroll`, ustawia
+`AutoScrollMinSize` na naturalny rozmiar tresci, przycina okno do obszaru roboczego
+i wciaga je z powrotem na ekran. Kazde okno wola to ze swoim naturalnym rozmiarem, a nie
+z biezacym `ClientSize` - ten po wlaczeniu przewijania jest juz pomniejszony o paski.
+`MainForm` robi to takze przy pokazaniu, bo startuje do zasobnika i przy budowaniu listy
+nie wiadomo jeszcze, na ktorym monitorze sie pojawi. Nowe okno tez ma to wywolac, a nie
+zakladac, ze uzytkownik ma duzy ekran.
+
 ## Pułapki, na które już wpadliśmy
 
 **`setupc` wymaga katalogu roboczego.** Szuka `com0com.inf` w katalogu bieżącym; wywołany
@@ -314,7 +337,7 @@ zasobnika, więc głównego okna zwykle nie ma na ekranie. Mały program pomocni
 sprawdza układ bez ruszania pulpitu. `MainForm` tak się nie da obejrzeć, bo sama się ukrywa.
 
 **Liczniki na karcie pokazują ruch klienta, nie nasz.** Odpytywanie o status i klawisze
-wysyłane z okna klawiatury nie wchodzą do `Rx`/`Tx`, a z odbioru liczymy tylko to, co po
+wysyłane z okna sterowania nie wchodzą do `Rx`/`Tx`, a z odbioru liczymy tylko to, co po
 odfiltrowaniu ramek statusu idzie dalej. Inaczej RX rósłby od własnych zapytań przy TX równym
 zeru i licznik kłamałby o ruchu programu sterującego.
 

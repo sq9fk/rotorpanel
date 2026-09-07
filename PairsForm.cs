@@ -17,7 +17,7 @@ public class PairsForm : Form
         Text            = "Pary portów com0com";
         ClientSize      = new Size(620, 400);
         StartPosition   = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox     = false;
         MaximizeBox     = false;
         BackColor       = Theme.Tlo;
@@ -64,6 +64,8 @@ public class PairsForm : Form
         CancelButton = zamknij;
 
         Odswiez();
+
+        Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(620, 400));
     }
 
     private void BudujListe()

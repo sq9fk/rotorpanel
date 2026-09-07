@@ -90,7 +90,7 @@ public sealed class SpeForm : Form
         Text            = tytul;
         ClientSize      = new Size(516, 520);
         StartPosition   = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox     = false;
         MaximizeBox     = false;
         BackColor       = Theme.Tlo;
@@ -158,12 +158,24 @@ public sealed class SpeForm : Form
         FormClosing += (_, _) =>
         {
             _puls.Stop();
-            _mostek.TrybEkranu = false;
-            _mostek.WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None)
-                   .GetAwaiter().GetResult();
+
+            // Na wzmacniacz nie czekamy tutaj. Blokujace GetResult zawieszalo caly
+            // program: zapis czeka na semafor mostka, a jego kontynuacja wraca na watek
+            // interfejsu, ktory wlasnie na tym GetResult stoi. Efekt byl taki, ze okno
+            // nie dawalo sie zamknac, zasobnik przestawal odpowiadac i zostawalo tylko
+            // zabicie procesu. RCU wylaczamy wiec w tle, a tryb ekranu gasimy dopiero
+            // po wyslaniu, zeby odpytywanie o stan nie wcisnelo sie przed nim.
+            var mostek = _mostek;
+            _ = Task.Run(async () =>
+            {
+                try { await mostek.WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None); }
+                finally { mostek.TrybEkranu = false; }
+            });
         };
 
         FormClosed += (_, _) => { _zegar.Dispose(); _puls.Dispose(); };
+
+        Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(516, 520));
     }
 
     private Button Przycisk(Klawisz k)

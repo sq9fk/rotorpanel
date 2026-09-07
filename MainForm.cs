@@ -35,13 +35,16 @@ public partial class MainForm : Form
         public double Szybkosc;
     }
 
+    /// <summary>Rozmiar, jakiego okno potrzebuje na cala tresc - bez wzgledu na ekran.</summary>
+    private Size _trescOkna;
+
     public MainForm(Config cfg)
     {
         _cfg = cfg;
 
         Text            = "Rotory";
         StartPosition   = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox     = false;
         BackColor       = Theme.Tlo;
         Font            = Theme.Zwykly();
@@ -89,6 +92,10 @@ public partial class MainForm : Form
 
         BudujListe();
         UtworzTray();
+
+        // Program startuje do zasobnika, wiec przy budowaniu listy nie wiadomo jeszcze,
+        // na ktorym monitorze okno sie pokaze. Przy pokazaniu wiadomo.
+        Shown += (_, _) => Ui.DopasujDoEkranu(this, _trescOkna);
 
         if (_cfg.AutoPolacz)
             foreach (var m in _mostki) m.Start();
@@ -156,7 +163,12 @@ public partial class MainForm : Form
         _pary.Location       = new Point(444, yPrzyciski);
 
         _stopka.Location = new Point(22, yPrzyciski + 40);
-        ClientSize = new Size(SzerokoscOkna, yPrzyciski + 40 + 26);
+
+        // Lista rosnie z liczba rotorow i urzadzen, wiec przy kilku pozycjach okno
+        // potrafi byc wyzsze niz ekran. Wtedy dostaje paski przewijania zamiast chowac
+        // przyciski pod krawedzia pulpitu.
+        _trescOkna = new Size(SzerokoscOkna, yPrzyciski + 40 + 26);
+        Ui.DopasujDoEkranu(this, _trescOkna);
 
         ZerujStanySieci();
         Odswiez();

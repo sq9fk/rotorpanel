@@ -31,7 +31,7 @@ public sealed class Mostek : IDisposable
     private SemaphoreSlim _budzikPortu;
     private bool _trybEkranu;
 
-    // Strumien do urzadzenia, zeby okno klawiatury mialo gdzie wyslac kod klawisza.
+    // Strumien do urzadzenia, zeby okno sterowania mialo gdzie wyslac kod klawisza.
     private volatile Stream _biezacaSiec;
 
     public Polaczenie Punkt { get; }
@@ -279,7 +279,7 @@ public sealed class Mostek : IDisposable
 
     /// <summary>
     /// Wysyla wzmacniaczowi kod klawisza. Zwraca false, gdy mostek nie jest polaczony
-    /// albo pisanie sie nie udalo - wtedy okno klawiatury ma o czym powiedziec.
+    /// albo pisanie sie nie udalo - wtedy okno sterowania ma o czym powiedziec.
     /// </summary>
     public async Task<bool> WyslijKlawisz(byte kod, CancellationToken ct)
     {
@@ -290,11 +290,14 @@ public sealed class Mostek : IDisposable
 
         try
         {
-            await _bramka.WaitAsync(ct);
+            // ConfigureAwait(false) nie jest tu kosmetyka. Metode wola okno sterowania
+            // z watku interfejsu, a bez tego kontynuacje wracaja na ten watek - i gdy
+            // ktos po drugiej stronie na nie zaczeka, program staje.
+            await _bramka.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                await siec.WriteAsync(ramka, 0, ramka.Length, ct);
-                await siec.FlushAsync(ct);
+                await siec.WriteAsync(ramka, 0, ramka.Length, ct).ConfigureAwait(false);
+                await siec.FlushAsync(ct).ConfigureAwait(false);
             }
             finally { _bramka.Release(); }
 

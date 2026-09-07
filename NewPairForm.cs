@@ -63,6 +63,8 @@ public class NewPairForm : Form
 
         AcceptButton = utworz;
         CancelButton = anuluj;
+
+        Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(430, 250));
     }
 
     private static TextBox Pole(string tekst, Point poz) => new()

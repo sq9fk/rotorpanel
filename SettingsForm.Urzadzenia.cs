@@ -171,7 +171,7 @@ public partial class SettingsForm
 
         Controls.Add(Ui.Etykieta(
             "RFC 2217 to port szeregowy przez Telnet (konwertery microBit); urządzenie otwiera port " +
-            "dopiero po podaniu prędkości. Model z listy włącza odczyt stanu i klawiaturę — typ " +
+            "dopiero po podaniu prędkości. Model z listy włącza odczyt stanu i sterowanie — typ " +
             "wpisany ręcznie jest tylko opisem.",
             Theme.Maly(), Theme.TekstSzary, new Point(324, 508), new Size(618, 44)));
     }

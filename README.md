@@ -166,7 +166,7 @@ z akcepterem `telnet` zamiast `tcp`.
 ## Wzmacniacz SPE Expert
 
 W tabeli **Urządzenia** kolumna *Typ urządzenia* jest listą znanych modeli — wybór jednego
-z nich włącza odczyt stanu i klawiaturę, a przy okazji podstawia parametry transmisji
+z nich włącza odczyt stanu i sterowanie, a przy okazji podstawia parametry transmisji
 (RFC 2217, 115200 8N1). Listę można też zignorować i wpisać własny typ; wtedy urządzenie jest
 zwykłym mostkiem szeregowym, dokładnie jak przedtem.
 
@@ -207,7 +207,8 @@ na jego stronie; wzmacniacza to nie dotyczy.
 
 ### Sterowanie
 
-Przycisk **Sterowanie…** na karcie otwiera klawiaturę przedniego panelu. Kody pochodzą wprost
+Przycisk **Sterowanie…** na karcie otwiera okno z klawiaturą przedniego panelu i podglądem
+wyświetlacza. Kody klawiszy pochodzą wprost
 z firmowej tabeli poleceń: INPUT `0x01`, BAND −/+ `0x02`/`0x03`, ANTENNA `0x04`, L −/+
 `0x05`/`0x06`, C −/+ `0x07`/`0x08`, TUNE `0x09`, WYŁĄCZ `0x0A`, POWER `0x0B`, DISPLAY `0x0C`,
 OPERATE `0x0D`, CAT `0x0E`, strzałki `0x0F`/`0x10`, S `0x11`, podświetlenie `0x82`/`0x83`.
@@ -218,7 +219,7 @@ co na karcie, a na dole informacja, co poszło do wzmacniacza.
 
 ### Podgląd wyświetlacza
 
-Okno klawiatury pokazuje **zawartość wyświetlacza wzmacniacza**, więc po jego menu da się
+Okno sterowania pokazuje **zawartość wyświetlacza wzmacniacza**, więc po jego menu da się
 chodzić normalnie, a nie na ślepo. Producent tego nie opisuje — tryb podglądu włącza komenda
 `0x80` (RCU ON), wyłącza `0x81`, a wzmacniacz przysyła wtedy ramki `0x6A` z 367 bajtami stanu
 ekranu. Znaki są kodowane jako **ASCII pomniejszone o `0x20`** w całym zakresie `0x01`–`0x5F`,
@@ -240,9 +241,10 @@ Za siatką idą jeszcze flagi kursora i dwubajtowa suma kontrolna.
 Ramka nie ma pola długości: kończy się tam, gdzie zaczyna się następna synchronizacja
 `AA AA AA`, a gdy ta nie przyjdzie — po 512 bajtach.
 
-Poza znakami w ramce siedzą własne symbole wyświetlacza. Dwa niosą treść i program je
-odwzorowuje: `0x8D` to pozioma kreska, `0x8E` trójnik, `0x8F` pionowa kreska między kolumnami,
-`0xAA` stopień przy temperaturze, a `0x99`–`0x9C` strzałki w podpowiedzi klawiszy.
+Poza znakami w ramce siedzą własne symbole wyświetlacza i program rysuje wszystkie: `0x8D` to
+pozioma kreska, `0x8E` trójnik, `0x8F` pionowa kreska między kolumnami, `0x9F`–`0xA3` ramka
+z rogami, `0xAA` stopień przy temperaturze, `0x99`–`0x9C` strzałki w podpowiedzi klawiszy,
+a `0xB0`–`0xDF` kafelki logo.
 
 **Zaznaczenie pozycji** siedzi w 40 bajtach za siatką — po jednym na kolumnę, a ustawiony bit
 wskazuje wiersz. Wyszło z pomiaru: naciśnięcie strzałki przesuwa te bity o jeden, a podpowiedź
@@ -250,18 +252,47 @@ u dołu ekranu zmienia się razem z nimi. Program rysuje takie komórki w negaty
 widać, gdzie się stoi.
 
 **Ramka wokół napisów** na ekranie głównym też jest w danych: `0x9F` biegnie górą, `0xA0` dołem,
-`0xA1` pionowo po prawej, a `0xA2` i `0xA3` to rogi. Program rysuje ją znakami ramek.
+`0xA1` pionowo po prawej, a `0xA2` i `0xA3` to rogi.
 
-### Kafelki graficzne
+### Piksele, nie znaki
 
-Logo, kreski i ramki wzmacniacz przysyła jako **kody komórek**, nie piksele — samych obrazków
-w ramce nie ma. Program ma je nauczone: `narzedzia/ucz-kafelki.py` bierze zrzut ekranu
-wyświetlacza i ramkę `0x6A` z tego samego ekranu, dopasowuje zrzut do siatki 40×8 i wycina z niego
-każdą komórkę, wiążąc ją z kodem z ramki. Wynik trafia do `KafelkiSpe.cs` jako mapy bitowe 10×14.
+Wyświetlacz Experta ma **240 na 64 piksele**, czyli komórka to dokładnie 6 na 8. To jedna
+liczba, ale wynika z niej cały sposób rysowania podglądu: program trzyma mapy bitowe w tej
+rozdzielczości i powiększa je **całkowitą krotnością** (dwukrotnie, więc komórka ma 12 na 16
+punktów, a cały ekran 480 na 128). Przy skali ułamkowej jedna i ta sama kreska wypada raz na
+jednym, raz na dwóch pikselach — stąd brały się przerwy w ukośnych liniach logo, poziome belki
+liter przesunięte o piksel i rozsypany znak stopnia.
 
-Uczymy się tylko kodów od `0x80` w górę. Tekst i tak renderujemy czcionką, a przy zrzucie zrobionym
-w innej chwili niż zapisana ramka komórki z wartościami (pasmo, temperatura) nie odpowiadałyby
-swoim kodom — to zresztą było widać przy pierwszej próbie, gdy pasek stanu wyszedł pomieszany.
+Rysowane jest **wszystko z map bitowych, tekst też**. Czcionka systemowa dawała obraz z dwóch
+światów: grafika pikselowa, a litery wygładzone i rozstrzelone, bo żaden krok czcionki nie
+pasuje do sześciopikselowej komórki.
+
+Skąd te mapy, skoro w ramce `0x6A` są same kody komórek, a pikseli nie ma:
+
+* `narzedzia/ucz-kafelki.py` bierze zrzut ekranu wyświetlacza i ramkę `0x6A` z tego samego
+  ekranu, dopasowuje zrzut do siatki 40×8 i wycina każdą komórkę, wiążąc ją z kodem z ramki.
+  Wynik to `KafelkiSpe.cs` — znaki własne panelu, od `0x80` w górę.
+* `narzedzia/ucz-czcionke.py` robi to samo dla tekstu i zapisuje `CzcionkaSpe.cs` — 96 znaków
+  6 na 8.
+
+Siatkę zrzutu wyznacza zasięg tuszu: górna krawędź ramki i wiersz kresek biegną przez całą
+szerokość, a separatory sięgają samego dołu. Dopasowanie do pionowych separatorów wychodziło
+o pół piksela obok, bo separator `0x8F` nie stoi przy krawędzi komórki, tylko w jej kolumnie 3.
+Same komórki próbkujemy po odcieniach z wagami brzegów — zrzut jest powiększeniem w skali
+ułamkowej, więc progowanie najpierw na czarno-białe dawało ten sam znak raz tak, raz inaczej,
+zależnie od tego, w którym miejscu rastra wypadła komórka. Sprawdzian, że siatka jest trafiona:
+**wszystkie 57 kodów graficznych i 35 sprawdzalnych liter wychodzą z każdego wystąpienia
+identycznie**.
+
+Nie wszystko da się zmierzyć i to jest zapisane w wynikach:
+
+* Ze zrzutu wolno wyciąć tylko komórki, o których wiadomo, że pokazują to samo co zapisana
+  ramka — nazwę modelu i opisy pól paska stanu. Wyszło z tego 35 znaków. Aż 32 zgodziły się co
+  do piksela z klasyczną czcionką 5×7 układów znakowych, a różniły się `D`, `t` i kropka; przy
+  takiej zgodności resztę tablicy można było wziąć stamtąd. Zmierzone zawsze wygrywają, więc
+  zrzut z nowymi znakami po prostu ich dołoży.
+* Strzałki `0x99`–`0x9C` są narysowane ręcznie, bo nie ma ich na ekranie głównym i nie było
+  czym ich zmierzyć. W `KafelkiSpe.cs` są tak oznaczone.
 
 Dzięki temu ekran główny wygląda jak na panelu: logo SPE, ramka wokół napisów i linie działowe
 są rysowane naprawdę, a nie zastępowane czymkolwiek.
@@ -293,6 +324,12 @@ się nie uda i zobaczysz komunikat z podpowiedzią, żeby przenieść go w inne 
 ---
 
 ## Interfejs
+
+Okna dopasowują się do ekranu, na którym stoją. Gdy zawartość się nie mieści — a Ustawienia
+potrzebują 1000 na 852 punkty, więc na laptopie bywa ciasno — okno zmniejsza się do obszaru
+roboczego i włącza paski przewijania, zamiast chować dolne przyciski pod krawędzią pulpitu.
+Okna główne, Ustawień, par COM i sterowania SPE można też zmieniać rozmiar ręcznie.
+
 
 ### Zasobnik systemowy
 
@@ -533,6 +570,13 @@ Klasy okien są dzielone na pliki częściowe, żeby żaden nie urósł ponad cz
 | `NewPairForm.cs` | okienko nowej pary z walidacją nazw |
 | `Com0Com.cs` | odczyt par z rejestru i wywołania `setupc` |
 | `SterownikAnten.cs` | odczyt nazw anten i przypisania nadajników ze sterownika |
+| `SpeForm.cs` | okno sterowania wzmacniaczem SPE: klawiatura i podgląd |
+| `StatusSpe.cs` | rozbiór odpowiedzi na `0x90` — model, pasmo, moc, temperatura |
+| `CzytnikSpe.cs` | wyjmowanie ramek statusu i ekranu ze strumienia do klienta |
+| `EkranSpe.cs` | rozbiór ramki `0x6A` na siatkę 40×8 i flagi kursora |
+| `PodgladLcd.cs` | rysowanie wyświetlacza z map bitowych |
+| `KafelkiSpe.cs`, `CzcionkaSpe.cs` | mapy bitowe znaków panelu — **generowane**, patrz `narzedzia/` |
+| `narzedzia/` | skrypty uczące map bitowych ze zrzutu wyświetlacza |
 | `Theme.cs`, `Ui.cs` | paleta oraz kontrolki własne: karta, dioda, znacznik |
 | `instalator/` | skrypty instalacyjne i skrypt składania paczki |
 | `ikona/` | generator ikony i gotowy plik `.ico` |
