@@ -146,6 +146,14 @@ czekanie na nastepny naglowek opoznialo podglad o cale odpytanie, bo kolejna ram
 dopiero przy nastepnym pulsie. `CzytnikSpe` bierze wiec typowa dlugosc (367 bajtow), gdy juz ja
 ma, a na synchronizacje czeka tylko wtedy, gdy ramka jest krotsza.
 
+**Ramka ekranu glownego jest w danych, logo nie.** Odczytane z ulozenia bajtow: `0x9F` gora
+ramki, `0xA0` dol, `0xA1` bok, `0xA2` i `0xA3` rogi, `0x8E` trojnik nad separatorem kolumny.
+Natomiast `0xB0`-`0xDF` to kafelki mapy bitowej logo - kazdy bajt inny wycinek obrazka, wiec bez
+tablicy znakow wyswietlacza nie da sie ich narysowac. Szukalem jej w `Term_13k_232.exe`
+(zasoby to formularze Delphi, tablicy tam nie ma) i probowalem uzyc Terma jako wzorca, podajac
+mu ramki 0x6A przez mostek - nie rysuje ramek, o ktore sam nie prosil. Droga, ktora zostaje:
+nauczyc sie kafelkow ze zdjecia ekranu dopasowanego do siatki 40x8.
+
 **Znaki to ASCII minus 0x20 - w calym zakresie.** Pierwsza wersja dekodera traktowala
 `0x10`-`0x3F` jako "znaki z atrybutem" (+0x20), a `0x40`-`0x7E` jako zwykly ASCII. Efekt:
 "SOLID STATE" zamiast "Solid State", "20 M" zamiast "20 m", a kropka i myslnik z "1.3K-FA"

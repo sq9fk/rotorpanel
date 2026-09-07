@@ -249,9 +249,13 @@ wskazuje wiersz. Wyszło z pomiaru: naciśnięcie strzałki przesuwa te bity o j
 u dołu ekranu zmienia się razem z nimi. Program rysuje takie komórki w negatywie, więc po menu
 widać, gdzie się stoi.
 
-Ekran główny ma w lewej połowie **logo i wykresy** — to kafelki mapy bitowej (bajty `0x9F`–`0xDF`),
-nie tekst. Nie da się ich odczytać jako znaki, więc w ich miejscu jest przygaszona tekstura.
-Reszta ekranu, czyli pasek pól i wszystkie menu, jest odwzorowana wiernie.
+**Ramka wokół napisów** na ekranie głównym też jest w danych: `0x9F` biegnie górą, `0xA0` dołem,
+`0xA1` pionowo po prawej, a `0xA2` i `0xA3` to rogi. Program rysuje ją znakami ramek.
+
+Zostaje **logo**: wzmacniacz składa je z kafelków mapy bitowej (bajty `0xB0`–`0xDF`), gdzie każdy
+bajt to inny wycinek obrazka. Samych pikseli w ramce nie ma, więc bez tablicy znaków wyświetlacza
+nie da się ich odtworzyć — w tym miejscu program rysuje prostokąt z napisem SPE o tych samych
+wymiarach, żeby ekran miał układ jak na panelu. To znak zastępczy, nie kopia.
 
 Wiedza o ramce `0x6A` i o komendach RCU pochodzi z projektu
 [vu2cpl/macexpert-spe](https://github.com/vu2cpl/macexpert-spe), gdzie ten protokół został

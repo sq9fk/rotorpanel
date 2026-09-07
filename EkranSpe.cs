@@ -121,6 +121,14 @@ public sealed class EkranSpe
     private const byte Trojnik   = 0x8E;   // polaczenie poziomej z pionowa
     private const byte Separator = 0x8F;   // pionowa
 
+    // Ramka wokol napisow na ekranie glownym - odczytane z ulozenia bajtow:
+    // 0x9F biegnie gora, 0xA0 dolem, 0xA1 pionowo po prawej, a 0xA2 i 0xA3 to rogi.
+    private const byte RamkaGora     = 0x9F;
+    private const byte RamkaDol      = 0xA0;
+    private const byte RamkaBok      = 0xA1;
+    private const byte RamkaRogGorny = 0xA2;
+    private const byte RamkaRogDolny = 0xA3;
+
     // Wlasne znaki wyswietlacza rozpoznane po bajtach w ramce: strzalki w podpowiedzi
     // klawiszy stoja parami miedzy nawiasami ([99 9A] i [9B 9C]), a 0xAA trafia sie
     // przed "C" przy temperaturze.
@@ -141,6 +149,11 @@ public sealed class EkranSpe
             else if (b == Separator)         znaki[i] = (char)0x2502;
             else if (b == Kreska)            znaki[i] = (char)0x2500;
             else if (b == Trojnik)           znaki[i] = (char)0x252C;
+            else if (b == RamkaGora)         znaki[i] = (char)0x2500;
+            else if (b == RamkaDol)          znaki[i] = (char)0x2500;
+            else if (b == RamkaBok)          znaki[i] = (char)0x2502;
+            else if (b == RamkaRogGorny)     znaki[i] = (char)0x2510;
+            else if (b == RamkaRogDolny)     znaki[i] = (char)0x2518;
             else if (b == StrzalkaLewo)      znaki[i] = (char)0x25C0;
             else if (b == StrzalkaGora)      znaki[i] = (char)0x25B2;
             else if (b == StrzalkaDol)       znaki[i] = (char)0x25BC;

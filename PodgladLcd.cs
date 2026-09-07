@@ -19,6 +19,16 @@ public sealed class PodgladLcd : Control
     private const byte Kreska    = 0x8D;
     private const byte Trojnik   = 0x8E;
     private const byte Separator = 0x8F;
+
+    private const byte RamkaGora     = 0x9F;
+    private const byte RamkaDol      = 0xA0;
+    private const byte RamkaBok      = 0xA1;
+    private const byte RamkaRogGorny = 0xA2;
+    private const byte RamkaRogDolny = 0xA3;
+
+    // Kafelki, z ktorych wzmacniacz sklada logo na ekranie glownym.
+    private const byte LogoOd = 0xB0;
+    private const byte LogoDo = 0xDF;
     private const byte StrzalkaLewo = 0x99, StrzalkaGora = 0x9A;
     private const byte StrzalkaDol  = 0x9B, StrzalkaPrawo = 0x9C;
     private const byte Stopien      = 0xAA;
@@ -72,6 +82,8 @@ public sealed class PodgladLcd : Control
         int marginesY = Math.Max(2,
             (ClientSize.Height - wysokoscWiersza * EkranSpe.Wierszy) / 2);
 
+        RysujLogo(g, marginesX, marginesY, szerokoscZnaku, wysokoscWiersza);
+
         using var pedzelZaznaczenia = new SolidBrush(Litery);
 
         for (int w = 0; w < _ekran.Bajty.Length; w++)
@@ -102,6 +114,50 @@ public sealed class PodgladLcd : Control
         }
     }
 
+    /// <summary>
+    /// Logo na ekranie glownym wzmacniacz sklada z kafelkow mapy bitowej i kazdy bajt
+    /// to inny wycinek obrazka - bez zawartosci znakow nie da sie tego odtworzyc.
+    /// Rysujemy wiec w tym miejscu wlasny znak zastepczy o tych samych wymiarach,
+    /// zeby ekran mial ten sam uklad co panel.
+    /// </summary>
+    private void RysujLogo(Graphics g, int marginesX, int marginesY,
+                           float szerokoscZnaku, int wysokoscWiersza)
+    {
+        int pierwszyW = int.MaxValue, ostatniW = -1;
+        int pierwszaK = int.MaxValue, ostatniaK = -1;
+
+        for (int w = 0; w < _ekran.Bajty.Length; w++)
+            for (int k = 0; k < _ekran.Bajty[w].Length; k++)
+            {
+                byte b = _ekran.Bajty[w][k];
+                if (b < LogoOd || b > LogoDo) continue;
+
+                pierwszyW = Math.Min(pierwszyW, w);
+                ostatniW  = Math.Max(ostatniW, w);
+                pierwszaK = Math.Min(pierwszaK, k);
+                ostatniaK = Math.Max(ostatniaK, k);
+            }
+
+        if (ostatniW < 0 || ostatniaK - pierwszaK < 4) return;
+
+        var pole = new Rectangle(
+            (int)(marginesX + pierwszaK * szerokoscZnaku) + 1,
+            marginesY + pierwszyW * wysokoscWiersza + 1,
+            (int)((ostatniaK - pierwszaK + 1) * szerokoscZnaku) - 2,
+            (ostatniW - pierwszyW + 1) * wysokoscWiersza - 2);
+
+        using var piso = new Pen(Litery, 1.6f);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.DrawRectangle(piso, pole);
+
+        using var czcionkaLogo = new Font("Segoe UI", pole.Height * 0.42f,
+            FontStyle.Bold, GraphicsUnit.Pixel);
+        TextRenderer.DrawText(g, "SPE", czcionkaLogo, pole, Litery,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.Default;
+    }
+
     private static char Znak(byte b)
     {
         // Wyswietlacz przesyla ASCII pomniejszone o 0x20 - dla calego zakresu,
@@ -110,6 +166,11 @@ public sealed class PodgladLcd : Control
         if (b == Separator)         return (char)0x2502;       // pionowa kreska
         if (b == Kreska)            return (char)0x2500;       // pozioma kreska
         if (b == Trojnik)           return (char)0x252C;       // trojnik
+        if (b == RamkaGora)         return (char)0x2500;
+        if (b == RamkaDol)          return (char)0x2500;
+        if (b == RamkaBok)          return (char)0x2502;
+        if (b == RamkaRogGorny)     return (char)0x2510;
+        if (b == RamkaRogDolny)     return (char)0x2518;
         if (b == StrzalkaLewo)      return (char)0x25C0;
         if (b == StrzalkaGora)      return (char)0x25B2;
         if (b == StrzalkaDol)       return (char)0x25BC;
