@@ -92,6 +92,105 @@ public class Znacznik : Label
     }
 }
 
+/// <summary>
+/// Linijka segmentowa - miernik w stylu paska LED. Rysuje wypelnienie w segmentach,
+/// bo ciagly pasek przy zmiennej mocy migocze i trudno z niego cokolwiek odczytac,
+/// a segmenty daja podzialke i widac, gdzie stoi wskazanie.
+///
+/// Trzyma szczyt przez sekunde i pol - moc przy nadawaniu skacze w takt modulacji,
+/// wiec bez tego nie da sie zobaczyc wartosci szczytowej.
+/// </summary>
+public sealed class PasekLed : Control
+{
+    private const int Segmentow = 40;
+    private static readonly TimeSpan TrwanieSzczytu = TimeSpan.FromMilliseconds(1500);
+
+    private double _wartosc, _maksimum = 100, _szczyt;
+    private DateTime _kiedySzczyt = DateTime.MinValue;
+
+    public PasekLed()
+    {
+        SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+        BackColor = Theme.Karta;
+        Height = 14;
+    }
+
+    public double Maksimum
+    {
+        get => _maksimum;
+        set { _maksimum = value > 0 ? value : 1; Invalidate(); }
+    }
+
+    /// <summary>Ile procent skali liczymy juz za duzo - powyzej segmenty ida na czerwono.</summary>
+    public double ProgCzerwony { get; set; } = 0.90;
+
+    public double ProgPomaranczowy { get; set; } = 0.75;
+
+    public double Wartosc
+    {
+        get => _wartosc;
+        set
+        {
+            if (Math.Abs(_wartosc - value) < 0.0001 && _szczyt <= _wartosc) return;
+            _wartosc = value;
+
+            if (value >= _szczyt || DateTime.UtcNow - _kiedySzczyt > TrwanieSzczytu)
+            {
+                _szczyt = value;
+                _kiedySzczyt = DateTime.UtcNow;
+            }
+            Invalidate();
+        }
+    }
+
+    /// <summary>Zeruje wskazanie i szczyt - po rozlaczeniu nie ma czego pokazywac.</summary>
+    public void Wyczysc()
+    {
+        _wartosc = _szczyt = 0;
+        _kiedySzczyt = DateTime.MinValue;
+        Invalidate();
+    }
+
+    private Color KolorSegmentu(int nr)
+    {
+        double udzial = (nr + 1.0) / Segmentow;
+        if (udzial > ProgCzerwony) return Color.FromArgb(0xD9, 0x3B, 0x2B);
+        if (udzial > ProgPomaranczowy) return Theme.Pomarancz;
+        return Theme.Zielony;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.Clear(BackColor);
+
+        double udzial = Math.Max(0, Math.Min(1, _wartosc / _maksimum));
+        int zapalonych = (int)Math.Round(udzial * Segmentow);
+
+        // Szczyt gasnie sam, zeby nie zostawal na ekranie po zakonczeniu nadawania.
+        if (DateTime.UtcNow - _kiedySzczyt > TrwanieSzczytu) _szczyt = _wartosc;
+        int segmentSzczytu = (int)Math.Round(
+            Math.Max(0, Math.Min(1, _szczyt / _maksimum)) * Segmentow) - 1;
+
+        float szerokosc = (float)Width / Segmentow;
+        for (int i = 0; i < Segmentow; i++)
+        {
+            bool zapalony = i < zapalonych;
+            bool szczyt = i == segmentSzczytu && segmentSzczytu >= zapalonych;
+            if (!zapalony && !szczyt)
+            {
+                using var zgaszony = new SolidBrush(Color.FromArgb(0x38, Theme.Szary));
+                g.FillRectangle(zgaszony, i * szerokosc, 0, szerokosc - 1, Height);
+                continue;
+            }
+
+            using var pedzel = new SolidBrush(KolorSegmentu(i));
+            g.FillRectangle(pedzel, i * szerokosc, 0, szerokosc - 1, Height);
+        }
+    }
+}
+
 public static class Ui
 {
     /// <summary>

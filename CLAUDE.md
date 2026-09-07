@@ -390,6 +390,20 @@ sterowania jest otwarte (`PrzechwytujEkran`). Jeśli w tym samym czasie klient t
 o tryb RCU, jego klatki zjemy. Przy zamkniętym oknie przechodzą bez zmian. Gdyby to zaczęło
 przeszkadzać, trzeba policzyć własne pulsy tak samo jak zapytania o status.
 
+**Stan wzmacniacza czytamy niezaleznie od trybu RCU.** `StatusForm` pokazuje wszystkie
+dziewietnascie pol ramki `0x43` plus linijki miernikow, i **dziala takze wtedy, gdy do pary
+wpiety jest klient** - wtedy nie odpytujemy sami, tylko rozbieramy ramki, o ktore poprosil on.
+To wazne rozroznienie: sterowanie (RCU) blokujemy przy kliencie, ale podglad stanu nie ma
+powodu znikac. Zakres linijki mocy bierze sie z pola identyfikacyjnego ramki
+(`StatusSpe.MocMaksymalna`: "13K" to 1,3 kW), a skale pradu i napiecia - 0-50 A i 0-60 V -
+odczytalem z podzialek na wlasnych ekranach panelu w ramkach `0x6A`, wiec nie sa zgadniete.
+
+**Karta wzmacniacza jest wyzsza niz pozostale.** `WysokoscKartySpe` to 112 zamiast 72, bo
+miesci linijke mocy nadawania i trzeci przycisk. `BudujUrzadzenia` przesuwa sie o wysokosc
+zalezna od `u.Spe` - jesli dolozysz cos do tej karty, popraw obie liczby naraz, inaczej karty
+zaczna na siebie nachodzic. Ukladu tej karty **nie da sie sprawdzic zrzutem** (`MainForm` sama
+sie ukrywa), wiec pozycje licz na piechote: przyciski stoja na y=8, 40 i 72, kazdy po 30 px.
+
 **Okna musza sie miescic na ekranie, na ktorym stoja.** Polozenia kontrolek sa wpisane na
 sztywno, wiec Ustawienia maja 1000 na 852 punkty - na laptopie z ekranem 1366 na 768 dolny
 pasek z przyciskiem *Zapisz* wychodzil pod krawedz pulpitu, a wysrodkowanie wypychalo jeszcze

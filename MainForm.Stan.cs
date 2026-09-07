@@ -19,8 +19,13 @@ public partial class MainForm
     }
 
     /// <summary>Wspolny szkielet karty - reszte dokladaja metody nizej.</summary>
-    private Karta PustaKarta(int y)
-        => new Karta { Location = new Point(0, y), Size = new Size(516, WysokoscKarty), Promien = 8 };
+    private Karta PustaKarta(int y, int wysokosc = 0)
+        => new Karta
+        {
+            Location = new Point(0, y),
+            Size = new Size(516, wysokosc > 0 ? wysokosc : WysokoscKarty),
+            Promien = 8
+        };
 
     private Button PrzyciskPrzelaczania(Karta karta, Mostek m, int y = 21)
     {
@@ -117,7 +122,7 @@ public partial class MainForm
 
     private Karta BudujKarteUrzadzenia(Urzadzenie u, Mostek m, int y)
     {
-        var karta = PustaKarta(y);
+        var karta = PustaKarta(y, u.Spe ? WysokoscKartySpe : 0);
 
         var dioda = new Led { Location = new Point(16, 26) };
         karta.Controls.Add(dioda);
@@ -182,10 +187,46 @@ public partial class MainForm
             karta.Controls.Add(sterowanie);
         }
 
+        // Linijka mocy nadawania wprost na karcie - najczesciej potrzebna liczba
+        // ma byc widoczna bez otwierania czegokolwiek.
+        PasekLed pasekMocy = null;
+        Label opisMocy = null;
+        Button stanPrzycisk = null;
+
+        if (u.Spe)
+        {
+            karta.Controls.Add(Ui.Etykieta("moc nadawania", Theme.Maly(), Theme.TekstSzary,
+                new Point(44, 68), new Size(120, 16)));
+
+            opisMocy = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
+                new Point(170, 68), new Size(220, 16));
+            opisMocy.TextAlign = ContentAlignment.MiddleRight;
+            karta.Controls.Add(opisMocy);
+
+            pasekMocy = new PasekLed
+            {
+                Location = new Point(44, 86),
+                Size = new Size(346, 12)
+            };
+            karta.Controls.Add(pasekMocy);
+
+            stanPrzycisk = Ui.Przycisk("Stan…", 92, glowny: false);
+            stanPrzycisk.Location = new Point(408, 72);
+            stanPrzycisk.Click += (_, _) =>
+            {
+                using var okno = new StatusForm(m, u.Etykieta + " — stan");
+                okno.ShowDialog(this);
+            };
+            karta.Controls.Add(stanPrzycisk);
+            _dymek.SetToolTip(stanPrzycisk,
+                "Wszystkie dane z ramki statusu — działa też przy podłączonym programie klienckim.");
+        }
+
         _ui["u" + u.Nr] = new Wiersz
         {
             Mostek = m, Dioda = dioda, Stan = stan, Ruch = ruch, Przelacz = przelacz,
-            Sterowanie = sterowanie,
+            Sterowanie = sterowanie, PrzyciskStanu = stanPrzycisk,
+            Moc = pasekMocy, OpisMocy = opisMocy,
             Spe = u.Spe ? etykietaTrasy : null, Klopot = klopot, Trasa = trasa
         };
         return karta;
@@ -220,6 +261,21 @@ public partial class MainForm
         var status = m.Status;
         bool swiezy = status is not null &&
                       (DateTime.UtcNow - status.Kiedy).TotalSeconds < 5;
+
+        if (u.Moc is not null)
+        {
+            if (swiezy)
+            {
+                u.Moc.Maksimum = status.MocMaksymalna;
+                u.Moc.Wartosc = status.MocWatow;
+                u.OpisMocy.Text = status.Moc + " W";
+            }
+            else
+            {
+                u.Moc.Wyczysc();
+                u.OpisMocy.Text = "";
+            }
+        }
 
         u.Spe.Text = swiezy ? status.Opis : u.Trasa;
         u.Spe.ForeColor = swiezy ? Theme.Tekst : Theme.TekstSzary;

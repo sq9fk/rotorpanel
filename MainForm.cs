@@ -3,6 +3,9 @@
 public partial class MainForm : Form
 {
     private const int WysokoscKarty = 72;
+
+    // Karta wzmacniacza jest wyzsza: miesci linijke mocy nadawania i trzeci przycisk.
+    private const int WysokoscKartySpe = 112;
     private const int Odstep        = 8;
     private const int GoraListy     = 68;
     private const int SzerokoscOkna = 580;
@@ -27,6 +30,9 @@ public partial class MainForm : Form
         public Label Ruch;
         public Button Przelacz;
         public Button Sterowanie;
+        public Button PrzyciskStanu;
+        public PasekLed Moc;
+        public Label OpisMocy;
         public Znacznik[] Trx;
         public Label Spe;
         public Znacznik Klopot;
@@ -214,7 +220,7 @@ public partial class MainForm : Form
             var mostek = new Mostek(_cfg, u);
             _mostki.Add(mostek);
             _lista.Controls.Add(BudujKarteUrzadzenia(u, mostek, y));
-            y += WysokoscKarty + Odstep;
+            y += (u.Spe ? WysokoscKartySpe : WysokoscKarty) + Odstep;
         }
 
         return y;

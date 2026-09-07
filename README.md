@@ -191,6 +191,20 @@ Odpowiedzi na własne zapytania mostek **zdejmuje ze strumienia** — program po
 pary portów o nie nie prosił i nie ma powodu ich oglądać. Wszystko inne przechodzi nietknięte,
 więc program sterujący (na przykład SPE Term) działa równolegle.
 
+### Stan wzmacniacza
+
+Na karcie wzmacniacza widać **linijkę mocy nadawania** — segmentowy miernik ze szczytem
+trzymanym przez półtorej sekundy, bo moc przy modulacji skacze i bez tego nie da się odczytać
+wartości szczytowej. Zakres bierze się z modelu podanego przez sam wzmacniacz.
+
+Przycisk **Stan…** otwiera pełny widok: mierniki mocy, prądu PA, napięcia PA i SWR oraz
+wszystkie pola ramki statusu — model, tryb, pasmo, wejście, bank, antena nadawcza i odbiorcza,
+stan ATU, poziom mocy, SWR na antenie i na ATU oraz trzy temperatury (górna, dolna, sumatora).
+Skale prądu i napięcia (0–50 A, 0–60 V) są odczytane z podziałek na własnych ekranach panelu.
+
+Ten widok **nie wymaga trybu RCU** i działa też wtedy, gdy do pary wpięty jest program
+kliencki i sterowanie jest zablokowane — stan czytamy wtedy z ramek, o które poprosił klient.
+
 ### Program kliencki na drugiej stronie pary
 
 Przez mostek może pracować zewnętrzny program — SPE Term albo
