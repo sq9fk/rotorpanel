@@ -146,13 +146,21 @@ czekanie na nastepny naglowek opoznialo podglad o cale odpytanie, bo kolejna ram
 dopiero przy nastepnym pulsie. `CzytnikSpe` bierze wiec typowa dlugosc (367 bajtow), gdy juz ja
 ma, a na synchronizacje czeka tylko wtedy, gdy ramka jest krotsza.
 
-**Ramka ekranu glownego jest w danych, logo nie.** Odczytane z ulozenia bajtow: `0x9F` gora
+**Kafelki graficzne sa nauczone ze zrzutu, nie zgadniete.** `narzedzia/ucz-kafelki.py` dopasowuje
+zrzut ekranu do siatki 40x8 i wiaze kazda komorke z kodem z ramki `0x6A`; wynik to `KafelkiSpe.cs`.
+Przesuniecie siatki wyznacza sie automatycznie - szuka takiego, przy ktorym na liniach podzialu
+jest najmniej tuszu (wyszlo 2,9 px w poziomie). Sprawdzian: komorki z napisu "EXPERT" musza dac
+litery E, X, P zgodne z kodami 0x25, 0x38, 0x30.
+
+Ucz sie **tylko kodow od 0x80**. Przy pierwszej probie uczylem sie wszystkiego i pasek stanu wyszedl
+pomieszany, bo zrzut byl z innego stanu wzmacniacza (40 m, ICOM, 31 C) niz zapisana ramka
+(20 m, NONE, 25 C) - komorki z wartosciami dostaly cudze mapy bitowe.
+
+**Ramka ekranu glownego jest w danych, logo tez - ale jako kody kafelkow.** Odczytane z ulozenia bajtow: `0x9F` gora
 ramki, `0xA0` dol, `0xA1` bok, `0xA2` i `0xA3` rogi, `0x8E` trojnik nad separatorem kolumny.
-Natomiast `0xB0`-`0xDF` to kafelki mapy bitowej logo - kazdy bajt inny wycinek obrazka, wiec bez
-tablicy znakow wyswietlacza nie da sie ich narysowac. Szukalem jej w `Term_13k_232.exe`
-(zasoby to formularze Delphi, tablicy tam nie ma) i probowalem uzyc Terma jako wzorca, podajac
-mu ramki 0x6A przez mostek - nie rysuje ramek, o ktore sam nie prosil. Droga, ktora zostaje:
-nauczyc sie kafelkow ze zdjecia ekranu dopasowanego do siatki 40x8.
+`0xB0`-`0xDF` to kafelki logo. Tablicy znakow szukalem w `Term_13k_232.exe` - zasoby to formularze
+Delphi i bitmapy przyciskow, tablicy tam nie ma; proba uzycia Terma jako wzorca tez nie wyszla,
+bo nie rysuje ramek, o ktore sam nie prosil. Zadziałalo dopiero uczenie ze zrzutu.
 
 **Znaki to ASCII minus 0x20 - w calym zakresie.** Pierwsza wersja dekodera traktowala
 `0x10`-`0x3F` jako "znaki z atrybutem" (+0x20), a `0x40`-`0x7E` jako zwykly ASCII. Efekt:

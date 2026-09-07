@@ -5,11 +5,9 @@ namespace RotorPanel;
 /// z rozebranych pol - pokazuje to, co wzmacniacz naprawde ma na ekranie, zeby
 /// menu wygladalo tak samo jak na panelu.
 ///
-/// Zaznaczona pozycja idzie w negatywie, kreski i ramki tak, jak je przysyla
-/// wzmacniacz. Logo i wykresy sa kafelkami mapy bitowej (0xB0-0xDF) - kazdy bajt to
-/// inny wycinek obrazka i bez tablicy znakow wyswietlacza nie da sie ich narysowac.
-/// Zostawiamy tam puste miejsce; zastepczy prostokat z napisem "SPE" byl zmysleniem
-/// i do tego nachodzil na napis Standby, bo kafelki logo siegaja calej szerokosci.
+/// Zaznaczona pozycja idzie w negatywie. Komorki, dla ktorych mamy nauczona mape
+/// bitowa (<see cref="KafelkiSpe"/>), rysujemy nia - dzieki temu logo i kreski
+/// wygladaja tak jak na panelu. Reszta idzie czcionka o stalej szerokosci.
 /// </summary>
 public sealed class PodgladLcd : Control
 {
@@ -36,6 +34,10 @@ public sealed class PodgladLcd : Control
 
     private EkranSpe _ekran;
     private string _zastepczy = "";
+
+    // Kafelki przeskalowane do biezacego rozmiaru komorki. Klucz: kod i czy w negatywie.
+    private readonly Dictionary<int, Bitmap> _pamiec = new();
+    private Size _rozmiarKomorki;
 
     public PodgladLcd()
     {
@@ -102,6 +104,14 @@ public sealed class PodgladLcd : Control
                     g.FillRectangle(pedzelZaznaczenia, x, y,
                         (int)Math.Ceiling(szerokoscZnaku), wysokoscWiersza);
 
+                var kafelek = Kafelek(bajt, (int)Math.Ceiling(szerokoscZnaku),
+                                      wysokoscWiersza, zaznaczone);
+                if (kafelek is not null)
+                {
+                    g.DrawImageUnscaled(kafelek, x, y);
+                    continue;
+                }
+
                 char znak = Znak(bajt);
                 if (znak == ' ') continue;
 
@@ -111,6 +121,55 @@ public sealed class PodgladLcd : Control
                     TextFormatFlags.NoPadding);
             }
         }
+    }
+
+    /// <summary>
+    /// Kafelek nauczony ze zrzutu, przeskalowany do rozmiaru komorki, albo null,
+    /// gdy takiego kodu nie znamy.
+    /// </summary>
+    private Bitmap Kafelek(byte kod, int szerokosc, int wysokosc, bool negatyw)
+    {
+        if (!KafelkiSpe.Mapy.TryGetValue(kod, out var mapa)) return null;
+        if (szerokosc <= 0 || wysokosc <= 0) return null;
+
+        if (_rozmiarKomorki.Width != szerokosc || _rozmiarKomorki.Height != wysokosc)
+        {
+            foreach (var b in _pamiec.Values) b.Dispose();
+            _pamiec.Clear();
+            _rozmiarKomorki = new Size(szerokosc, wysokosc);
+        }
+
+        int klucz = kod | (negatyw ? 0x100 : 0);
+        if (_pamiec.TryGetValue(klucz, out var gotowy)) return gotowy;
+
+        var obraz = new Bitmap(szerokosc, wysokosc);
+        Color tusz = negatyw ? TloEkranu : Litery;
+
+        for (int y = 0; y < wysokosc; y++)
+        {
+            int zy = y * KafelkiSpe.Wysokosc / wysokosc;
+            ushort wiersz = mapa[Math.Min(zy, mapa.Length - 1)];
+
+            for (int x = 0; x < szerokosc; x++)
+            {
+                int zx = x * KafelkiSpe.Szerokosc / szerokosc;
+                bool zapalony = (wiersz >> (KafelkiSpe.Szerokosc - 1 - zx) & 1) != 0;
+                if (zapalony) obraz.SetPixel(x, y, tusz);
+            }
+        }
+
+        _pamiec[klucz] = obraz;
+        return obraz;
+    }
+
+    protected override void Dispose(bool zwalniamy)
+    {
+        if (zwalniamy)
+        {
+            foreach (var b in _pamiec.Values) b.Dispose();
+            _pamiec.Clear();
+        }
+        base.Dispose(zwalniamy);
     }
 
     private static char Znak(byte b)

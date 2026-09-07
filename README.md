@@ -252,10 +252,19 @@ widać, gdzie się stoi.
 **Ramka wokół napisów** na ekranie głównym też jest w danych: `0x9F` biegnie górą, `0xA0` dołem,
 `0xA1` pionowo po prawej, a `0xA2` i `0xA3` to rogi. Program rysuje ją znakami ramek.
 
-Zostaje **logo**: wzmacniacz składa je z kafelków mapy bitowej (bajty `0xB0`–`0xDF`), gdzie każdy
-bajt to inny wycinek obrazka. Samych pikseli w ramce nie ma, więc bez tablicy znaków wyświetlacza
-nie da się ich odtworzyć — te komórki zostają puste. Żeby narysować logo naprawdę, trzeba nauczyć
-program kafelków: dopasować zdjęcie ekranu do siatki 40×8 i wyciąć z niego każdą komórkę.
+### Kafelki graficzne
+
+Logo, kreski i ramki wzmacniacz przysyła jako **kody komórek**, nie piksele — samych obrazków
+w ramce nie ma. Program ma je nauczone: `narzedzia/ucz-kafelki.py` bierze zrzut ekranu
+wyświetlacza i ramkę `0x6A` z tego samego ekranu, dopasowuje zrzut do siatki 40×8 i wycina z niego
+każdą komórkę, wiążąc ją z kodem z ramki. Wynik trafia do `KafelkiSpe.cs` jako mapy bitowe 10×14.
+
+Uczymy się tylko kodów od `0x80` w górę. Tekst i tak renderujemy czcionką, a przy zrzucie zrobionym
+w innej chwili niż zapisana ramka komórki z wartościami (pasmo, temperatura) nie odpowiadałyby
+swoim kodom — to zresztą było widać przy pierwszej próbie, gdy pasek stanu wyszedł pomieszany.
+
+Dzięki temu ekran główny wygląda jak na panelu: logo SPE, ramka wokół napisów i linie działowe
+są rysowane naprawdę, a nie zastępowane czymkolwiek.
 
 Wiedza o ramce `0x6A` i o komendach RCU pochodzi z projektu
 [vu2cpl/macexpert-spe](https://github.com/vu2cpl/macexpert-spe), gdzie ten protokół został
