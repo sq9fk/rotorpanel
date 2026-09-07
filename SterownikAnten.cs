@@ -23,7 +23,14 @@ public sealed class StanSterownika
 
 public static class SterownikAnten
 {
-    private static readonly HttpClient Klient = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
+    // Limit odpowiedzi: sterownik oddaje jedna strone HTML, wiec megabajt to i tak
+    // duzo z zapasem. Bez tego uszkodzone albo podszywajace sie urzadzenie w sieci
+    // moze wpompowac dowolnie duzo danych do pamieci - GetStringAsync czyta calosc.
+    private static readonly HttpClient Klient = new HttpClient
+    {
+        Timeout = TimeSpan.FromSeconds(6),
+        MaxResponseContentBufferSize = 1024 * 1024
+    };
 
     /// <summary>Rozdziela zapis host[:port] na skladniki; bez portu przyjmujemy 80.</summary>
     public static bool Rozdziel(string adres, out string host, out int port)

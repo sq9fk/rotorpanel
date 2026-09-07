@@ -82,7 +82,7 @@ public sealed class EkranSpe
         e.Wiersze = wiersze.ToArray();
         e.Bajty = Siatka(dane, od, dlugosc);
 
-        var surowe = new byte[Math.Min(dlugosc, dane.Count - od)];
+        var surowe = new byte[Math.Max(0, Math.Min(dlugosc, dane.Count - od))];
         for (int i = 0; i < surowe.Length; i++) surowe[i] = dane[od + i];
         e.Surowe = surowe;
         e.Zaznaczone = Zaznaczenia(dane, od, dlugosc);

@@ -264,8 +264,21 @@ public static class Com0Com
         => WykonajLinie(cfg, polecenia.Select(x => LiniaSetupc(cfg, x)), tytul, wlasciciel);
 
     /// <summary>
-    /// Uruchamia gotowe linie wsadowe w oknie podniesionym przez UAC. Pozwala mieszac
+    /// Uruchamia gotowe polecenia w oknie podniesionym przez UAC. Pozwala mieszac
     /// wywolania setupc z innymi poleceniami, na przyklad sprzataniem rejestru.
+    ///
+    /// **Polecenia ida jako argumenty procesu, nie jako plik wsadowy.** Wczesniej
+    /// powstawal plik .bat w %TEMP% i to jego uruchamialismy z podniesieniem
+    /// uprawnien - a %TEMP% jest zapisywalny dla uzytkownika, wiec dowolny proces
+    /// dzialajacy na tym koncie mogl podmienic plik w okienku miedzy zapisem
+    /// a startem i dostac prawa administratora. Argumenty trafiaja do CreateProcess
+    /// wprost i nie da sie ich po drodze podmienic. Nie wracaj do pliku wsadowego.
+    ///
+    /// Cudzyslowy: cmd traktuje calosc po /c jako jedno polecenie, gdy pierwszym
+    /// znakiem jest cudzyslow - stad podwojne opakowanie. Sciezka setupc nie moze
+    /// zawierac cudzyslowu, bo File.Exists nizej by jej nie znalazlo (Windows nie
+    /// pozwala na ten znak w nazwie pliku), a nazwy portow przepuszcza biala lista
+    /// w NewPairForm.
     /// </summary>
     public static bool WykonajLinie(Config cfg, IEnumerable<string> polecenia, string tytul, IWin32Window wlasciciel)
     {
@@ -276,28 +289,39 @@ public static class Com0Com
             return false;
         }
 
-        string bat = Path.Combine(Path.GetTempPath(),
-            "rotorpanel_" + Guid.NewGuid().ToString("N") + ".bat");
-
         string katalog = Path.GetDirectoryName(Config.NaWindows(cfg.Setupc)) ?? "";
 
         // setupc szuka com0com.inf w katalogu biezacym - bez tego "install" konczy sie
         // bledem "SetupOpenInfFile ... ERROR: 2".
-        var linie = new List<string>
+        var czesci = new List<string> { "cd /d " + Cudzyslow(katalog) };
+        czesci.AddRange(polecenia);
+        czesci.Add("echo.");
+        czesci.Add("echo Gotowe. Zamknij to okno.");
+        czesci.Add("pause");
+
+        string polecenie = string.Join(" & ", czesci);
+
+        // Wiersz polecenia cmd ma okolo 8191 znakow. Przy kilkudziesieciu parach
+        // moglibysmy sie o to otrzec - lepiej powiedziec to wprost, niz uciac w polowie.
+        if (polecenie.Length > 7500)
         {
-            "@echo off",
-            "title " + tytul,
-            "cd /d " + Cudzyslow(katalog)
-        };
-        linie.AddRange(polecenia);
-        linie.Add("echo.");
-        linie.Add("echo Gotowe. Zamknij to okno.");
-        linie.Add("pause");
+            MessageBox.Show(wlasciciel,
+                "Za duzo operacji naraz - wykonaj je w mniejszych porcjach.",
+                "RotorPanel", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
 
         try
         {
-            File.WriteAllLines(bat, linie, Encoding.ASCII);
-            var psi = new ProcessStartInfo { FileName = bat, UseShellExecute = true, Verb = "runas" };
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c \"" + polecenie + "\"",
+                WorkingDirectory = katalog,
+                UseShellExecute = true,
+                Verb = "runas"
+            };
+
             using var proc = Process.Start(psi);
             proc?.WaitForExit();
             return true;
@@ -312,10 +336,6 @@ public static class Com0Com
         {
             MessageBox.Show(wlasciciel, ex.Message, "RotorPanel", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return false;
-        }
-        finally
-        {
-            try { File.Delete(bat); } catch { /* nieistotne */ }
         }
     }
 }

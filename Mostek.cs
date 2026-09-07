@@ -42,9 +42,13 @@ public sealed class Mostek : IDisposable
     private long _ostatniRuchKlienta;
 
     // Wynik ostatniego sprawdzenia, czy druga strona pary jest zajeta, i jego czas.
-    // Sprawdzanie otwiera port, wiec robimy to najwyzej raz na dwie sekundy.
-    private bool _stronaKlientaZajeta;
-    private DateTime _kiedyBadanaStrona = DateTime.MinValue;
+    // Wlasciwosc KlientNaPorcie czytana jest z watku interfejsu (odswiezanie karty)
+    // i z petli odpytywania, wiec pola musza byc czytane atomowo, a samo badanie -
+    // synchroniczne CreateFile na porcie szeregowym, ktore potrafi zablokowac -
+    // idzie do puli watkow. Wczesniej wykonywalo sie wprost na watku interfejsu.
+    private volatile bool _stronaKlientaZajeta;
+    private long _kiedyBadanaStrona;
+    private int _badanieWToku;
 
     public Polaczenie Punkt { get; }
     public string Adres => _cfg.AdresDla(Punkt);
@@ -83,18 +87,34 @@ public sealed class Mostek : IDisposable
             // Klient moze miec port otwarty i milczec - wtedy widac go tylko po tym,
             // ze nie da sie tego portu otworzyc. Stad pytanie: sterowanie wraca dopiero,
             // gdy druga strona pary jest naprawde wolna.
-            // Probujemy dopiero po dluzszej ciszy. Kazda proba na moment otwiera port,
-            // wiec przy pracujacym kliencie moglibysmy mu go podebrac w chwili, gdy
-            // sam go otwiera - a tego robic nie wolno.
-            if (odRuchu > TimeSpan.FromSeconds(10) &&
-                DateTime.UtcNow - _kiedyBadanaStrona > TimeSpan.FromSeconds(5))
-            {
-                _kiedyBadanaStrona = DateTime.UtcNow;
-                _stronaKlientaZajeta = !string.IsNullOrWhiteSpace(Punkt.Com) &&
-                                       PortIo.Zajety(Punkt.Com);
-            }
+            ZaplanujBadanieStrony(odRuchu);
             return _stronaKlientaZajeta;
         }
+    }
+
+    /// <summary>
+    /// Zleca sprawdzenie, czy druga strona pary jest zajeta. Probujemy dopiero po
+    /// dluzszej ciszy, bo kazda proba na moment otwiera port - przy pracujacym
+    /// kliencie moglibysmy mu go podebrac w chwili, gdy sam go otwiera.
+    /// </summary>
+    private void ZaplanujBadanieStrony(TimeSpan odRuchu)
+    {
+        if (odRuchu <= TimeSpan.FromSeconds(10)) return;
+        if (string.IsNullOrWhiteSpace(Punkt.Com)) return;
+
+        long ostatnie = Interlocked.Read(ref _kiedyBadanaStrona);
+        if (ostatnie != 0 &&
+            DateTime.UtcNow - new DateTime(ostatnie) < TimeSpan.FromSeconds(5)) return;
+
+        if (Interlocked.Exchange(ref _badanieWToku, 1) == 1) return;
+        Interlocked.Exchange(ref _kiedyBadanaStrona, DateTime.UtcNow.Ticks);
+
+        Task.Run(() =>
+        {
+            try { _stronaKlientaZajeta = PortIo.Zajety(Punkt.Com); }
+            catch { /* port zniknal - przy nastepnym badaniu sie wyjasni */ }
+            finally { Interlocked.Exchange(ref _badanieWToku, 0); }
+        });
     }
 
     /// <summary>Ostatnia zawartosc wyswietlacza albo null.</summary>

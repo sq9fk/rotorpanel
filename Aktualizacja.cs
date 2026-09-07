@@ -25,7 +25,13 @@ public static class Aktualizacja
 
     private static HttpClient ZrobKlienta()
     {
-        var k = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        var k = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30),
+            // Plik wydania wazy okolo ćwierć megabajta; limit chroni przed
+            // wciagnieciem czegokolwiek wiekszego do pamieci.
+            MaxResponseContentBufferSize = 64L * 1024 * 1024
+        };
         // GitHub odrzuca zapytania bez naglowka User-Agent.
         k.DefaultRequestHeaders.Add("User-Agent", "RotorPanel");
         k.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
@@ -73,7 +79,7 @@ public static class Aktualizacja
             }
         }
 
-        if (string.IsNullOrEmpty(adres)) return null;
+        if (!AdresZaufany(adres)) return null;
 
         return new Wydanie
         {
@@ -81,6 +87,28 @@ public static class Aktualizacja
             Tag = Json.Tekst(korzen, "tag_name"),
             Adres = adres
         };
+    }
+
+    /// <summary>
+    /// Czy adres pobrania wyglada na nasz. Bierzemy go z odpowiedzi API, wiec choc
+    /// przychodzi po TLS z api.github.com, nie ma powodu ufac mu na slowo: wymagamy
+    /// https i hosta w domenie GitHuba. Program podmienia sam siebie tym plikiem,
+    /// wiec to jedyny moment, w ktorym mozemy cokolwiek sprawdzic.
+    ///
+    /// Uwaga na przyszlosc: to nadal **nie jest** weryfikacja integralnosci. Pelnym
+    /// rozwiazaniem byloby podanie sumy SHA-256 w opisie wydania i sprawdzenie jej
+    /// przed podmiana - dopoki tego nie ma, calosc zaufania lezy na TLS i GitHubie.
+    /// </summary>
+    private static bool AdresZaufany(string adres)
+    {
+        if (string.IsNullOrEmpty(adres)) return false;
+        if (!Uri.TryCreate(adres, UriKind.Absolute, out var uri)) return false;
+        if (uri.Scheme != Uri.UriSchemeHttps) return false;
+
+        string host = uri.Host;
+        return host.Equals("github.com", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".github.com", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Zamienia zapis w rodzaju v1.2.3 na numer wersji.</summary>
@@ -101,6 +129,9 @@ public static class Aktualizacja
 
     public static async Task<string> Pobierz(Wydanie w)
     {
+        if (!AdresZaufany(w.Adres))
+            throw new InvalidDataException("Adres pobrania nie pochodzi z GitHuba.");
+
         var dane = await Klient.GetByteArrayAsync(w.Adres);
         if (dane == null || dane.Length < 32 * 1024)
             throw new InvalidDataException("Pobrany plik jest podejrzanie maly.");

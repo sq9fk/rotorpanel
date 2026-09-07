@@ -429,6 +429,48 @@ z biezacym `ClientSize` - ten po wlaczeniu przewijania jest juz pomniejszony o p
 nie wiadomo jeszcze, na ktorym monitorze sie pojawi. Nowe okno tez ma to wywolac, a nie
 zakladac, ze uzytkownik ma duzy ekran.
 
+## Wnioski z audytu (wrzesień 2026)
+
+**Nie uruchamiaj niczego z podniesieniem UAC przez plik w `%TEMP%`.** Tak bylo do 1.9.4:
+`Com0Com.WykonajLinie` pisala plik `.bat` do katalogu tymczasowego i uruchamiala go
+z `Verb = "runas"`. `%TEMP%` jest zapisywalny dla uzytkownika, wiec dowolny proces na tym
+koncie mogl podmienic plik w okienku miedzy zapisem a startem i dostac prawa administratora.
+Teraz polecenia ida **jako argumenty** `cmd.exe /c` - CreateProcess dostaje je wprost i nie
+da sie ich po drodze podmienic. Zapisu do pliku nie przywracaj.
+
+**Nazwy portow filtruj biala lista, nie czarna.** `NewPairForm` przepuszczal wszystko poza
+spacja, tabulatorem, przecinkiem i `=`. Nazwa `COM9&calc` trafiala do polecenia uruchamianego
+jako administrator. Teraz przechodza wylacznie litery i cyfry; ta walidacja jest czescia
+zabezpieczenia powyzej, nie kosmetyka.
+
+**Parser JSON ma limit zagniezdzenia i musi go miec.** Bez niego wejscie `[[[[...` daje
+`StackOverflowException`, ktorego **w .NET nie da sie przechwycic** - proces ginie bez slowa,
+wiec nawet komunikat "Blad konfiguracji" w `Program.Main` by sie nie pojawil. Limit to 64
+poziomy. Sprawdzone: 60 przechodzi, 70 i 20000 daja `FormatException`, proces zyje.
+
+**Klawisze przelaczajace tor pytaja, gdy nie wiadomo, czy wzmacniacz stoi.** INPUT, ANT
+i BAND± przy zalaczonym RF to gorace przelaczanie przekaznika. Odczyt stanu jest przy otwartym
+podgladzie prawie zawsze nieswiezy (nie odpytujemy, bo to opoznia klatki), wiec drugim zrodlem
+jest sam odzwierciedlony wyswietlacz: ekran glowny wypisuje "Standby" tylko wtedy, gdy
+przekazniki sa w obejsciu. Brak tego slowa niczego nie dowodzi - wtedy pytamy. Nie zamieniaj
+tego na ciche wyslanie tylko dlatego, ze pytanie bywa uciazliwe.
+
+**Adres pobrania aktualizacji sprawdzamy, zanim czegokolwiek uzyjemy.** Bierzemy go z JSON-a
+odpowiedzi API, wiec wymagamy `https` i hosta w domenie GitHuba. To nadal **nie jest**
+weryfikacja integralnosci - pelnym rozwiazaniem byloby podanie SHA-256 w opisie wydania
+i sprawdzenie go przed podmiana. Dopoki tego nie ma, zaufanie lezy na TLS i GitHubie.
+
+**Nie badaj portu i nie niszcz mostkow na watku interfejsu.** `KlientNaPorcie` wykonywalo
+`CreateFile` na porcie szeregowym wprost z odswiezania karty (co 700 ms), a `BudujListe`
+niszczylo mostki sekwencyjnie, gdzie `Mostek.Stop` czeka do 2,5 s na kazdy - przy kilku
+mostkach zapis ustawien zamrazal okno na kilkanascie sekund. Badanie idzie teraz do puli
+watkow (`ZaplanujBadanieStrony`, pola czytane atomowo), a przebudowa listy uzywa
+`RozlaczWszystko`, ktore rozlacza rownolegle.
+
+**Slad ma limit rozmiaru.** Rosl bez ograniczenia (~9 MB na godzine) i otwieral plik przy
+kazdej linii, w sciezce danych mostka. Teraz trzyma otwarty uchwyt, a po 10 MB przewija plik
+na `.old`.
+
 ## Pułapki, na które już wpadliśmy
 
 **`setupc` wymaga katalogu roboczego.** Szuka `com0com.inf` w katalogu bieżącym; wywołany

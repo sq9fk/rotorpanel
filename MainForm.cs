@@ -149,8 +149,10 @@ public partial class MainForm : Form
         // Okna sterowania i stanu trzymaja mostek, ktory za chwile zniknie.
         OknaMostka.ZamknijWszystkie();
 
-        foreach (var m in _mostki) m.Dispose();
-        _mostki.Clear();
+        // Rownolegle, jak przy zamykaniu programu. Mostek.Stop czeka do 2,5 s na
+        // zakonczenie petli, wiec sekwencyjnie przy kilku mostkach zapis ustawien
+        // potrafil zamrozic okno na kilkanascie sekund.
+        RozlaczWszystko();
         _ui.Clear();
         _lista.Controls.Clear();
 

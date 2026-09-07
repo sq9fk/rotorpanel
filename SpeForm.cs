@@ -31,6 +31,17 @@ public sealed class SpeForm : Form
     // Klawisze, ktore zmieniaja stan nadawania albo zasilania - pytamy przed wyslaniem.
     private static readonly byte[] Ostrozne = { 0x09, 0x0A, 0x0B, 0x0D };
 
+    // Klawisze przelaczajace tor sygnalu: wejscie, antena, pasmo. Zrobione przy
+    // zalaczonym RF to gorace przelaczanie przekaznika. Wzmacniacz zapewne sie broni,
+    // ale interfejs nie ma prawa tego proponowac bez slowa - pytamy, chyba ze swiezy
+    // odczyt stanu mowi wprost, ze wzmacniacz jest w Standby i nie nadaje.
+    private static readonly byte[] PrzelaczajaceTor = { 0x01, 0x04, 0x02, 0x03 };
+
+    // Po tym czasie odczyt stanu przestaje byc dowodem na cokolwiek. Przy otwartym
+    // podgladzie ekranu w ogole nie odpytujemy o status (opoznialoby to klatki), wiec
+    // zwykle jest wlasnie nieswiezy - i wtedy pytamy.
+    private static readonly TimeSpan StanUznawanyZaSwiezy = TimeSpan.FromSeconds(10);
+
     private readonly struct Klawisz
     {
         public readonly string Napis;
@@ -241,9 +252,12 @@ public sealed class SpeForm : Form
         var przycisk = Ui.Przycisk(k.Napis, szerokosc, glowny: false);
         if (ostrozny) przycisk.ForeColor = Color.FromArgb(0xB3, 0x26, 0x1E);
 
+        bool przelaczaTor = Array.IndexOf(PrzelaczajaceTor, k.Kod) >= 0;
+
         przycisk.Click += async (_, _) =>
         {
             if (ostrozny && !Potwierdz(k)) return;
+            if (przelaczaTor && !PotwierdzPrzelaczenieToru(k)) return;
             await Nacisnij(k);
         };
 
@@ -256,6 +270,42 @@ public sealed class SpeForm : Form
                Environment.NewLine + k.Opis + ".",
                "Potwierdzenie", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+
+    /// <summary>
+    /// Pyta przed przelaczeniem toru, jesli nie mamy pewnosci, ze wzmacniacz stoi.
+    /// Przy swiezym odczycie mowiacym "Standby, odbior" przepuszczamy bez pytania -
+    /// wtedy przekazniki i tak sa w obejsciu i nie ma czego chronic.
+    /// </summary>
+    private bool PotwierdzPrzelaczenieToru(Klawisz k)
+    {
+        var stan = _mostek.Status;
+        bool swiezy = stan is not null && DateTime.UtcNow - stan.Kiedy < StanUznawanyZaSwiezy;
+
+        if (swiezy && !stan.Nadaje && !stan.Operate) return true;
+
+        // Przy otwartym podgladzie nie odpytujemy o status (opoznialoby to klatki),
+        // wiec odczyt jest tu prawie zawsze nieswiezy i samo pytanie o nadawanie
+        // meczyloby przy kazdej zmianie pasma. Drugim zrodlem jest sam wyswietlacz:
+        // ekran glowny wypisuje "Standby" tylko wtedy, gdy przekazniki sa w obejsciu.
+        // Brak tego slowa niczego nie dowodzi - wtedy pytamy.
+        if (_mostek.Ekran?.Calosc.IndexOf("Standby", StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        string powod = !swiezy
+            ? "Nie widzę na wyświetlaczu, że wzmacniacz jest w Standby, a odczytu stanu" +
+              Environment.NewLine + "nie mam — przy otwartym podglądzie nie jest odpytywany."
+            : stan.Nadaje
+                ? "Odczyt stanu mówi, że wzmacniacz NADAJE."
+                : "Wzmacniacz jest w trybie Operate.";
+
+        return MessageBox.Show(this,
+                   "Przełączyć " + k.Opis + "?" + Environment.NewLine + Environment.NewLine +
+                   powod + Environment.NewLine + Environment.NewLine +
+                   "Przełączanie anteny, wejścia lub pasma przy załączonym RF to gorące" +
+                   Environment.NewLine + "przełączanie przekaźnika.",
+                   "Przełączenie toru", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                   MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+    }
 
     private async Task Nacisnij(Klawisz k)
     {

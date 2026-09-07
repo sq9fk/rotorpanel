@@ -20,10 +20,20 @@ public sealed class JsonObiekt : List<KeyValuePair<string, object>>
 /// </summary>
 public static partial class Json
 {
+    /// <summary>
+    /// Ile poziomow zagnizdzenia przepuszczamy. Bez tego limitu wejscie w rodzaju
+    /// "[[[[..." konczy sie przepelnieniem stosu, a **StackOverflowException w .NET
+    /// jest nieprzechwytywalny** - proces ginie natychmiast, bez zadnego komunikatu,
+    /// wiec nawet obudowa "Blad konfiguracji" w Program.Main by sie nie odezwala.
+    /// Plik konfiguracyjny jest edytowalny recznie, a odpowiedz z API GitHuba
+    /// przychodzi z sieci, wiec obie drogi warto zamknac.
+    /// </summary>
+    private const int MaksymalneZagniezdzenie = 64;
+
     public static object Parsuj(string tekst)
     {
         int i = 0;
-        object wynik = Wartosc(tekst, ref i);
+        object wynik = Wartosc(tekst, ref i, 0);
         PomijBiale(tekst, ref i);
         return wynik;
     }
@@ -33,21 +43,23 @@ public static partial class Json
         while (i < t.Length && char.IsWhiteSpace(t[i])) i++;
     }
 
-    private static object Wartosc(string t, ref int i)
+    private static object Wartosc(string t, ref int i, int glebokosc)
     {
         PomijBiale(t, ref i);
         if (i >= t.Length) throw new FormatException("Nieoczekiwany koniec danych.");
+        if (glebokosc > MaksymalneZagniezdzenie)
+            throw new FormatException("Za gleboko zagniezdzony JSON.");
 
         switch (t[i])
         {
-            case '{': return Obiekt(t, ref i);
-            case '[': return Tablica(t, ref i);
+            case '{': return Obiekt(t, ref i, glebokosc + 1);
+            case '[': return Tablica(t, ref i, glebokosc + 1);
             case '"': return Napis(t, ref i);
             default:  return Prosta(t, ref i);
         }
     }
 
-    private static Dictionary<string, object> Obiekt(string t, ref int i)
+    private static Dictionary<string, object> Obiekt(string t, ref int i, int glebokosc)
     {
         var wynik = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         i++;
@@ -61,7 +73,7 @@ public static partial class Json
             PomijBiale(t, ref i);
             if (i >= t.Length || t[i] != ':') throw new FormatException("Brak dwukropka po kluczu " + klucz);
             i++;
-            wynik[klucz] = Wartosc(t, ref i);
+            wynik[klucz] = Wartosc(t, ref i, glebokosc);
             PomijBiale(t, ref i);
 
             if (i < t.Length && t[i] == ',') { i++; continue; }
@@ -71,7 +83,7 @@ public static partial class Json
         throw new FormatException("Niedomkniety obiekt JSON.");
     }
 
-    private static List<object> Tablica(string t, ref int i)
+    private static List<object> Tablica(string t, ref int i, int glebokosc)
     {
         var wynik = new List<object>();
         i++;
@@ -80,7 +92,7 @@ public static partial class Json
 
         while (i < t.Length)
         {
-            wynik.Add(Wartosc(t, ref i));
+            wynik.Add(Wartosc(t, ref i, glebokosc));
             PomijBiale(t, ref i);
 
             if (i < t.Length && t[i] == ',') { i++; continue; }
