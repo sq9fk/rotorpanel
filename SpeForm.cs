@@ -1,4 +1,4 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Klawiatura wzmacniacza SPE Expert. Kody klawiszy pochodza wprost z firmowego
@@ -88,7 +88,7 @@ public sealed class SpeForm : Form
         _mostek = mostek;
 
         Text            = tytul;
-        ClientSize      = new Size(516, 584);
+        ClientSize      = new Size(516, 520);
         StartPosition   = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox     = false;
@@ -111,12 +111,12 @@ public sealed class SpeForm : Form
             "Dopóki mostek jest połączony, strona RC-1216H nie odświeża stanu.",
             Theme.Maly(), Theme.TekstSzary, new Point(16, 48), new Size(448, 16)));
 
-        // Podglad wyswietlacza: pieciu wierszy po 32 znaki, czcionka o stalej
-        // szerokosci, zeby kolumny stoly tak jak na panelu wzmacniacza.
-        _lcd = new PodgladLcd { Location = new Point(18, 100), Size = new Size(480, 180) };
+        // Podglad wyswietlacza: 40 na 8 komorek po 6 na 8 pikseli panelu, kazdy
+        // powiekszony dwukrotnie - stad 480 na 128 punktow plus waski margines.
+        _lcd = new PodgladLcd { Location = new Point(18, 100), Size = new Size(480, 136) };
         Controls.Add(_lcd);
 
-        int y = 296;
+        int y = 252;
         foreach (var rzad in Uklad)
         {
             int x = 18;

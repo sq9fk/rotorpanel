@@ -146,29 +146,44 @@ czekanie na nastepny naglowek opoznialo podglad o cale odpytanie, bo kolejna ram
 dopiero przy nastepnym pulsie. `CzytnikSpe` bierze wiec typowa dlugosc (367 bajtow), gdy juz ja
 ma, a na synchronizacje czeka tylko wtedy, gdy ramka jest krotsza.
 
-**Ucz kafelki w tej samej rozdzielczosci, w jakiej je rysujesz.** Komorka na ekranie ma
-12 na 22 piksele i tyle samo maja kafelki - rysujemy je jeden do jednego, bez skalowania.
-Wczesniej uczylem ich w 10 na 14 i skalowalem: jednopikselowe kreski gubily kolumny (znikaly
-separatory), a logo mialo przerwy i nierowna grubosc. Siatke stawiamy na calkowitych
-wielokrotnosciach rozmiaru komorki, wiec pionowe kreski lacza sie miedzy wierszami.
+**Wyświetlacz ma 240 na 64 piksele, czyli komórka to 6 na 8.** To jest klucz do
+wszystkiego, co dotyczy rysowania. Przez długi czas uczyłem kafelków w 12 na 22 i skalowałem
+je ułamkowo — stąd brały się wszystkie skargi na wygląd: kreski raz jedno-, raz dwupikselowe,
+przerwy w ukośnych liniach logo, poziome belki liter o piksel za wysoko, rozsypany znak
+stopnia. Uczymy się więc w rozdzielczości panelu, a `PodgladLcd.Skala` powiększa **całkowitą
+krotnością** (teraz 2, czyli komórka 12 na 16 punktów i cały ekran 480 na 128). Nie wracaj do
+skali ułamkowej i nie dobieraj rozmiaru komórki „na oko" — wynika on ze `Skala` razy 6 na 8.
 
-**Kreski scieniamy dwa razy.** Na zrzucie maja dwa-trzy piksele, wiec `narzedzia/ucz-kafelki.py`
-robi Zhang-Suen najpierw na samym zrzucie, potem jeszcze raz na zlozonej siatce w docelowej
-skali. Bez tego drugiego przejscia powiekszenie z 9,6 piksela na 12 rozdmuchiwalo kreski.
+**Siatkę zrzutu wyznacza zasięg tuszu, nie separatory.** Górna krawędź ramki i wiersz kresek
+biegną przez całą szerokość, a separatory sięgają samego dołu, więc skrajne wiersze i kolumny
+z tuszem dają pole wyświetlacza wprost. Dopasowanie do pionowych separatorów, które było tu
+wcześniej, wychodziło o pół komórki obok, bo separator `0x8F` **nie stoi przy krawędzi
+komórki, tylko w jej kolumnie 3**. Zmierzone dla zrzutu 385 na 107: pole od (7, 2), krok
+9,4 na 12,5 px, czyli piksel panelu to 1,57 px zrzutu.
 
-**Kafelki rysujemy dla wszystkich nauczonych kodow.** Po przejsciu na rysowanie jeden do jednego nie ma juz powodu
-zastepowac ich znakami - kreski, ramki, strzalki i logo ida z map bitowych. Znak jest tylko
-zapasem, gdy kodu nie ma w slowniku.
+**Komórki próbkuj po odcieniach, nie po czerni.** Zrzut jest powiększeniem w skali ułamkowej,
+więc krawędzie są wygładzone, a piksel panelu nie pokrywa się z pikselami zrzutu. Progowanie
+najpierw na czarno-białe, a dopiero potem uśrednianie, dawało ten sam znak raz tak, raz
+inaczej — zależnie od tego, w którym miejscu rastra wypadła komórka. Liczenie średniego
+zaczernienia z wagami brzegów usuwa to bez reszty: **wszystkie 57 kodów graficznych i 35
+sprawdzalnych liter wychodzą z każdego wystąpienia identycznie**. To jest dobry sprawdzian
+po każdej zmianie w `narzedzia/ucz-kafelki.py`.
 
-**Kafelki graficzne sa nauczone ze zrzutu, nie zgadniete.** `narzedzia/ucz-kafelki.py` dopasowuje
-zrzut ekranu do siatki 40x8 i wiaze kazda komorke z kodem z ramki `0x6A`; wynik to `KafelkiSpe.cs`.
-Przesuniecie siatki wyznacza sie automatycznie - szuka takiego, przy ktorym na liniach podzialu
-jest najmniej tuszu (wyszlo 2,9 px w poziomie). Sprawdzian: komorki z napisu "EXPERT" musza dac
-litery E, X, P zgodne z kodami 0x25, 0x38, 0x30.
+**Cały ekran idzie z map bitowych — tekst też.** `CzcionkaSpe` (generuje ją
+`narzedzia/ucz-czcionke.py`) trzyma 96 znaków 6 na 8, `KafelkiSpe` znaki własne panelu.
+`PodgladLcd` rysuje jedno i drugie tak samo. Wcześniej tekst szedł Consolas i obraz był
+z dwóch światów: grafika pikselowa, litery wygładzone i rozstrzelone, bo żaden krok czcionki
+nie pasuje do sześciopikselowej komórki. Czcionka systemowa została tylko do napisu
+zastępczego.
 
-Ucz sie **tylko kodow od 0x80**. Przy pierwszej probie uczylem sie wszystkiego i pasek stanu wyszedl
-pomieszany, bo zrzut byl z innego stanu wzmacniacza (40 m, ICOM, 31 C) niz zapisana ramka
-(20 m, NONE, 25 C) - komorki z wartosciami dostaly cudze mapy bitowe.
+**Czcionka jest w części zmierzona, w części dopełniona — i to jest zapisane w wyniku.**
+Ze zrzutu da się wyciąć tylko te komórki, o których wiadomo, że pokazują to samo co zapisana
+ramka: nazwa modelu, opisy pól paska stanu. Wyszło 35 znaków. Aż 32 zgodziły się co do
+piksela z klasyczną czcionką 5x7 układów znakowych, a różniły się `D`, `t` i kropka — i te
+wpisane są w tablicy w skrypcie. Taka zgodność wystarczy, żeby resztę wziąć stamtąd. Każde
+uruchomienie skryptu wypisuje, które znaki się różnią; **zmierzone zawsze wygrywają**, więc
+zrzut z nowymi znakami po prostu ich dołoży. Strzałki `0x99`-`0x9C` są rysowane ręcznie
+(nie ma ich na ekranie głównym, nie ma czym zmierzyć) i tak oznaczone w `KafelkiSpe.cs`.
 
 **Ramka ekranu glownego jest w danych, logo tez - ale jako kody kafelkow.** Odczytane z ulozenia bajtow: `0x9F` gora
 ramki, `0xA0` dol, `0xA1` bok, `0xA2` i `0xA3` rogi, `0x8E` trojnik nad separatorem kolumny.
@@ -188,10 +203,11 @@ nowej klatki i pokazywac "czekam na wyswietlacz". Poniewaz wzmacniacz co jakis c
 puls, napis mrugal bez powodu - a ekran przeciez nadal pokazuje to samo. Teraz ostatnia klatka
 zostaje na widoku do nastepnej.
 
-**Wlasne znaki wyswietlacza rozpoznane do tej pory:** `0x8D` pozioma kreska, `0x8F` pionowa,
-`0x8E` trojnik nad separatorem kolumny, `0x99`/`0x9A`/`0x9B`/`0x9C` strzalki w podpowiedzi
-klawiszy (para na jeden nawias), `0xAA` stopien przy temperaturze. Kafelki `0x9F`-`0xDF` to mapa bitowa logo i wykresow - rysowanie ich
-jednym znakiem dawalo pole szumu, wiec zostaja puste.
+**Wlasne znaki wyswietlacza rozpoznane do tej pory:** `0x8D` pozioma kreska (wiersz 4 komorki),
+`0x8F` pionowa (kolumna 3), `0x8E` trojnik nad separatorem kolumny, `0x99`-`0x9C` strzalki
+w podpowiedzi klawiszy, `0x9F`-`0xA3` ramka i jej rogi, `0xAA` stopien przy temperaturze -
+na panelu to kwadracik 2 na 2 piksele, nie kolko, dlatego znak `°` z czcionki wygladal obco.
+`0xB0`-`0xDF` to kafelki logo.
 
 **Kursor to jeden bajt na kolumne, bit wskazuje wiersz.** 40 bajtow zaraz za siatka
 (`EkranSpe.PoczatekFlag`), potem dwubajtowa suma kontrolna. Zmierzone przez porownanie ramek
@@ -201,9 +217,8 @@ ktora opisuje wybrana pozycje. Reguła jest wspolna dla wszystkich ekranow, wiec
 osobnych dekoderow per ekran, jak ma `macexpert-spe`.
 
 **`0x8D` to kreska, nie tlo w negatywie.** Pierwsza wersja rysowala wiersz z tym znakiem jako
-zielony pasek. Na zdjeciach w instrukcji widac, ze to zwykle poziome myslniki obok tytulu -
-renderujemy je jako `U+2500`, a `0x8F` jako `U+2502`. Zaznaczenie pozycji (negatyw na panelu)
-siedzi w flagach kursora za siatka i nie jest odtworzone.
+zielony pasek. Na zdjeciach w instrukcji widac, ze to zwykla pozioma kreska obok tytulu.
+Zaznaczenie pozycji (negatyw na panelu) siedzi w flagach kursora za siatka.
 
 **Ramka ekranu nie ma dlugosci - ramuj ja synchronizacja.** Poczatkowo zakladalismy stale
 367 bajtow. Tak jest w praktyce na 1.3K-FA, ale `macexpert-spe` ramuje od `AA AA AA 6A` do
@@ -213,8 +228,7 @@ samo; `EkranSpe.Rozbierz` przyjmuje dlugosc, zamiast jej zakladac.
 **Pokazujemy ekran wzmacniacza, nie skladamy wlasnego.** `macexpert-spe` rozbiera ramke na pola
 i rysuje wlasny interfejs z szescioma dekoderami kursora per ekran. My renderujemy siatke znakow
 w `PodgladLcd` - mniej kodu, a menu wyglada tak jak na panelu i dziala dla ekranow, ktorych nikt
-nie rozbieral. Znaki `0x8F` (kreska) i `0x8D` (tlo paska tytulu) sa odwzorowane; reszta symboli
-idzie jako spacja.
+nie rozbieral.
 
 **Ramki od wzmacniacza rozbieraj po kolei, nie po rodzaju.** Pierwsza wersja `CzytnikSpe`
 szukała najpierw ramek ekranu w całym buforze i oddawała klientowi wszystko, co leżało przed

@@ -1,13 +1,21 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Rysuje zawartosc wyswietlacza wzmacniacza SPE. Nie sklada wlasnego interfejsu
 /// z rozebranych pol - pokazuje to, co wzmacniacz naprawde ma na ekranie, zeby
 /// menu wygladalo tak samo jak na panelu.
 ///
-/// Zaznaczona pozycja idzie w negatywie. Komorki, dla ktorych mamy nauczona mape
-/// bitowa (<see cref="KafelkiSpe"/>), rysujemy nia - dzieki temu logo i kreski
-/// wygladaja tak jak na panelu. Reszta idzie czcionka o stalej szerokosci.
+/// Kazda komorka idzie z mapy bitowej: znaki z <see cref="CzcionkaSpe"/>, a logo,
+/// kreski i ramki z <see cref="KafelkiSpe"/>. Zaznaczona pozycja idzie w negatywie.
+/// Rysowanie tekstu czcionka systemowa dawalo obraz z dwoch swiatow - grafika
+/// pikselowa, litery wygladzone i rozstrzelone, bo zaden krok czcionki nie pasuje
+/// do szesciopikselowej komorki panelu.
+///
+/// Kafelki sa w natywnej rozdzielczosci wyswietlacza (6 na 8 pikseli) i powieksza
+/// je <see cref="Skala"/> - calkowita, zeby kazdy piksel panelu byl kwadratem tej
+/// samej wielkosci. Przy skali ulamkowej jednopikselowe kreski wychodzily raz
+/// grubsze, raz ciensze, ukosne linie logo mialy przerwy, a belki liter siadaly
+/// piksel za wysoko.
 /// </summary>
 public sealed class PodgladLcd : Control
 {
@@ -15,35 +23,25 @@ public sealed class PodgladLcd : Control
     private static readonly Color Litery    = Color.FromArgb(0xC8, 0xF5, 0xD0);
     private static readonly Color Uspione   = Color.FromArgb(0x60, 0x74, 0x68);
 
-    private const byte Kreska    = 0x8D;
-    private const byte Trojnik   = 0x8E;
-    private const byte Separator = 0x8F;
-
-    private const byte RamkaGora     = 0x9F;
-    private const byte RamkaDol      = 0xA0;
-    private const byte RamkaBok      = 0xA1;
-    private const byte RamkaRogGorny = 0xA2;
-    private const byte RamkaRogDolny = 0xA3;
-
-    // Kafelki, z ktorych wzmacniacz sklada logo na ekranie glownym.
-    private const byte LogoOd = 0xB0;
-    private const byte LogoDo = 0xDF;
-    private const byte StrzalkaLewo = 0x99, StrzalkaGora = 0x9A;
-    private const byte StrzalkaDol  = 0x9B, StrzalkaPrawo = 0x9C;
-    private const byte Stopien      = 0xAA;
-
     private EkranSpe _ekran;
     private string _zastepczy = "";
 
     // Gotowe kafelki. Klucz laczy kod i to, czy rysujemy w negatywie.
     private readonly Dictionary<int, Bitmap> _pamiec = new();
 
+    /// <summary>Ile pikseli ekranu na jeden piksel wyswietlacza.</summary>
+    public const int Skala = 2;
+
+    private const int SzerokoscZnaku  = KafelkiSpe.Szerokosc * Skala;
+    private const int WysokoscWiersza = KafelkiSpe.Wysokosc * Skala;
+
     public PodgladLcd()
     {
         SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
         BackColor = TloEkranu;
-        Font = new Font("Consolas", 11f, FontStyle.Regular, GraphicsUnit.Point);
+        // Czcionka sluzy juz tylko do napisu zastepczego - tresc ekranu idzie z map bitowych.
+        Font = new Font("Consolas", 10f, FontStyle.Regular, GraphicsUnit.Point);
     }
 
     /// <summary>Ekran do pokazania albo null, gdy nie ma swiezego odczytu.</summary>
@@ -72,17 +70,11 @@ public sealed class PodgladLcd : Control
             return;
         }
 
-        // Komorka ma dokladnie taki rozmiar, w jakim nauczone sa kafelki. Dzieki temu
-        // rysujemy je jeden do jednego: kreski zostaja jednopikselowe i lacza sie
-        // miedzy komorkami, zamiast gubic kolumny przy skalowaniu.
-        int szerokoscZnaku = KafelkiSpe.Szerokosc;
-        int wysokoscWiersza = KafelkiSpe.Wysokosc;
+        int szerokoscZnaku = SzerokoscZnaku;
+        int wysokoscWiersza = WysokoscWiersza;
 
         int marginesX = Math.Max(2, (ClientSize.Width - szerokoscZnaku * EkranSpe.Kolumn) / 2);
         int marginesY = Math.Max(2, (ClientSize.Height - wysokoscWiersza * EkranSpe.Wierszy) / 2);
-
-        var miaraZnaku = TextRenderer.MeasureText(g, "0", Font,
-            new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
 
         using var pedzelZaznaczenia = new SolidBrush(Litery);
 
@@ -104,53 +96,51 @@ public sealed class PodgladLcd : Control
                     g.FillRectangle(pedzelZaznaczenia, x, y, szerokoscZnaku, wysokoscWiersza);
 
                 var kafelek = Kafelek(bajt, zaznaczone);
-                if (kafelek is not null)
-                {
-                    g.DrawImageUnscaled(kafelek, x, y);
-                    continue;
-                }
-
-                char znak = Znak(bajt);
-                if (znak == ' ') continue;
-
-                Color kolor = zaznaczone ? TloEkranu : Litery;
-
-                // Znak stawiamy na srodku komorki, bo czcionka jest wezsza niz kafelek.
-                var gdzie = new Point(x + (szerokoscZnaku - miaraZnaku.Width) / 2,
-                                      y + (wysokoscWiersza - miaraZnaku.Height) / 2);
-
-                TextRenderer.DrawText(g, znak.ToString(), Font, gdzie, kolor,
-                    TextFormatFlags.NoPadding);
+                if (kafelek is not null) g.DrawImageUnscaled(kafelek, x, y);
             }
         }
     }
 
     /// <summary>
-    /// Kafelek nauczony ze zrzutu, przeskalowany do rozmiaru komorki, albo null,
-    /// gdy kodu nie znamy albo lepiej narysowac go znakiem.
-    ///
-    /// Kafelki sa nauczone w rozmiarze komorki, wiec rysujemy je jeden do jednego -
-    /// bez skalowania, ktore gubilo jednopikselowe kreski.
+    /// Gotowy obrazek komorki, powiekszony <see cref="Skala"/> razy, albo null,
+    /// gdy kodu nie umiemy narysowac.
     /// </summary>
     private Bitmap Kafelek(byte kod, bool negatyw)
     {
-        if (!KafelkiSpe.Mapy.TryGetValue(kod, out var mapa)) return null;
+        var mapa = Mapa(kod);
+        if (mapa is null) return null;
 
-        int szerokosc = KafelkiSpe.Szerokosc;
-        int wysokosc = KafelkiSpe.Wysokosc;
         int klucz = kod | (negatyw ? 0x100 : 0);
         if (_pamiec.TryGetValue(klucz, out var gotowy)) return gotowy;
 
-        var obraz = new Bitmap(szerokosc, wysokosc);
+        var obraz = new Bitmap(SzerokoscZnaku, WysokoscWiersza);
         Color tusz = negatyw ? TloEkranu : Litery;
 
-        for (int y = 0; y < wysokosc && y < mapa.Length; y++)
-            for (int x = 0; x < szerokosc; x++)
-                if ((mapa[y] >> (szerokosc - 1 - x) & 1) != 0)
-                    obraz.SetPixel(x, y, tusz);
+        for (int y = 0; y < KafelkiSpe.Wysokosc && y < mapa.Length; y++)
+            for (int x = 0; x < KafelkiSpe.Szerokosc; x++)
+            {
+                if ((mapa[y] >> (KafelkiSpe.Szerokosc - 1 - x) & 1) == 0) continue;
+
+                // Kazdy piksel panelu to kwadrat Skala na Skala - powiekszenie robimy
+                // sami, bo GDI+ przy skalowaniu obrazu wygladzilby krawedzie.
+                for (int py = 0; py < Skala; py++)
+                    for (int px = 0; px < Skala; px++)
+                        obraz.SetPixel(x * Skala + px, y * Skala + py, tusz);
+            }
 
         _pamiec[klucz] = obraz;
         return obraz;
+    }
+
+    /// <summary>
+    /// Mapa bitowa komorki: najpierw znaki wlasne wyswietlacza, potem czcionka.
+    /// Kod znaku to bajt plus 0x20 - i to dla calego zakresu, nie tylko dla liter.
+    /// </summary>
+    private static byte[] Mapa(byte kod)
+    {
+        if (KafelkiSpe.Mapy.TryGetValue(kod, out var kafelek)) return kafelek;
+        if (kod < CzcionkaSpe.Glify.Length) return CzcionkaSpe.Glify[kod];
+        return null;
     }
 
     protected override void Dispose(bool zwalniamy)
@@ -163,24 +153,4 @@ public sealed class PodgladLcd : Control
         base.Dispose(zwalniamy);
     }
 
-    private static char Znak(byte b)
-    {
-        // Wyswietlacz przesyla ASCII pomniejszone o 0x20 - dla calego zakresu,
-        // nie tylko dla wielkich liter.
-        if (b >= 0x01 && b <= 0x5F) return (char)(b + 0x20);
-        if (b == Separator)         return (char)0x2502;       // pionowa kreska
-        if (b == Kreska)            return (char)0x2500;       // pozioma kreska
-        if (b == Trojnik)           return (char)0x252C;       // trojnik
-        if (b == RamkaGora)         return (char)0x2500;
-        if (b == RamkaDol)          return (char)0x2500;
-        if (b == RamkaBok)          return (char)0x2502;
-        if (b == RamkaRogGorny)     return (char)0x2510;
-        if (b == RamkaRogDolny)     return (char)0x2518;
-        if (b == StrzalkaLewo)      return (char)0x25C0;
-        if (b == StrzalkaGora)      return (char)0x25B2;
-        if (b == StrzalkaDol)       return (char)0x25BC;
-        if (b == StrzalkaPrawo)     return (char)0x25B6;
-        if (b == Stopien)           return (char)0x00B0;
-        return ' ';                                            // pusto albo kafelek grafiki
-    }
 }
