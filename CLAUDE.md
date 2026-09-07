@@ -215,11 +215,18 @@ nowej klatki i pokazywac "czekam na wyswietlacz". Poniewaz wzmacniacz co jakis c
 puls, napis mrugal bez powodu - a ekran przeciez nadal pokazuje to samo. Teraz ostatnia klatka
 zostaje na widoku do nastepnej.
 
-**Wlasne znaki wyswietlacza rozpoznane do tej pory:** `0x8D` pozioma kreska (wiersz 4 komorki),
-`0x8F` pionowa (kolumna 3), `0x8E` trojnik nad separatorem kolumny, `0x99`-`0x9C` strzalki
-w podpowiedzi klawiszy, `0x9F`-`0xA3` ramka i jej rogi, `0xAA` stopien przy temperaturze -
-na panelu to kwadracik 2 na 2 piksele, nie kolko, dlatego znak `°` z czcionki wygladal obco.
-`0xB0`-`0xDF` to kafelki logo.
+**Wlasne znaki wyswietlacza rozpoznane do tej pory:** `0x81`-`0x84` linijka miernikow
+(lewa zaslepka, przedzialka zwykla, przedzialka co piata, prawa zaslepka), `0x8D` pozioma
+kreska (wiersz 4 komorki), `0x8F` pionowa (kolumna 3), `0x8E` trojnik nad separatorem kolumny,
+`0x99`-`0x9C` strzalki w podpowiedzi klawiszy - **para na jeden nawias**, `[` `0x99` `0x9A` `]`
+to `[◁▲]`, a pozioma belka pod trojkatem siega jedna kolumne w lewa komorke, `0x9F`-`0xA3`
+ramka i jej rogi, `0xAA` stopien przy temperaturze - na panelu to kwadracik 2 na 2 piksele,
+nie kolko, dlatego znak `°` z czcionki wygladal obco. `0xB0`-`0xDF` to kafelki logo.
+
+**Wypelnienia linijki przy nadawaniu sa wciaz nieznane.** Ramke Operate mamy z postoju, wiec
+linijki byly puste i wyszly z niej tylko kody tla. Kody, ktorymi wzmacniacz rysuje slupek przy
+nadawaniu, poznamy dopiero z ramki zlapanej w trakcie TX. Do tego czasu te komorki beda puste -
+nie zgaduj ich ksztaltu.
 
 **Do nauki znakow potrzebne sa dwie rzeczy naraz: obraz i ramka.** Ramka mowi, jakim kodem
 wzmacniacz prosi o komorke, obraz mowi, jak ta komorka wyglada - jedno bez drugiego jest

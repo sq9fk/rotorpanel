@@ -284,11 +284,21 @@ zależnie od tego, w którym miejscu rastra wypadła komórka. Sprawdzian, że s
 **wszystkie 57 kodów graficznych i 35 sprawdzalnych liter wychodzą z każdego wystąpienia
 identycznie**.
 
-Ekrany inne niż główny mają własne symbole, których na głównym nie ma — linijki mierników
-`PA OUT` i `I PA` w trybie Operate czy strzałki w podpowiedziach menu SET. Żeby dało się je
+Ekrany inne niż główny mają własne symbole, których na głównym nie ma. Żeby dało się je
 nauczyć, okno sterowania zapisuje na **Ctrl+S** bieżącą ramkę `0x6A` do podkatalogu `ekrany`
 obok pliku programu. Sama ramka nie wystarczy — mówi tylko, jakim kodem wzmacniacz prosi
-o daną komórkę — więc do nauki trzeba jeszcze obrazu tego samego ekranu.
+o daną komórkę — więc drugim źródłem są zdjęcia ekranów z instrukcji 1.3K-FA, a wiąże je
+`narzedzia/ucz-z-instrukcji.py`. Tak powstały linijki mierników `PA OUT` i `I PA` w trybie
+Operate (`0x81`–`0x84`) oraz strzałki `[◁▲][▽▷]` w podpowiedziach menu SET (`0x99`–`0x9C`).
+
+Dowód, że zdjęcie z instrukcji i ramka z własnego wzmacniacza opisują ten sam układ, jest
+w samym wyniku: przy dobrym dopasowaniu komórki, których kod już znamy, muszą wyjść ze
+zdjęcia co do piksela takie same. W wierszu podpowiedzi zgodziły się 24 komórki z 28,
+a niezgodne były **dokładnie te cztery strzałki**, o które chodziło.
+
+Czego wciąż nie ma: wypełnienia linijki przy nadawaniu. Ramka Operate została złapana na
+postoju, więc słupki były puste; kody, którymi wzmacniacz rysuje wypełnienie, pokaże dopiero
+ramka z trakcie nadawania.
 
 Nie wszystko da się zmierzyć i to jest zapisane w wynikach:
 
