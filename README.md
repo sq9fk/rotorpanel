@@ -205,9 +205,9 @@ Kiedy mostek jest połączony, aktualny stan wzmacniacza widać w RotorPanelu, a
 RC-1216H. Po rozłączeniu kontroler potrafi nie wrócić sam do odczytu — pomaga *Restart device*
 na jego stronie; wzmacniacza to nie dotyczy.
 
-### Klawiatura
+### Sterowanie
 
-Przycisk **Klawisze…** na karcie otwiera klawiaturę przedniego panelu. Kody pochodzą wprost
+Przycisk **Sterowanie…** na karcie otwiera klawiaturę przedniego panelu. Kody pochodzą wprost
 z firmowej tabeli poleceń: INPUT `0x01`, BAND −/+ `0x02`/`0x03`, ANTENNA `0x04`, L −/+
 `0x05`/`0x06`, C −/+ `0x07`/`0x08`, TUNE `0x09`, WYŁĄCZ `0x0A`, POWER `0x0B`, DISPLAY `0x0C`,
 OPERATE `0x0D`, CAT `0x0E`, strzałki `0x0F`/`0x10`, S `0x11`, podświetlenie `0x82`/`0x83`.

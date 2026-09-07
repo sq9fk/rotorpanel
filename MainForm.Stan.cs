@@ -166,19 +166,19 @@ public partial class MainForm
         var stan = EtykietaStanuKarty(karta, true);
         var ruch = EtykietaRuchu(karta, opisPolaczenia);
 
-        // Przy znanym modelu robimy miejsce na drugi przycisk - klawiature panelu.
+        // Przy znanym modelu robimy miejsce na drugi przycisk - sterowanie panelem.
         var przelacz = PrzyciskPrzelaczania(karta, m, u.Spe ? 8 : 21);
 
         if (u.Spe)
         {
-            var klawisze = Ui.Przycisk("Klawisze…", 92, glowny: false);
-            klawisze.Location = new Point(408, 40);
-            klawisze.Click += (_, _) =>
+            var sterowanie = Ui.Przycisk("Sterowanie…", 92, glowny: false);
+            sterowanie.Location = new Point(408, 40);
+            sterowanie.Click += (_, _) =>
             {
-                using var okno = new SpeForm(m, u.Etykieta + " — klawiatura");
+                using var okno = new SpeForm(m, u.Etykieta + " — sterowanie");
                 okno.ShowDialog(this);
             };
-            karta.Controls.Add(klawisze);
+            karta.Controls.Add(sterowanie);
         }
 
         _ui["u" + u.Nr] = new Wiersz
