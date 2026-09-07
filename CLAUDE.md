@@ -146,6 +146,12 @@ czekanie na nastepny naglowek opoznialo podglad o cale odpytanie, bo kolejna ram
 dopiero przy nastepnym pulsie. `CzytnikSpe` bierze wiec typowa dlugosc (367 bajtow), gdy juz ja
 ma, a na synchronizacje czeka tylko wtedy, gdy ramka jest krotsza.
 
+**Kafelkami rysujemy tylko logo, reszte znakami.** Nauczony kafelek pionowej kreski (`0x8F`)
+ma zapalona jedynie ostatnia kolumne i przy skalowaniu do komorki gubil ja - separatory miedzy
+polami paska stanu po prostu znikaly, choc kod byl w slowniku i w ramce. Kreski, ramki, strzalki
+i stopien ida wiec znakami ramek (sa przy okazji ostrzejsze), a mapy bitowe zostaja dla kodow od
+`0xB0`, czyli dla logo, ktorego zadnym znakiem nie zastapisz.
+
 **Kafelki graficzne sa nauczone ze zrzutu, nie zgadniete.** `narzedzia/ucz-kafelki.py` dopasowuje
 zrzut ekranu do siatki 40x8 i wiaze kazda komorke z kodem z ramki `0x6A`; wynik to `KafelkiSpe.cs`.
 Przesuniecie siatki wyznacza sie automatycznie - szuka takiego, przy ktorym na liniach podzialu
