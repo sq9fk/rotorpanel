@@ -85,7 +85,6 @@ public partial class MainForm
         _ = Handle;
 
         _menu = new ContextMenuStrip { Font = Theme.Zwykly() };
-        _menu.Opening += (_, _) => ZbudujMenu();
 
         // Menu pokazujemy sami w obsludze prawego przycisku - przypisanie
         // ContextMenuStrip do NotifyIcon reaguje niekonsekwentnie.
@@ -109,6 +108,14 @@ public partial class MainForm
         _tray.MouseUp += (_, e) =>
         {
             if (e.Button != MouseButtons.Right) return;
+
+            // Pozycje musza istniec **przed** Show. Budowane w zdarzeniu Opening
+            // przychodzily za pozno: menu bylo w tej chwili puste, wiec WinForms
+            // go nie pokazywalo i trzeba bylo kliknac drugi raz. Zmierzone w osobnym
+            // programie - pierwsze Show: Visible=False i wysokosc 32 (sam margines),
+            // drugie: Visible=True i wysokosc 54. Z pozycjami dodanymi wczesniej
+            // pierwsze Show pokazuje menu od razu.
+            ZbudujMenu();
 
             // Bez wysuniecia okna na pierwszy plan menu nie znika po klikniecu obok.
             SetForegroundWindow(Handle);

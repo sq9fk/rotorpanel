@@ -91,6 +91,13 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Menu zasobnika buduj przed `Show`, nie w zdarzeniu `Opening`.** Pozycje dodawane
+w `Opening` przychodza za pozno: w chwili wywolania `Show` menu jest puste, wiec WinForms
+go nie pokazuje - i trzeba kliknac prawym drugi raz. Zmierzone w osobnym programie:
+pierwsze `Show` daje `Visible=False` i wysokosc 32 (sam margines), drugie `Visible=True`
+i wysokosc 54; z pozycjami dodanymi wczesniej pierwsze `Show` pokazuje menu od razu.
+Menu i tak trzeba przebudowac przy kazdym otwarciu, bo wypisuje biezacy stan mostkow.
+
 **Aktualizacja podmienia plik przez przemianowanie.** Windows nie pozwala nadpisać
 uruchomionego programu, ale pozwala zmienić mu nazwę — stąd `.old`. Przed startem nowej kopii
 `Program.ZwolnijBlokade()` musi puścić muteks jednej instancji, inaczej nowa kopia uzna się za
