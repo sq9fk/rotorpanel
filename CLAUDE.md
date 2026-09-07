@@ -321,11 +321,29 @@ stanu". Teraz pętla bierze **najwcześniejszy** nagłówek `AA AA AA`, patrzy n
 (`0x43` status, `0x6A` ekran) i dopiero wtedy decyduje. Potwierdzenia i wszystko inne idą do
 klienta.
 
-**Status SPE czytamy sami i sami go zjadamy.** `Mostek` przy `Urzadzenie.Spe` wstrzykuje
-w strumień własne zapytanie `0x90` raz na sekundę, a `CzytnikSpe` wyjmuje odpowiedzi zanim
-trafią na drugą stronę pary portów. Klient (SPE Term) o nie nie prosił, więc nie może ich
-dostać. Do gniazda piszą wtedy dwie strony — pompa i odpytywanie — stąd semafor `_bramka`;
-bez niego ramki potrafiłyby się przepleść w połowie.
+**Zdejmuj ze strumienia tylko tyle ramek statusu, ile sam zamówiłeś.** `Mostek` przy
+`Urzadzenie.Spe` wstrzykuje własne zapytanie `0x90` raz na sekundę, a `CzytnikSpe` wyjmuje
+odpowiedzi, żeby nie trafiły do klienta, który o nie nie prosił. Pierwsza wersja zjadała
+**każdą** ramkę statusu — i to był błąd, bo SPE Term oraz AetherSDR odpytują wzmacniacz
+same. Efekt: żaden z nich nic nie rysował i nic nie odczytywał, choć mostek stał, port był
+otwarty, a nasza własna karta pokazywała stan poprawnie. Teraz `ZglosWlasneZapytanie` liczy
+niezaspokojone własne zapytania (najwyżej dwa, żeby przy wyłączonym wzmacniaczu licznik nie
+urósł) i tylko tyle ramek znika; resztę rozbieramy dla siebie **i oddajemy dalej**.
+Sprawdzian na nagraniu `rx-term.bin`: bez własnych zapytań do klienta idzie 7 z 8 ramek
+(ósma to ta urwana w połowie, którą i tak odrzucamy), po dwóch własnych — 5.
+
+**Gdy klient odpytuje sam, my przestajemy.** `CzytnikSpe.KlientPytaSam` jest prawdziwe przez
+trzy sekundy od ramki statusu, o którą nie pytaliśmy; `OdpytujSpe` wtedy tylko śpi. Stan
+czytamy z ramek klienta po drodze, a wzmacniacz ma o połowę mniej roboty — co jest istotne,
+bo zmierzone wcześniej: nadmiar ruchu gubi mu odpowiedzi.
+
+Do gniazda piszą dwie strony — pompa i odpytywanie — stąd semafor `_bramka`; bez niego ramki
+potrafiłyby się przepleść w połowie.
+
+**Ramki ekranu `0x6A` mają ten problem wciąż otwarty.** Zdejmujemy je zawsze, gdy nasze okno
+sterowania jest otwarte (`PrzechwytujEkran`). Jeśli w tym samym czasie klient też poprosi
+o tryb RCU, jego klatki zjemy. Przy zamkniętym oknie przechodzą bez zmian. Gdyby to zaczęło
+przeszkadzać, trzeba policzyć własne pulsy tak samo jak zapytania o status.
 
 **Okna musza sie miescic na ekranie, na ktorym stoja.** Polozenia kontrolek sa wpisane na
 sztywno, wiec Ustawienia maja 1000 na 852 punkty - na laptopie z ekranem 1366 na 768 dolny

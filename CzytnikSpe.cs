@@ -1,9 +1,15 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Wylawia ze strumienia od wzmacniacza ramki, o ktore sam pytal mostek: status
 /// (0x43) i - gdy sami wlaczylismy tryb RCU - zawartosc wyswietlacza (0x6A).
 /// Reszta bajtow idzie do klienta bez zmian, bo to odpowiedzi na jego polecenia.
+///
+/// Ramki statusu zdejmujemy **tylko w liczbie wlasnych zapytan**. Pierwsza wersja
+/// zjadala kazda, bo zalozylismy, ze klient o status nie pyta - a SPE Term i AetherSDR
+/// pytaja same i wtedy nie dostawaly nic: zaden z nich nic nie rysowal. Teraz kazda
+/// ramke i tak rozbieramy dla siebie, ale oddajemy ja dalej, jesli nie czekamy na
+/// odpowiedz na wlasne zapytanie.
 ///
 /// Bufor przegladamy po kolei, od najwczesniejszego naglowka. Szukanie w nim
 /// najpierw jednego rodzaju ramek rozjezdzalo strumien: ramki lezace wczesniej
@@ -15,7 +21,30 @@ public sealed class CzytnikSpe
 
     private readonly List<byte> _reszta = new();
 
+    // Ile wlasnych zapytan 0x90 czeka na odpowiedz. Ograniczone, bo przy wylaczonym
+    // wzmacniaczu licznik roslby bez konca i potem zjadalibysmy ramki klienta.
+    private const int MaksWlasnych = 2;
+    private int _wlasneOczekujace;
+
     public StatusSpe Status { get; private set; }
+
+    /// <summary>Kiedy przyszla ramka statusu, o ktora nie pytalismy my.</summary>
+    public DateTime OstatniObcyStatus { get; private set; } = DateTime.MinValue;
+
+    /// <summary>
+    /// Czy po drugiej stronie pary siedzi program, ktory sam odpytuje o status.
+    /// Wtedy nie ma po co dokladac wlasnych zapytan - stan przeczytamy z jego ramek,
+    /// a wzmacniacz nie lubi nadmiaru ruchu.
+    /// </summary>
+    public bool KlientPytaSam =>
+        DateTime.UtcNow - OstatniObcyStatus < TimeSpan.FromSeconds(3);
+
+    /// <summary>Mostek melduje, ze wyslal wlasne zapytanie o status.</summary>
+    public void ZglosWlasneZapytanie()
+    {
+        if (Volatile.Read(ref _wlasneOczekujace) < MaksWlasnych)
+            Interlocked.Increment(ref _wlasneOczekujace);
+    }
 
     public EkranSpe Ekran { get; private set; }
 
@@ -57,7 +86,7 @@ public sealed class CzytnikSpe
 
             if (rodzaj == StatusSpe.DlugoscDanych)
             {
-                if (!ZdejmijStatus(out czekam)) Oddaj(wyjscie, 1);
+                if (!ZdejmijStatus(wyjscie, out czekam)) Oddaj(wyjscie, 1);
                 else if (czekam) return wyjscie.ToArray();
             }
             else if (rodzaj == EkranSpe.Typ && PrzechwytujEkran)
@@ -80,7 +109,7 @@ public sealed class CzytnikSpe
     /// Zdejmuje ramke statusu. Zwraca false, gdy to nie byla ramka statusu;
     /// przez <paramref name="czekam"/> mowi, ze jest jeszcze niekompletna.
     /// </summary>
-    private bool ZdejmijStatus(out bool czekam)
+    private bool ZdejmijStatus(List<byte> wyjscie, out bool czekam)
     {
         czekam = false;
 
@@ -106,7 +135,21 @@ public sealed class CzytnikSpe
         if (status is null) return false;
 
         Status = status;
-        _reszta.RemoveRange(0, StatusSpe.DlugoscRamki);
+
+        // Odpowiedz na wlasne zapytanie zdejmujemy, cudza idzie do klienta - rozbior
+        // dla siebie zrobilismy juz wyzej, wiec nic na tym nie tracimy.
+        if (Volatile.Read(ref _wlasneOczekujace) > 0)
+        {
+            if (Interlocked.Decrement(ref _wlasneOczekujace) < 0)
+                Interlocked.Exchange(ref _wlasneOczekujace, 0);
+            _reszta.RemoveRange(0, StatusSpe.DlugoscRamki);
+        }
+        else
+        {
+            OstatniObcyStatus = DateTime.UtcNow;
+            Oddaj(wyjscie, StatusSpe.DlugoscRamki);
+        }
+
         return true;
     }
 

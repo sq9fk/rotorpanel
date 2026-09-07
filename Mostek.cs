@@ -324,7 +324,11 @@ public sealed class Mostek : IDisposable
             // Przy otwartym podgladzie ekranu w ogole nie pytamy o status. Zmierzone:
             // zapytanie wciskajace sie miedzy puls a klatke opoznialo ja o ponad sekunde,
             // a stan i tak widac wtedy na samym ekranie wzmacniacza.
-            if (_trybEkranu)
+            // Gdy po drugiej stronie pary siedzi program, ktory sam odpytuje o status
+            // (SPE Term, AetherSDR), nie dokladamy wlasnych zapytan - stan czytamy
+            // z jego ramek po drodze. Wzmacniacz ma wtedy o polowe mniej roboty,
+            // a zmierzone wczesniej: nadmiar ruchu gubi mu odpowiedzi.
+            if (_trybEkranu || czytnik.KlientPytaSam)
             {
                 await Task.Delay(500, ct);
                 continue;
@@ -335,6 +339,7 @@ public sealed class Mostek : IDisposable
             {
                 await siec.WriteAsync(zapytanie, 0, zapytanie.Length, ct);
                 await siec.FlushAsync(ct);
+                czytnik.ZglosWlasneZapytanie();
             }
             finally { _bramka.Release(); }
 
