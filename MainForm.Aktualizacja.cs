@@ -83,7 +83,7 @@ public partial class MainForm
 
         try
         {
-            Aktualizacja.Podmien(pobrany);
+            Aktualizacja.Podmien(pobrany, wydanie);
         }
         catch (Exception ex)
         {

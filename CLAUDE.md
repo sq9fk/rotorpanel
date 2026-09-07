@@ -477,10 +477,20 @@ jest sam odzwierciedlony wyswietlacz: ekran glowny wypisuje "Standby" tylko wted
 przekazniki sa w obejsciu. Brak tego slowa niczego nie dowodzi - wtedy pytamy. Nie zamieniaj
 tego na ciche wyslanie tylko dlatego, ze pytanie bywa uciazliwe.
 
-**Adres pobrania aktualizacji sprawdzamy, zanim czegokolwiek uzyjemy.** Bierzemy go z JSON-a
-odpowiedzi API, wiec wymagamy `https` i hosta w domenie GitHuba. To nadal **nie jest**
-weryfikacja integralnosci - pelnym rozwiazaniem byloby podanie SHA-256 w opisie wydania
-i sprawdzenie go przed podmiana. Dopoki tego nie ma, zaufanie lezy na TLS i GitHubie.
+**Aktualizacje sprawdzamy po sumie SHA-256, nie po adresie.** Adres pobrania bierzemy
+z JSON-a odpowiedzi API, wiec wymagamy `https` i hosta w domenie GitHuba - ale to tylko
+pierwsze sito. Rozstrzyga suma: GitHub podaje ja przy zasobie wydania w polu `digest`
+(zapis `sha256:<64 znaki hex>`), zapasowo szukamy 64-znakowego ciagu szesnastkowego
+w opisie wydania. **Bez sumy nie aktualizujemy w ogole** - `Pobierz` rzuca wyjatkiem
+i mowi, zeby pobrac wersje recznie. Sume liczymy dwa razy: raz na pobranych bajtach,
+zanim cokolwiek trafi na dysk, i drugi raz w `Podmien`, juz z pliku - miedzy pobraniem
+a podmiana plik lezy w `%TEMP%` i to jedyna chwila, w ktorej moglby sie zmienic. Nie
+upraszczaj tego do jednego sprawdzenia i nie przepuszczaj wydania bez sumy: program
+podmienia sam siebie tym plikiem, wiec TLS i nazwa hosta to za malo.
+
+Wydajac nowa wersje **nie trzeba** nic dopisywac - GitHub liczy `digest` sam przy wgrywaniu
+zasobu. Sprawdzone na zywym wydaniu v1.9.6: `digest` z API zgadza sie z `sha256sum` pliku,
+a `Pobierz` z podmieniona suma nie zostawia niczego w katalogu tymczasowym.
 
 **Nie badaj portu i nie niszcz mostkow na watku interfejsu.** `KlientNaPorcie` wykonywalo
 `CreateFile` na porcie szeregowym wprost z odswiezania karty (co 700 ms), a `BudujListe`

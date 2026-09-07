@@ -332,6 +332,12 @@ pojawiła się nowsza wersja. Jeśli tak, pokazuje panel i pyta, czy ją pobrać
 ściąga plik, podmienia się nim i uruchamia ponownie — bez instalatora i bez ręcznego
 kopiowania.
 
+Pobrany plik jest sprawdzany po sumie **SHA-256**, którą GitHub liczy sam przy wgrywaniu
+zasobu wydania. Suma musi się zgodzić dwa razy: zaraz po pobraniu, zanim cokolwiek trafi na
+dysk, i jeszcze raz tuż przed podmianą pliku programu. Jeśli się nie zgadza albo wydanie
+w ogóle jej nie podaje, aktualizacja jest przerywana i zobaczysz komunikat — wtedy pobierz
+nową wersję ręcznie ze strony wydań.
+
 Podmiana działa tak, że działający plik jest **przemianowywany** na `.old`: Windows nie
 pozwala nadpisać uruchomionego programu, ale pozwala zmienić mu nazwę. Gdyby kopiowanie
 nowego pliku się nie powiodło, poprzedni wraca na miejsce. Plik `.old` znika przy następnym
