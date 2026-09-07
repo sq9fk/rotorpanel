@@ -205,6 +205,11 @@ Skale prądu i napięcia (0–50 A, 0–60 V) są odczytane z podziałek na wła
 Ten widok **nie wymaga trybu RCU** i działa też wtedy, gdy do pary wpięty jest program
 kliencki i sterowanie jest zablokowane — stan czytamy wtedy z ramek, o które poprosił klient.
 
+**Stan i Sterowanie to osobne, niezależne okna.** Każde ma własny przycisk w pasku zadań i nie
+blokuje panelu, więc RotorPanel można schować do zasobnika i zostawić je na widoku — mostki
+pracują dalej, a okna się odświeżają. Ponowne kliknięcie przycisku przywraca okno już otwarte,
+zamiast otwierać drugie.
+
 ### Program kliencki na drugiej stronie pary
 
 Przez mostek może pracować zewnętrzny program — SPE Term albo

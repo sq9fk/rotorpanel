@@ -83,28 +83,29 @@ public sealed class SpeForm : Form
         }
     };
 
-    // Otwarte okna sterowania, zeby dalo sie je zamknac, gdy do pary wepnie sie
-    // program kliencki - dwoch panow na jednym laczu konczy sie gubieniem ramek.
-    private static readonly List<SpeForm> _otwarte = new();
+    /// <summary>Otwiera okno sterowania albo przywraca juz otwarte dla tego mostka.</summary>
+    public static void Pokaz(Mostek mostek, string tytul)
+        => OknaMostka.Pokaz(mostek, () => new SpeForm(mostek, tytul));
 
-    /// <summary>Zamyka okno sterowania tym mostkiem, jesli akurat jest otwarte.</summary>
-    public static void ZamknijOtwarte(Mostek mostek)
-    {
-        foreach (var okno in _otwarte.ToArray())
-            if (ReferenceEquals(okno._mostek, mostek) && !okno.IsDisposed)
-                try { okno.Close(); } catch { /* zamykane w innym watku */ }
-    }
+    /// <summary>
+    /// Zamyka okno sterowania tym mostkiem. Wolane, gdy do pary wepnie sie program
+    /// kliencki - dwoch panow na jednym laczu konczy sie gubieniem ramek.
+    /// </summary>
+    public static void ZamknijOtwarte(Mostek mostek) => OknaMostka.Zamknij<SpeForm>(mostek);
 
     public SpeForm(Mostek mostek, string tytul)
     {
         _mostek = mostek;
-        _otwarte.Add(this);
 
         Text            = tytul;
         ClientSize      = new Size(516, 520);
-        StartPosition   = FormStartPosition.CenterParent;
+        StartPosition   = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.Sizable;
-        MinimizeBox     = false;
+
+        // Okno jest niezalezne od panelu, wiec ma sens minimalizowanie i wlasny
+        // przycisk w pasku zadan - panel moze byc schowany do zasobnika.
+        MinimizeBox     = true;
+        ShowInTaskbar   = true;
         MaximizeBox     = false;
         BackColor       = Theme.Tlo;
         Font            = Theme.Zwykly();
@@ -187,7 +188,7 @@ public sealed class SpeForm : Form
             });
         };
 
-        FormClosed += (_, _) => { _otwarte.Remove(this); _zegar.Dispose(); _puls.Dispose(); };
+        FormClosed += (_, _) => { _zegar.Dispose(); _puls.Dispose(); };
 
         Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(516, 520));
 

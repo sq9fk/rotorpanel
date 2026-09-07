@@ -179,11 +179,7 @@ public partial class MainForm
         {
             sterowanie = Ui.Przycisk("Sterowanie…", 92, glowny: false);
             sterowanie.Location = new Point(408, 40);
-            sterowanie.Click += (_, _) =>
-            {
-                using var okno = new SpeForm(m, u.Etykieta + " — sterowanie");
-                okno.ShowDialog(this);
-            };
+            sterowanie.Click += (_, _) => SpeForm.Pokaz(m, u.Etykieta + " — sterowanie");
             karta.Controls.Add(sterowanie);
         }
 
@@ -212,11 +208,7 @@ public partial class MainForm
 
             stanPrzycisk = Ui.Przycisk("Stan…", 92, glowny: false);
             stanPrzycisk.Location = new Point(408, 72);
-            stanPrzycisk.Click += (_, _) =>
-            {
-                using var okno = new StatusForm(m, u.Etykieta + " — stan");
-                okno.ShowDialog(this);
-            };
+            stanPrzycisk.Click += (_, _) => StatusForm.Pokaz(m, u.Etykieta + " — stan");
             karta.Controls.Add(stanPrzycisk);
             _dymek.SetToolTip(stanPrzycisk,
                 "Wszystkie dane z ramki statusu — działa też przy podłączonym programie klienckim.");

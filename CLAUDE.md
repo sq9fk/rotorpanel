@@ -398,6 +398,20 @@ powodu znikac. Zakres linijki mocy bierze sie z pola identyfikacyjnego ramki
 (`StatusSpe.MocMaksymalna`: "13K" to 1,3 kW), a skale pradu i napiecia - 0-50 A i 0-60 V -
 odczytalem z podzialek na wlasnych ekranach panelu w ramkach `0x6A`, wiec nie sa zgadniete.
 
+**Okna wzmacniacza sa niezalezne od panelu - i to jest celowe.** Sterowanie i stan otwieraja
+sie przez `Show`, **bez wlasciciela**, z wlasnym przyciskiem w pasku zadan. Dzieki temu panel
+mozna schowac do zasobnika i zostawic je na widoku - mostki pracuja dalej, wiec okna sie
+odswiezaja. Wczesniej byly modalne (`ShowDialog(this)`): blokowaly panel i znikaly razem z nim.
+Nie wracaj do `ShowDialog` dla tych dwoch; `SettingsForm` i `PairsForm` maja byc modalne, bo
+zmieniaja konfiguracje pod reka.
+
+`OknaMostka` pilnuje, zeby na jeden mostek przypadalo jedno okno danego rodzaju - drugie
+klikniecie przywraca otwarte zamiast mnozyc kopie - i pozwala je pozamykac. Dwa miejsca musza
+to wolac: `BudujListe` przed `m.Dispose()`, bo okna trzymaja mostek, ktory zaraz zniknie, oraz
+`OdswiezSpe`, gdy do pary wepnie sie klient (wtedy tylko sterowanie, stan zostaje). Sprawdzone:
+drugie `Pokaz` nie tworzy kopii, oba okna maja `Owner == null` i `ShowInTaskbar`, a kaskada
+odsuwa drugie o 28 punktow.
+
 **Karta wzmacniacza jest wyzsza niz pozostale.** `WysokoscKartySpe` to 112 zamiast 72, bo
 miesci linijke mocy nadawania i trzeci przycisk. `BudujUrzadzenia` przesuwa sie o wysokosc
 zalezna od `u.Spe` - jesli dolozysz cos do tej karty, popraw obie liczby naraz, inaczej karty

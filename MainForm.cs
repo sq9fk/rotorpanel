@@ -146,6 +146,9 @@ public partial class MainForm : Form
     /// <summary>Okno dopasowuje wysokosc do zawartosci - lista nigdy sie nie przewija.</summary>
     private void BudujListe()
     {
+        // Okna sterowania i stanu trzymaja mostek, ktory za chwile zniknie.
+        OknaMostka.ZamknijWszystkie();
+
         foreach (var m in _mostki) m.Dispose();
         _mostki.Clear();
         _ui.Clear();

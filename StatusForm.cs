@@ -33,16 +33,21 @@ public sealed class StatusForm : Form
         "Temperatura górna", "Temperatura dolna", "Temperatura sumatora"
     };
 
+    /// <summary>Otwiera podglad stanu albo przywraca juz otwarty dla tego mostka.</summary>
+    public static void Pokaz(Mostek mostek, string tytul)
+        => OknaMostka.Pokaz(mostek, () => new StatusForm(mostek, tytul));
+
     public StatusForm(Mostek mostek, string tytul)
     {
         _mostek = mostek;
 
         Text            = tytul;
         ClientSize      = new Size(460, 470);
-        StartPosition   = FormStartPosition.CenterParent;
+        StartPosition   = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.Sizable;
-        MinimizeBox     = false;
+        MinimizeBox     = true;
         MaximizeBox     = false;
+        ShowInTaskbar   = true;
         BackColor       = Theme.Tlo;
         Font            = Theme.Zwykly();
 

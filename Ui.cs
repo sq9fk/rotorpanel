@@ -191,6 +191,72 @@ public sealed class PasekLed : Control
     }
 }
 
+/// <summary>
+/// Okna wzmacniacza - sterowanie i stan - sa **niezalezne od okna glownego**: bez
+/// wlasciciela, w pasku zadan, otwierane przez Show, nie ShowDialog. Dzieki temu
+/// panel mozna schowac do zasobnika i zostawic je na widoku, a one dalej odswiezaja
+/// sie z mostka. Wczesniej byly modalne: blokowaly panel i znikaly razem z nim.
+///
+/// Rejestr pilnuje, zeby na jeden mostek przypadalo jedno okno danego rodzaju -
+/// drugie klikniecie przywraca to otwarte zamiast mnozyc kopie - i pozwala je
+/// pozamykac, gdy mostki sa przebudowywane albo gdy do pary wepnie sie klient.
+/// </summary>
+public static class OknaMostka
+{
+    private static readonly List<(Mostek Mostek, Form Okno)> _otwarte = new();
+
+    /// <summary>Pokazuje okno albo przywraca juz otwarte dla tego mostka.</summary>
+    public static void Pokaz<T>(Mostek mostek, Func<T> utworz) where T : Form
+    {
+        var istniejace = _otwarte.FirstOrDefault(
+            o => ReferenceEquals(o.Mostek, mostek) && o.Okno is T && !o.Okno.IsDisposed);
+
+        if (istniejace.Okno is not null)
+        {
+            if (istniejace.Okno.WindowState == FormWindowState.Minimized)
+                istniejace.Okno.WindowState = FormWindowState.Normal;
+            istniejace.Okno.Activate();
+            return;
+        }
+
+        var okno = utworz();
+
+        // Kaskada, zeby drugie okno nie stanelo dokladnie na pierwszym.
+        if (_otwarte.Count > 0 && okno.StartPosition == FormStartPosition.CenterScreen)
+        {
+            okno.StartPosition = FormStartPosition.Manual;
+            var srodek = Screen.FromPoint(Cursor.Position).WorkingArea;
+            okno.Location = new Point(
+                srodek.X + (srodek.Width - okno.Width) / 2 + _otwarte.Count * 28,
+                srodek.Y + (srodek.Height - okno.Height) / 2 + _otwarte.Count * 28);
+        }
+
+        _otwarte.Add((mostek, okno));
+        okno.FormClosed += (_, _) => _otwarte.RemoveAll(o => ReferenceEquals(o.Okno, okno));
+        okno.Show();
+    }
+
+    /// <summary>Zamyka okna danego rodzaju dla tego mostka; null - dla wszystkich.</summary>
+    public static void Zamknij<T>(Mostek mostek = null) where T : Form
+    {
+        foreach (var (m, okno) in _otwarte.ToArray())
+        {
+            if (okno is not T || okno.IsDisposed) continue;
+            if (mostek is not null && !ReferenceEquals(m, mostek)) continue;
+            try { okno.Close(); } catch { /* zamykane gdzie indziej */ }
+        }
+    }
+
+    /// <summary>Zamyka wszystkie - mostki wlasnie znikaja i okna nie maja co pokazywac.</summary>
+    public static void ZamknijWszystkie()
+    {
+        foreach (var (_, okno) in _otwarte.ToArray())
+            if (!okno.IsDisposed)
+                try { okno.Close(); } catch { /* jak wyzej */ }
+        _otwarte.Clear();
+    }
+}
+
 public static class Ui
 {
     /// <summary>
