@@ -21,12 +21,20 @@ public sealed class SpeForm : Form
     // po niej pulsowanie z zegara jest wstrzymane.
     private bool _klawiszWToku;
     private DateTime _ostatniKlawisz = DateTime.MinValue;
+    private DateTime _nastepnyPuls = DateTime.MinValue;
 
     // Kazdy zbedny puls kosztuje: przy takcie 1 s wzmacniacz odpowiadal kolejno po
     // 218, 1150, 1055 i 2170 ms, a klawisz wyslany 100 ms po pulsie przepadal.
     // Dlatego w tle pulsujemy rzadko, a po klawiszu robimy cisze.
     private static readonly TimeSpan CiszaPoKlawiszu = TimeSpan.FromMilliseconds(1500);
-    private static readonly TimeSpan TaktSpoczynku   = TimeSpan.FromSeconds(3);
+
+    // Zapas na wypadek, gdy wzmacniacz przemilczy puls i klatka nie przyjdzie wcale.
+    // W normalnym biegu cykl napedza sama klatka, wiec ten czas sie nie uzywa.
+    private static readonly TimeSpan TaktSpoczynku = TimeSpan.FromMilliseconds(1500);
+
+    // Odstep miedzy odpowiedzia (klatka albo stan) a nastepnym pulsem. Bez niego
+    // polecenia pietrzylyby sie szybciej, niz wzmacniacz odpowiada.
+    private static readonly TimeSpan PrzerwaPoOdpowiedzi = TimeSpan.FromMilliseconds(300);
 
     // Klawisze, ktore zmieniaja stan nadawania albo zasilania - pytamy przed wyslaniem.
     private static readonly byte[] Ostrozne = { 0x09, 0x0A, 0x0B, 0x0D };
@@ -358,6 +366,11 @@ public sealed class SpeForm : Form
         if (_mostek.Stan != StanMostka.Polaczony) return;
 
         _ostatniPuls = DateTime.UtcNow;
+        _mostek.ZglosPulsRcu();
+
+        // Zapas: gdyby klatka nie przyszla wcale, cykl ruszy sam po tym czasie.
+        _nastepnyPuls = _ostatniPuls + TaktSpoczynku;
+
         await _mostek.WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None);
         await Task.Delay(20);
         await _mostek.WyslijKlawisz(EkranSpe.RcuWlacz, CancellationToken.None);
@@ -381,13 +394,29 @@ public sealed class SpeForm : Form
     /// Puls z zegara. Wstrzymany tylko na czas obslugi klawisza, bo trafiony zaraz
     /// po nim kasuje ten klawisz.
     /// </summary>
+    /// <summary>
+    /// Klatka przyszla, wiec planujemy nastepny puls krotko po niej - cykl napedza
+    /// odpowiedz, nie sztywny zegar, wiec polecenia nie pietrza sie szybciej, niz
+    /// wzmacniacz odpowiada. Zapytania o stan **nie** wieszamy na tym lancuchu:
+    /// przy milczacym wzmacniaczu ginelyby razem z klatkami.
+    /// </summary>
+    private void PoKlatce()
+    {
+        if (_klawiszWToku) return;
+        _nastepnyPuls = DateTime.UtcNow + PrzerwaPoOdpowiedzi;
+    }
+
     private async Task PulsGdyTrzeba()
     {
         if (_klawiszWToku) return;
 
         var teraz = DateTime.UtcNow;
         if (teraz - _ostatniKlawisz < CiszaPoKlawiszu) return;
-        if (teraz - _ostatniPuls < TaktSpoczynku) return;
+        if (teraz < _nastepnyPuls) return;
+
+        // Druga strona tej samej umowy: stan omija okno miedzy pulsem a klatka,
+        // a puls omija zapytanie o stan. Bez tego puls trafial w odpowiedz i przepadal.
+        if (_mostek.CzekamNaStan) return;
 
         await Puls();
     }
@@ -402,7 +431,19 @@ public sealed class SpeForm : Form
         // kilku sekundach mrugalo napisem "czekam na wyswietlacz" za kazdym razem, gdy
         // wzmacniacz przemilczal puls - a przeciez nadal pokazuje to samo co ostatnio.
         var ekran = _mostek.Ekran;
-        if (ekran is not null && !ReferenceEquals(_lcd.Ekran, ekran)) _lcd.Ekran = ekran;
+        if (ekran is not null && !ReferenceEquals(_lcd.Ekran, ekran))
+        {
+            _lcd.Ekran = ekran;
+
+            // Od pulsu do klatki na ekranie - to jest liczba, na ktora patrzymy przy
+            // kazdej skardze na wolne odswiezanie. Podloga wzmacniacza to okolo 500 ms.
+            if (Slad.Wlaczony && _ostatniPuls != DateTime.MinValue)
+                Slad.Zapisz("klatka po " +
+                    (int)(DateTime.UtcNow - _ostatniPuls).TotalMilliseconds + " ms od pulsu");
+
+            PoKlatce();
+
+        }
         else if (ekran is null && _lcd.Ekran is not null) _lcd.Ekran = null;
     }
 

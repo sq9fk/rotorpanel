@@ -130,9 +130,31 @@ juz watku interfejsu, a `FormClosing` niczego nie czeka - RCU wylacza w tle i do
 wyslaniu gasi `TrybEkranu`. Nie wracaj do blokowania; jesli kiedys naprawde trzeba poczekac
 na mostek z poziomu okna, zrob to `async void` na zdarzeniu, nie synchronicznie.
 
-**Odpytywanie o status przy otwartym podgladzie trzeba wylaczyc.** Zapytanie `0x90` wciskajace
-sie miedzy puls a klatke opoznialo ja o ponad sekunde. Przy `TrybEkranu` petla `OdpytujSpe`
-tylko spi - stan i tak widac na ekranie wzmacniacza.
+**Stan i obraz to dwa niezalezne strumienie, ktore ustepuja sobie nawzajem.** Przy otwartym
+podgladzie dziela jedno lacze, a wzmacniacz obsluguje jedno naraz - ale **nie wolno wiazac
+jednego z drugim**. Reguly sa trzy:
+
+* `OdpytujSpe` milczy zupelnie, gdy do pary wpiety jest klient, oraz gdy podglad jest otwarty,
+  a nikt nie patrzy na okno stanu (`TrybStanu`) - wtedy stan widac na samym ekranie.
+* Zapytanie o stan omija okno miedzy pulsem RCU a klatka (`CzekamNaKlatke`, 900 ms). Zmierzone:
+  wciskajac sie tam opoznia klatke o ponad sekunde.
+* Puls omija zapytanie o stan w locie (`CzekamNaStan`, 400 ms). **Zabezpieczenie musi byc
+  obustronne.** Gdy bylo jednostronne, puls trafial w odpowiedz o stan i przepadal: pojedyncza
+  klatka przychodzila po 559 ms, ale mediana odstepu miedzy klatkami wynosila 2,72 s.
+
+**Nie doczepiaj zapytania o stan do odebranej klatki.** Probowalem tego, zeby "wyrownac takt".
+Wyszlo odwrotnie - lancuch jest tak wolny jak jego najwolniejsze ogniwo, a wzmacniacz co jakis
+czas milknie na kilka sekund. Zmierzone: odstepy miedzy klatkami od 1,25 s do 11 s, wiec odczyt
+stanu starzal sie do siedmiu sekund i okno stanu meldowalo, ze wzmacniacz nie odpowiada. Po
+rozlaczeniu strumieni stan trzyma mediane 1,0-1,6 s **takze wtedy, gdy obraz stoi**, bo idzie
+osobnym kanalem.
+
+**Nie pytaj o linie CTS/DSR na uchwycie portu.** Wykrywanie klienta robilo `GetCommModemStatus`
+na tym samym synchronicznym uchwycie, po ktorym czyta pompa - zmierzone: 71 prob, srednio
+387 ms, najdluzsza **2259 ms**, 24 ponad 200 ms. Blokowalo to sciezke danych i bylo widac jako
+skoki opoznienia klatek. Do tego bylo bezuzyteczne: SPE Term tych linii nie podnosi. Zostaje
+ruch od strony portu (za darmo) i proba otwarcia drugiej strony pary, ktora idzie przez osobny
+uchwyt. Po usunieciu ani jedno badanie nie przekroczylo progu 5 ms.
 
 **Wzmacniacz czasem przemilcza puls.** Potrafi nie odpowiedziec przez ponad trzy sekundy, do
 nastepnego pulsu z zegara. Dlatego po klawiszu czekamy 700 ms na klatke i ponawiamy puls
@@ -353,12 +375,12 @@ jako 4 i 2 bajty, oddalone o kilkadziesiąt milisekund. Teraz zatrzymujemy **tyl
 `0xAA`**, bo tylko one mogą być początkiem nagłówka.
 
 **Gdy do pary wpięty jest klient, milczymy i blokujemy sterowanie.** Wzmacniacz ma jednego pana
-naraz. Klienta wykrywamy trzema sposobami, od najszybszego: świeży ruch od strony portu (do 5 s),
-linie CTS/DSR, a po dziesięciu sekundach ciszy — próba otwarcia drugiej strony pary. Ten ostatni
-sposób jest jedynym, który wykryje klienta trzymającego port otwarty i milczącego, i **to on
-decyduje, kiedy sterowanie wraca**. Linie sterujące nie wystarczą: zmierzone — SPE Term ich nie
-podnosi. Próby nie robimy przy pracującym kliencie, żeby nie podebrać mu portu w chwili, gdy sam
-go otwiera.
+naraz. Klienta wykrywamy dwoma sposobami: świeżym ruchem od strony portu (do 5 s), a po
+dziesięciu sekundach ciszy — próbą otwarcia drugiej strony pary. Ta druga jest jedyna, która
+wykryje klienta trzymającego port otwarty i milczącego, i **to ona decyduje, kiedy sterowanie
+wraca**. Próby nie robimy przy pracującym kliencie, żeby nie podebrać mu portu w chwili, gdy sam
+go otwiera. Linii CTS/DSR **nie pytamy** — patrz wyżej: kosztowały do 2,3 s blokady ścieżki
+danych, a SPE Term ich i tak nie podnosi.
 
 **Ślad diagnostyczny mostka.** Pusty plik `slad.wlacz` obok programu włącza zapis do `slad.txt`:
 bajty na każdym odcinku osobno, czas każdego zapisu na port i podgląd pierwszych bajtów ramki.

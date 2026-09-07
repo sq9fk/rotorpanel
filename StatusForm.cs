@@ -105,12 +105,18 @@ public sealed class StatusForm : Form
         int wysokosc = y + tabela.Height + 20;
         ClientSize = new Size(460, wysokosc);
 
-        _zegar = new System.Windows.Forms.Timer { Interval = 250 };
+        // Status przychodzi najwyzej raz na sekunde, a przy otwartym podgladzie
+        // wyswietlacza wcale, wiec czestsze odswiezanie to sama praca na watku
+        // interfejsu - dzielonym z rysowaniem ekranu wzmacniacza.
+        _zegar = new System.Windows.Forms.Timer { Interval = 500 };
         _zegar.Tick += (_, _) => Odswiez();
         _zegar.Start();
         Odswiez();
 
-        FormClosed += (_, _) => _zegar.Dispose();
+        // Dopoki to okno jest otwarte, ramka statusu ma pierwszenstwo - odpytywanie
+        // idzie takze przy wlaczonym podgladzie wyswietlacza.
+        _mostek.TrybStanu = true;
+        FormClosed += (_, _) => { _mostek.TrybStanu = false; _zegar.Dispose(); };
         Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(460, wysokosc));
     }
 
@@ -136,9 +142,20 @@ public sealed class StatusForm : Form
         return (pasek, odczyt);
     }
 
+    private StatusSpe _pokazany;
+    private StanMostka _pokazanyStan = (StanMostka)(-1);
+
     private void Odswiez()
     {
         var s = _mostek.Status;
+
+        // Nowa ramka to nowy obiekt, wiec porownanie referencji wystarcza. Bez tego
+        // przemalowywalibysmy cztery linijki i czternascie etykiet dwa razy na sekunde
+        // bez zadnego powodu - a ten sam watek rysuje wyswietlacz w oknie sterowania.
+        // Wiek odczytu pokazujemy dalej, wiec licznik sekund musi isc mimo wszystko.
+        bool zmiana = !ReferenceEquals(s, _pokazany) || _mostek.Stan != _pokazanyStan;
+        _pokazany = s;
+        _pokazanyStan = _mostek.Stan;
 
         if (s is null)
         {
@@ -164,7 +181,12 @@ public sealed class StatusForm : Form
         _stanDanych.Text = wiek < 5
             ? "Odczyt sprzed " + wiek.ToString("0.0") + " s" +
               (_mostek.KlientNaPorcie ? " — z ramek programu na porcie." : ".")
-            : "Odczyt sprzed " + wiek.ToString("0") + " s — wzmacniacz nie odpowiada.";
+            : _mostek.TrybEkranu
+                ? "Odczyt sprzed " + wiek.ToString("0") +
+                  " s — przy otwartym podglądzie wyświetlacza stan idzie rzadziej."
+                : "Odczyt sprzed " + wiek.ToString("0") + " s — wzmacniacz nie odpowiada.";
+
+        if (!zmiana) return;   // wiek juz odswiezony, reszta bez zmian
 
         _pasekMocy.Maksimum = s.MocMaksymalna;
         _pasekMocy.Wartosc = s.MocWatow;

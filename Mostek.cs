@@ -30,6 +30,9 @@ public sealed class Mostek : IDisposable
     private System.Collections.Concurrent.ConcurrentQueue<byte[]> _kolejkaPortu;
     private SemaphoreSlim _budzikPortu;
     private bool _trybEkranu;
+    private volatile bool _trybStanu;
+    private long _ostatniPulsRcu;
+    private long _ostatnieZapytanieOStan;
 
     // Strumien do urzadzenia, zeby okno sterowania mialo gdzie wyslac kod klawisza.
     private volatile Stream _biezacaSiec;
@@ -46,8 +49,9 @@ public sealed class Mostek : IDisposable
     // i z petli odpytywania, wiec pola musza byc czytane atomowo, a samo badanie -
     // synchroniczne CreateFile na porcie szeregowym, ktore potrafi zablokowac -
     // idzie do puli watkow. Wczesniej wykonywalo sie wprost na watku interfejsu.
-    private volatile bool _stronaKlientaZajeta;
+    private volatile bool _klientWykryty;
     private long _kiedyBadanaStrona;
+    private long _kiedyBadanyPort;
     private int _badanieWToku;
 
     public Polaczenie Punkt { get; }
@@ -81,37 +85,66 @@ public sealed class Mostek : IDisposable
 
             if (_czytnikSpe?.KlientPytaSam == true) return true;
 
-            var port = _portPary;
-            if (port is not null && port.DrugaStronaAktywna()) return true;
-
-            // Klient moze miec port otwarty i milczec - wtedy widac go tylko po tym,
-            // ze nie da sie tego portu otworzyc. Stad pytanie: sterowanie wraca dopiero,
-            // gdy druga strona pary jest naprawde wolna.
-            ZaplanujBadanieStrony(odRuchu);
-            return _stronaKlientaZajeta;
+            // Reszta to zbuforowany wynik badania w tle. Wlasciwosc jest czytana
+            // z watku interfejsu kilka razy na sekunde (karta i okno stanu), a kazde
+            // dotkniecie uchwytu portu - nawet samo GetCommModemStatus - potrafi tam
+            // czekac na trwajacy ReadFile, bo uchwyt jest synchroniczny. Przy otwartym
+            // podgladzie wyswietlacza zbieralo sie z tego tyle zastoju, ze puls RCU
+            // (idzie z zegara okna) wypadal za pozno i klatki szly z opoznieniem.
+            // Tutaj nie wolno wykonac zadnej operacji na porcie.
+            ZaplanujBadanieKlienta(odRuchu);
+            return _klientWykryty;
         }
     }
 
     /// <summary>
-    /// Zleca sprawdzenie, czy druga strona pary jest zajeta. Probujemy dopiero po
-    /// dluzszej ciszy, bo kazda proba na moment otwiera port - przy pracujacym
+    /// Zleca badanie klienta w tle. Linie sterujace sprawdzamy co dwie sekundy,
+    /// a otwarcie drugiej strony pary - dopiero po dziesieciu sekundach ciszy i nie
+    /// czesciej niz co piec, bo kazda proba na moment zajmuje port i przy pracujacym
     /// kliencie moglibysmy mu go podebrac w chwili, gdy sam go otwiera.
     /// </summary>
-    private void ZaplanujBadanieStrony(TimeSpan odRuchu)
+    private void ZaplanujBadanieKlienta(TimeSpan odRuchu)
     {
-        if (odRuchu <= TimeSpan.FromSeconds(10)) return;
-        if (string.IsNullOrWhiteSpace(Punkt.Com)) return;
-
         long ostatnie = Interlocked.Read(ref _kiedyBadanaStrona);
         if (ostatnie != 0 &&
-            DateTime.UtcNow - new DateTime(ostatnie) < TimeSpan.FromSeconds(5)) return;
+            DateTime.UtcNow - new DateTime(ostatnie) < TimeSpan.FromSeconds(2)) return;
 
         if (Interlocked.Exchange(ref _badanieWToku, 1) == 1) return;
         Interlocked.Exchange(ref _kiedyBadanaStrona, DateTime.UtcNow.Ticks);
 
         Task.Run(() =>
         {
-            try { _stronaKlientaZajeta = PortIo.Zajety(Punkt.Com); }
+            try
+            {
+                var zegar = System.Diagnostics.Stopwatch.StartNew();
+
+                // Linii CTS/DSR juz nie pytamy. Zmierzone dwojako i oba wyniki byly
+                // przeciw: SPE Term ich nie podnosi, wiec niczego nie wykrywaly, a samo
+                // GetCommModemStatus na naszym synchronicznym uchwycie potrafilo czekac
+                // na trwajacy ReadFile - 71 prob, srednio 387 ms, najdluzsza 2259 ms,
+                // co widac bylo jako skoki opoznienia klatek. Zostaje ruch od strony
+                // portu (za darmo) i proba otwarcia drugiej strony pary, ktora idzie
+                // przez osobny uchwyt i pompie nie przeszkadza.
+                bool wynik = false;
+
+                if (odRuchu > TimeSpan.FromSeconds(10) &&
+                    !string.IsNullOrWhiteSpace(Punkt.Com))
+                {
+                    long poprzednie = Interlocked.Read(ref _kiedyBadanyPort);
+                    if (poprzednie == 0 ||
+                        DateTime.UtcNow - new DateTime(poprzednie) > TimeSpan.FromSeconds(5))
+                    {
+                        Interlocked.Exchange(ref _kiedyBadanyPort, DateTime.UtcNow.Ticks);
+                        wynik = PortIo.Zajety(Punkt.Com);
+                    }
+                    else wynik = _klientWykryty;
+                }
+
+                _klientWykryty = wynik;
+
+                if (Slad.Wlaczony && zegar.ElapsedMilliseconds > 5)
+                    Slad.Zapisz("badanie klienta trwalo " + zegar.ElapsedMilliseconds + " ms");
+            }
             catch { /* port zniknal - przy nastepnym badaniu sie wyjasni */ }
             finally { Interlocked.Exchange(ref _badanieWToku, 0); }
         });
@@ -132,6 +165,52 @@ public sealed class Mostek : IDisposable
             _trybEkranu = value;
             var czytnik = _czytnikSpe;
             if (czytnik is not null) czytnik.PrzechwytujEkran = value;
+        }
+    }
+
+    /// <summary>
+    /// Czy ktos patrzy na okno stanu. Wtedy ramka statusu jest tym, co uzytkownik
+    /// naprawde oglada, wiec odpytujemy normalnie - takze przy wlaczonym podgladzie
+    /// wyswietlacza. Bez tego okno stanu po piciu sekundach meldowalo, ze wzmacniacz
+    /// nie odpowiada, choc to my przestawalismy pytac.
+    /// </summary>
+    public bool TrybStanu
+    {
+        get => _trybStanu;
+        set => _trybStanu = value;
+    }
+
+    /// <summary>
+    /// Okno sterowania melduje tu kazdy puls RCU. Odpytywanie o stan omija okno miedzy
+    /// pulsem a klatka - zmierzone: zapytanie wciskajace sie w te przerwe opoznia
+    /// klatke o ponad sekunde. Poza tym oknem w cyklu jest cisza.
+    /// </summary>
+    public void ZglosPulsRcu() => Interlocked.Exchange(ref _ostatniPulsRcu, DateTime.UtcNow.Ticks);
+
+    private bool CzekamNaKlatke
+    {
+        get
+        {
+            long puls = Interlocked.Read(ref _ostatniPulsRcu);
+            return puls != 0 &&
+                   DateTime.UtcNow - new DateTime(puls) < TimeSpan.FromMilliseconds(900);
+        }
+    }
+
+    /// <summary>
+    /// Czy wlasnie czekamy na odpowiedz o stan. Zabezpieczenie musi byc **obustronne**:
+    /// stan omijal okno miedzy pulsem a klatka, ale puls nie omijal zapytania o stan
+    /// i trafial w moment, gdy wzmacniacz odpowiadal - wtedy przepadal, a klatka
+    /// przychodzila dopiero po zapasowym takcie. Zmierzone przed ta poprawka: mediana
+    /// odstepu miedzy klatkami 2,72 s przy poprawnym opoznieniu pojedynczej klatki 559 ms.
+    /// </summary>
+    public bool CzekamNaStan
+    {
+        get
+        {
+            long kiedy = Interlocked.Read(ref _ostatnieZapytanieOStan);
+            return kiedy != 0 &&
+                   DateTime.UtcNow - new DateTime(kiedy) < TimeSpan.FromMilliseconds(400);
         }
     }
 
@@ -376,6 +455,20 @@ public sealed class Mostek : IDisposable
     }
 
     /// <summary>
+    /// Wysyla jedno zapytanie o stan i melduje czytnikowi, ze odpowiedz nalezy do nas
+    /// (inaczej poszlaby do klienta na drugiej stronie pary). Sluzy oknu sterowania:
+    /// przy wlaczonym podgladzie petla OdpytujSpe milczy, wiec ktos musi zapytac
+    /// w spokojnej chwili cyklu, tuz po odebranej klatce.
+    /// </summary>
+    public async Task<bool> ZapytajOStan(CancellationToken ct)
+    {
+        var czytnik = _czytnikSpe;
+        bool poszlo = await WyslijKlawisz(StatusSpe.Zapytanie, ct);
+        if (poszlo) czytnik?.ZglosWlasneZapytanie();
+        return poszlo;
+    }
+
+    /// <summary>
     /// Wysyla wzmacniaczowi kod klawisza. Zwraca false, gdy mostek nie jest polaczony
     /// albo pisanie sie nie udalo - wtedy okno sterowania ma o czym powiedziec.
     /// </summary>
@@ -419,18 +512,34 @@ public sealed class Mostek : IDisposable
 
         while (!ct.IsCancellationRequested)
         {
-            // Przy otwartym podgladzie ekranu w ogole nie pytamy o status. Zmierzone:
-            // zapytanie wciskajace sie miedzy puls a klatke opoznialo ja o ponad sekunde,
-            // a stan i tak widac wtedy na samym ekranie wzmacniacza.
             // Gdy do pary wpiety jest program kliencki (SPE Term, AetherSDR), milkniemy
             // zupelnie - on jest wtedy panem lacza. Wykrywamy go po ruchu od strony
             // portu: linie CTS/DSR potrafia milczec (zmierzone - Term ich nie podnosi),
-            // a wlasnych ramek statusu klient wcale nie musi zamawiac. Stan czytamy z jego ramek po drodze,
-            // a wzmacniacz nie dostaje podwojnego ruchu; zmierzone wczesniej: nadmiar
-            // zapytan gubi mu odpowiedzi.
-            if (_trybEkranu || KlientNaPorcie)
+            // a wlasnych ramek statusu klient wcale nie musi zamawiac. Stan czytamy
+            // z jego ramek po drodze, a wzmacniacz nie dostaje podwojnego ruchu.
+            if (KlientNaPorcie)
             {
                 await Task.Delay(500, ct);
+                continue;
+            }
+
+            // Przy wlaczonym podgladzie pytamy tylko wtedy, gdy ktos patrzy na okno
+            // stanu - samo okno sterowania pokazuje stan na ekranie wzmacniacza.
+            if (_trybEkranu && !_trybStanu)
+            {
+                await Task.Delay(500, ct);
+                continue;
+            }
+
+            // Stan chodzi **wlasnym taktem**, niezaleznie od klatek. Probowalem
+            // doczepic go do klatki (zapytanie zaraz po niej) i wyszlo zle: wzmacniacz
+            // co jakis czas milknie na kilka sekund, a wtedy razem z klatka ginal stan.
+            // Zmierzone: odstepy miedzy klatkami od 1,25 s do 11 s, wiec odczyt stanu
+            // starzal sie do siedmiu sekund. Jedyne ograniczenie to nie wchodzic miedzy
+            // puls a klatke - poza tym oknem zapytanie nikomu nie przeszkadza.
+            if (_trybEkranu && CzekamNaKlatke)
+            {
+                await Task.Delay(100, ct);
                 continue;
             }
 
@@ -442,6 +551,7 @@ public sealed class Mostek : IDisposable
                 await siec.WriteAsync(zapytanie, 0, zapytanie.Length, ct);
                 await siec.FlushAsync(ct);
                 czytnik.ZglosWlasneZapytanie();
+                Interlocked.Exchange(ref _ostatnieZapytanieOStan, DateTime.UtcNow.Ticks);
             }
             finally { _bramka.Release(); }
 
