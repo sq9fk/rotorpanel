@@ -1,4 +1,4 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Zawartosc wyswietlacza wzmacniacza SPE Expert, czytana z ramki 0x6A.
@@ -46,6 +46,13 @@ public sealed class EkranSpe
     /// <summary>Surowe bajty siatki - kontrolka sama decyduje, jak je narysowac.</summary>
     public byte[][] Bajty { get; private set; } = new byte[0][];
 
+    /// <summary>
+    /// Cala ramka tak, jak przyszla. Trzymamy ja, bo z niej ucza sie mapy bitowe
+    /// znakow wlasnych: bez ramki wiadomo tylko, jak komorka wyglada, a nie jakim
+    /// kodem wzmacniacz o nia prosi.
+    /// </summary>
+    public byte[] Surowe { get; private set; } = new byte[0];
+
     /// <summary>Komorki, ktore wzmacniacz pokazuje w negatywie (zaznaczenie).</summary>
     public bool[][] Zaznaczone { get; private set; } = new bool[0][];
 
@@ -74,6 +81,10 @@ public sealed class EkranSpe
 
         e.Wiersze = wiersze.ToArray();
         e.Bajty = Siatka(dane, od, dlugosc);
+
+        var surowe = new byte[Math.Min(dlugosc, dane.Count - od)];
+        for (int i = 0; i < surowe.Length; i++) surowe[i] = dane[od + i];
+        e.Surowe = surowe;
         e.Zaznaczone = Zaznaczenia(dane, od, dlugosc);
 
         // Ostatni wiersz to podpowiedzi klawiszy - przydaje sie osobno w dymku.

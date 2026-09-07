@@ -132,8 +132,9 @@ public sealed class SpeForm : Form
             y += 44;
         }
 
-        _stopka = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
-            new Point(18, y + 4), new Size(480, 32));
+        _stopka = Ui.Etykieta(
+            "Ctrl+S zapisuje bieżącą ramkę wyświetlacza do podkatalogu „ekrany”.",
+            Theme.Maly(), Theme.TekstSzary, new Point(18, y + 4), new Size(480, 32));
         Controls.Add(_stopka);
 
         _zegar = new System.Windows.Forms.Timer { Interval = 60 };
@@ -176,6 +177,46 @@ public sealed class SpeForm : Form
         FormClosed += (_, _) => { _zegar.Dispose(); _puls.Dispose(); };
 
         Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(516, 520));
+
+        // Ctrl+S zapisuje biezaca ramke ekranu. Mapy bitowe znakow wlasnych uczy sie
+        // ze zdjecia panelu zestawionego z ramka z tej samej chwili - bez ramki
+        // wiadomo tylko, jak komorka wyglada, a nie jakim kodem wzmacniacz o nia prosi.
+        KeyPreview = true;
+        KeyDown += (_, e) =>
+        {
+            if (e.Control && e.KeyCode == Keys.S) { ZapiszRamke(); e.Handled = true; }
+        };
+    }
+
+    /// <summary>Zapisuje ostatnia ramke ekranu obok pliku programu i mowi gdzie.</summary>
+    private void ZapiszRamke()
+    {
+        var ekran = _mostek.Ekran;
+        if (ekran is null || ekran.Surowe.Length == 0)
+        {
+            _stopka.Text = "Nie ma czego zapisac - nie przyszla jeszcze zadna ramka ekranu.";
+            _stopka.ForeColor = Color.FromArgb(0xB3, 0x26, 0x1E);
+            return;
+        }
+
+        try
+        {
+            string katalog = Path.Combine(
+                Path.GetDirectoryName(Application.ExecutablePath) ?? ".", "ekrany");
+            Directory.CreateDirectory(katalog);
+
+            string plik = Path.Combine(katalog,
+                "ekran-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bin");
+            File.WriteAllBytes(plik, ekran.Surowe);
+
+            _stopka.Text = "Zapisano ramkę (" + ekran.Surowe.Length + " B): " + plik;
+            _stopka.ForeColor = Theme.TekstSzary;
+        }
+        catch (Exception ex)
+        {
+            _stopka.Text = "Nie udało się zapisać ramki: " + ex.Message;
+            _stopka.ForeColor = Color.FromArgb(0xB3, 0x26, 0x1E);
+        }
     }
 
     private Button Przycisk(Klawisz k)

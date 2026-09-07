@@ -221,6 +221,15 @@ w podpowiedzi klawiszy, `0x9F`-`0xA3` ramka i jej rogi, `0xAA` stopien przy temp
 na panelu to kwadracik 2 na 2 piksele, nie kolko, dlatego znak `°` z czcionki wygladal obco.
 `0xB0`-`0xDF` to kafelki logo.
 
+**Do nauki znakow potrzebne sa dwie rzeczy naraz: obraz i ramka.** Ramka mowi, jakim kodem
+wzmacniacz prosi o komorke, obraz mowi, jak ta komorka wyglada - jedno bez drugiego jest
+bezuzyteczne. Ekran glowny mielismy w obu postaciach i stad `KafelkiSpe`. Ekrany Operate
+i SET maja wlasne symbole (linijki miernikow `PA OUT` i `I PA`, strzalki w podpowiedziach),
+ktorych na glownym nie ma, wiec wychodza puste. Dlatego okno sterowania zapisuje ramke na
+**Ctrl+S** do podkatalogu `ekrany`, a `EkranSpe.Surowe` trzyma ja w calosci. Obrazy tych
+ekranow sa w instrukcji 1.3K-FA (`manual/obraz-09.jpg` to Operate z pustymi linijkami).
+Nie zgaduj tych map bitowych - bez pary obraz-ramka nie da sie zwiazac ksztaltu z kodem.
+
 **Kursor to jeden bajt na kolumne, bit wskazuje wiersz.** 40 bajtow zaraz za siatka
 (`EkranSpe.PoczatekFlag`), potem dwubajtowa suma kontrolna. Zmierzone przez porownanie ramek
 przed i po nacisnieciu strzalki: 13 kolejnych bajtow zmienilo sie z `08` na `04`, czyli

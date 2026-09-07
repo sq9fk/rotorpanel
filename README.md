@@ -284,6 +284,12 @@ zależnie od tego, w którym miejscu rastra wypadła komórka. Sprawdzian, że s
 **wszystkie 57 kodów graficznych i 35 sprawdzalnych liter wychodzą z każdego wystąpienia
 identycznie**.
 
+Ekrany inne niż główny mają własne symbole, których na głównym nie ma — linijki mierników
+`PA OUT` i `I PA` w trybie Operate czy strzałki w podpowiedziach menu SET. Żeby dało się je
+nauczyć, okno sterowania zapisuje na **Ctrl+S** bieżącą ramkę `0x6A` do podkatalogu `ekrany`
+obok pliku programu. Sama ramka nie wystarczy — mówi tylko, jakim kodem wzmacniacz prosi
+o daną komórkę — więc do nauki trzeba jeszcze obrazu tego samego ekranu.
+
 Nie wszystko da się zmierzyć i to jest zapisane w wynikach:
 
 * Ze zrzutu wolno wyciąć tylko komórki, o których wiadomo, że pokazują to samo co zapisana
