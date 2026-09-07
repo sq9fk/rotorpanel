@@ -73,8 +73,11 @@ public sealed class PodgladLcd : Control
         int szerokoscZnaku = SzerokoscZnaku;
         int wysokoscWiersza = WysokoscWiersza;
 
-        int marginesX = Math.Max(2, (ClientSize.Width - szerokoscZnaku * EkranSpe.Kolumn) / 2);
-        int marginesY = Math.Max(2, (ClientSize.Height - wysokoscWiersza * EkranSpe.Wierszy) / 2);
+        // Bez wymuszania marginesu. Kontrolka o szerokosci rownej siatce dostawala
+        // wczesniej dwa piksele z lewej, przez co prawa krawedz ramki wypadala poza
+        // obraz i wygladalo to jak uciety ekran.
+        int marginesX = Math.Max(0, (ClientSize.Width - szerokoscZnaku * EkranSpe.Kolumn) / 2);
+        int marginesY = Math.Max(0, (ClientSize.Height - wysokoscWiersza * EkranSpe.Wierszy) / 2);
 
         using var pedzelZaznaczenia = new SolidBrush(Litery);
 

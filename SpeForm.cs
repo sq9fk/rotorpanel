@@ -112,8 +112,10 @@ public sealed class SpeForm : Form
             Theme.Maly(), Theme.TekstSzary, new Point(16, 48), new Size(448, 16)));
 
         // Podglad wyswietlacza: 40 na 8 komorek po 6 na 8 pikseli panelu, kazdy
-        // powiekszony dwukrotnie - stad 480 na 128 punktow plus waski margines.
-        _lcd = new PodgladLcd { Location = new Point(18, 100), Size = new Size(480, 136) };
+        // powiekszony dwukrotnie - stad 480 na 128 punktow. Kontrolka jest o osiem
+        // wieksza, zeby zostala ramka po cztery piksele, a samo szklo wypadlo w tej
+        // samej osi co karta wyzej.
+        _lcd = new PodgladLcd { Location = new Point(14, 96), Size = new Size(488, 136) };
         Controls.Add(_lcd);
 
         int y = 252;
