@@ -210,6 +210,14 @@ blokuje panelu, więc RotorPanel można schować do zasobnika i zostawić je na 
 pracują dalej, a okna się odświeżają. Ponowne kliknięcie przycisku przywraca okno już otwarte,
 zamiast otwierać drugie.
 
+Przy obu otwartych oknach dzielą jedno łącze, a wzmacniacz obsługuje jedno pytanie naraz —
+ale **żadne z nich nie czeka na drugie**. Stan chodzi własnym taktem także wtedy, gdy obraz
+stoi, bo wzmacniacz potrafi zamilknąć na kilka sekund. Ustępują sobie tylko na chwilę:
+zapytanie o stan nie wchodzi między klawisz a odpowiedź z ekranem, a odświeżenie ekranu nie
+wchodzi w trwające zapytanie o stan. Zmierzone przy obu otwartych oknach: stan odświeża się
+co **1,6 s** (mediana), obraz co **2,6 s**, a od kliknięcia klawisza do zmiany obrazu mija
+**0,7 s**. Bez tego wzajemnego ustępowania klatki gubiły się nawzajem z pytaniami o stan.
+
 ### Program kliencki na drugiej stronie pary
 
 Przez mostek może pracować zewnętrzny program — SPE Term albo
@@ -525,6 +533,10 @@ setupc change CNCA1 PortName=COM11,EmuBR=no,ExclusiveMode=no
 Uwaga: przeładowanie urządzenia com0com powoduje, że sterownik zapisuje te wartości z
 powrotem do rejestru.
 
+**Aktualizacja przerywa się z komunikatem o sumie SHA-256.** Pobrany plik nie jest tym, który
+wydano, albo wydanie nie podaje sumy. Program celowo niczego wtedy nie podmienia — pobierz nową
+wersję ręcznie ze [strony wydań](https://github.com/sq9fk/rotorpanel/releases).
+
 **Mostek łączy się i natychmiast rozłącza.** Sprawdź, czy `ser2net` po stronie Pi na pewno
 działa — każdy port przyjmuje **jedno** połączenie na raz.
 
@@ -599,13 +611,15 @@ Klasy okien są dzielone na pliki częściowe, żeby żaden nie urósł ponad cz
 | `Com0Com.cs` | odczyt par z rejestru i wywołania `setupc` |
 | `SterownikAnten.cs` | odczyt nazw anten i przypisania nadajników ze sterownika |
 | `SpeForm.cs` | okno sterowania wzmacniaczem SPE: klawiatura i podgląd |
+| `StatusForm.cs` | okno stanu wzmacniacza: mierniki i pełna tabela pól ramki |
 | `StatusSpe.cs` | rozbiór odpowiedzi na `0x90` — model, pasmo, moc, temperatura |
 | `CzytnikSpe.cs` | wyjmowanie ramek statusu i ekranu ze strumienia do klienta |
 | `EkranSpe.cs` | rozbiór ramki `0x6A` na siatkę 40×8 i flagi kursora |
 | `PodgladLcd.cs` | rysowanie wyświetlacza z map bitowych |
 | `CzcionkaSpe.cs` | font ROM wyświetlacza, 256 glifów — **generowany**, patrz `narzedzia/wczytaj-rom.py` |
 | `narzedzia/` | generator tablicy z ROM-u i skrypty uczące map bitowych ze zdjęć — niezależny sprawdzian |
-| `Theme.cs`, `Ui.cs` | paleta oraz kontrolki własne: karta, dioda, znacznik |
+| `Theme.cs`, `Ui.cs` | paleta, kontrolki własne (karta, dioda, znacznik, linijka LED), dopasowanie okien do ekranu |
+| `Slad.cs` | ślad diagnostyczny mostka, włączany plikiem `slad.wlacz` |
 | `instalator/` | skrypty instalacyjne i skrypt składania paczki |
 | `ikona/` | generator ikony i gotowy plik `.ico` |
 
