@@ -25,9 +25,6 @@ public sealed class PodgladLcd : Control
     private const byte RamkaRogGorny = 0xA2;
     private const byte RamkaRogDolny = 0xA3;
 
-    /// <summary>Od tego kodu w gore ida kafelki logo - te rysujemy mapa bitowa.</summary>
-    private const byte Logo = 0xB0;
-
     // Kafelki, z ktorych wzmacniacz sklada logo na ekranie glownym.
     private const byte LogoOd = 0xB0;
     private const byte LogoDo = 0xDF;
@@ -38,17 +35,15 @@ public sealed class PodgladLcd : Control
     private EkranSpe _ekran;
     private string _zastepczy = "";
 
-    // Kafelki przeskalowane do rozmiaru komorki. Klucz laczy kod, szerokosc
-    // i to, czy rysujemy w negatywie.
+    // Gotowe kafelki. Klucz laczy kod i to, czy rysujemy w negatywie.
     private readonly Dictionary<int, Bitmap> _pamiec = new();
-    private int _wysokoscKomorki;
 
     public PodgladLcd()
     {
         SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
         BackColor = TloEkranu;
-        Font = new Font("Consolas", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
+        Font = new Font("Consolas", 11f, FontStyle.Regular, GraphicsUnit.Point);
     }
 
     /// <summary>Ekran do pokazania albo null, gdy nie ma swiezego odczytu.</summary>
@@ -77,17 +72,17 @@ public sealed class PodgladLcd : Control
             return;
         }
 
-        // Szerokosc znaku bierzemy z pomiaru, zeby kolumny stoly rowno niezaleznie
-        // od tego, jaka czcionka o stalej szerokosci jest w systemie.
-        var miara = TextRenderer.MeasureText(g, new string('0', 10), Font,
-            new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
-        float szerokoscZnaku = miara.Width / 10f;
-        int wysokoscWiersza = miara.Height + 1;
+        // Komorka ma dokladnie taki rozmiar, w jakim nauczone sa kafelki. Dzieki temu
+        // rysujemy je jeden do jednego: kreski zostaja jednopikselowe i lacza sie
+        // miedzy komorkami, zamiast gubic kolumny przy skalowaniu.
+        int szerokoscZnaku = KafelkiSpe.Szerokosc;
+        int wysokoscWiersza = KafelkiSpe.Wysokosc;
 
-        int marginesX = Math.Max(4,
-            (int)((ClientSize.Width - szerokoscZnaku * EkranSpe.Kolumn) / 2));
-        int marginesY = Math.Max(2,
-            (ClientSize.Height - wysokoscWiersza * EkranSpe.Wierszy) / 2);
+        int marginesX = Math.Max(2, (ClientSize.Width - szerokoscZnaku * EkranSpe.Kolumn) / 2);
+        int marginesY = Math.Max(2, (ClientSize.Height - wysokoscWiersza * EkranSpe.Wierszy) / 2);
+
+        var miaraZnaku = TextRenderer.MeasureText(g, "0", Font,
+            new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
 
         using var pedzelZaznaczenia = new SolidBrush(Litery);
 
@@ -99,20 +94,16 @@ public sealed class PodgladLcd : Control
             {
                 byte bajt = _ekran.Bajty[w][k];
 
-                // Komorki maja szerokosc ulamkowa, wiec kolejne zaczynaja sie raz co
-                // 11, raz co 12 pikseli. Rysowanie kafelka zaokraglonego w gore gubilo
-                // jego ostatnia kolumne - a wlasnie tam siedzi pionowa kreska.
-                int x = (int)(marginesX + k * szerokoscZnaku);
-                int szerKomorki = Math.Max(1, (int)(marginesX + (k + 1) * szerokoscZnaku) - x);
+                int x = marginesX + k * szerokoscZnaku;
 
                 bool zaznaczone = w < _ekran.Zaznaczone.Length &&
                                   k < _ekran.Zaznaczone[w].Length &&
                                   _ekran.Zaznaczone[w][k];
 
                 if (zaznaczone)
-                    g.FillRectangle(pedzelZaznaczenia, x, y, szerKomorki, wysokoscWiersza);
+                    g.FillRectangle(pedzelZaznaczenia, x, y, szerokoscZnaku, wysokoscWiersza);
 
-                var kafelek = Kafelek(bajt, szerKomorki, wysokoscWiersza, zaznaczone);
+                var kafelek = Kafelek(bajt, zaznaczone);
                 if (kafelek is not null)
                 {
                     g.DrawImageUnscaled(kafelek, x, y);
@@ -124,7 +115,11 @@ public sealed class PodgladLcd : Control
 
                 Color kolor = zaznaczone ? TloEkranu : Litery;
 
-                TextRenderer.DrawText(g, znak.ToString(), Font, new Point(x, y), kolor,
+                // Znak stawiamy na srodku komorki, bo czcionka jest wezsza niz kafelek.
+                var gdzie = new Point(x + (szerokoscZnaku - miaraZnaku.Width) / 2,
+                                      y + (wysokoscWiersza - miaraZnaku.Height) / 2);
+
+                TextRenderer.DrawText(g, znak.ToString(), Font, gdzie, kolor,
                     TextFormatFlags.NoPadding);
             }
         }
@@ -134,41 +129,25 @@ public sealed class PodgladLcd : Control
     /// Kafelek nauczony ze zrzutu, przeskalowany do rozmiaru komorki, albo null,
     /// gdy kodu nie znamy albo lepiej narysowac go znakiem.
     ///
-    /// Kreski, ramki i strzalki idą znakami ramek: sa ostrzejsze, a kafelek z kreska
-    /// przy samej krawedzi komorki gubil swoja jedyna kolumne przy skalowaniu.
-    /// Kafelki zostaja tam, gdzie znaku nie ma - czyli w logo.
+    /// Kafelki sa nauczone w rozmiarze komorki, wiec rysujemy je jeden do jednego -
+    /// bez skalowania, ktore gubilo jednopikselowe kreski.
     /// </summary>
-    private Bitmap Kafelek(byte kod, int szerokosc, int wysokosc, bool negatyw)
+    private Bitmap Kafelek(byte kod, bool negatyw)
     {
-        if (kod < Logo) return null;
         if (!KafelkiSpe.Mapy.TryGetValue(kod, out var mapa)) return null;
-        if (szerokosc <= 0 || wysokosc <= 0) return null;
 
-        if (_wysokoscKomorki != wysokosc)
-        {
-            foreach (var b in _pamiec.Values) b.Dispose();
-            _pamiec.Clear();
-            _wysokoscKomorki = wysokosc;
-        }
-
-        int klucz = kod | (negatyw ? 0x100 : 0) | (szerokosc << 9);
+        int szerokosc = KafelkiSpe.Szerokosc;
+        int wysokosc = KafelkiSpe.Wysokosc;
+        int klucz = kod | (negatyw ? 0x100 : 0);
         if (_pamiec.TryGetValue(klucz, out var gotowy)) return gotowy;
 
         var obraz = new Bitmap(szerokosc, wysokosc);
         Color tusz = negatyw ? TloEkranu : Litery;
 
-        for (int y = 0; y < wysokosc; y++)
-        {
-            int zy = y * KafelkiSpe.Wysokosc / wysokosc;
-            ushort wiersz = mapa[Math.Min(zy, mapa.Length - 1)];
-
+        for (int y = 0; y < wysokosc && y < mapa.Length; y++)
             for (int x = 0; x < szerokosc; x++)
-            {
-                int zx = x * KafelkiSpe.Szerokosc / szerokosc;
-                bool zapalony = (wiersz >> (KafelkiSpe.Szerokosc - 1 - zx) & 1) != 0;
-                if (zapalony) obraz.SetPixel(x, y, tusz);
-            }
-        }
+                if ((mapa[y] >> (szerokosc - 1 - x) & 1) != 0)
+                    obraz.SetPixel(x, y, tusz);
 
         _pamiec[klucz] = obraz;
         return obraz;

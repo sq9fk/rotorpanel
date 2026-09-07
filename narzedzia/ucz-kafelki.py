@@ -22,7 +22,9 @@ RAMKA = sys.argv[2]
 SZER, WYS, STRIDE = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 WYJSCIE = sys.argv[6] if len(sys.argv) > 6 else os.path.join(K, "..", "KafelkiSpe.cs")
 KOLUMN, WIERSZY = 40, 8
-KOM_SZER, KOM_WYS = 10, 14
+# Rozdzielczosc kafelka rowna rozmiarowi komorki na ekranie - program rysuje je
+# wtedy jeden do jednego i kreski zostaja o grubosci jednego piksela.
+KOM_SZER, KOM_WYS = 12, 22
 PRZES_X, PRZES_Y = 2.9, 0.3
 
 dane = open(ZRZUT, "rb").read()
@@ -32,11 +34,64 @@ krok_x = SZER / KOLUMN
 krok_y = WYS / WIERSZY
 
 
-def tusz(x, y):
+def _tusz_zrodlowy(x, y):
     if not (0 <= x < SZER and 0 <= y < WYS):
         return False
     i = y * STRIDE + x * 4
     return (dane[i] + dane[i + 1] + dane[i + 2]) / 3 < 128
+
+
+def scienij(maska, szer=None, wys=None):
+    """Zhang-Suen: sprowadza kreski do grubosci jednego piksela.
+
+    Na wyswietlaczu kreski maja jeden piksel, ale na zrzucie sa grubsze i po
+    przeniesieniu do kafelkow logo wychodzilo nierowno. Scienienie daje linie
+    o stalej grubosci, takiej jak ramka."""
+    m = [wiersz[:] for wiersz in maska]
+    szer = szer or SZER
+    wys = wys or WYS
+    zmiana = True
+
+    def sasiedzi(x, y):
+        return [m[y - 1][x], m[y - 1][x + 1], m[y][x + 1], m[y + 1][x + 1],
+                m[y + 1][x], m[y + 1][x - 1], m[y][x - 1], m[y - 1][x - 1]]
+
+    while zmiana:
+        zmiana = False
+        for krok in (0, 1):
+            doUsuniecia = []
+            for y in range(1, wys - 1):
+                for x in range(1, szer - 1):
+                    if not m[y][x]:
+                        continue
+                    s8 = sasiedzi(x, y)
+                    ile = sum(s8)
+                    if not (2 <= ile <= 6):
+                        continue
+                    przejsc = sum(1 for i in range(8)
+                                  if s8[i] == 0 and s8[(i + 1) % 8] == 1)
+                    if przejsc != 1:
+                        continue
+                    p2, p3, p4, p5, p6, p7 = s8[0], s8[1], s8[2], s8[3], s8[4], s8[5]
+                    if krok == 0:
+                        if p2 * p4 * p6 or p4 * p6 * s8[6]:
+                            continue
+                    else:
+                        if p2 * p4 * s8[6] or p2 * p6 * s8[6]:
+                            continue
+                    doUsuniecia.append((x, y))
+            for x, y in doUsuniecia:
+                m[y][x] = 0
+                zmiana = True
+    return m
+
+
+MASKA = scienij([[1 if _tusz_zrodlowy(x, y) else 0 for x in range(SZER)]
+                 for y in range(WYS)])
+
+
+def tusz(x, y):
+    return 0 <= x < SZER and 0 <= y < WYS and MASKA[y][x] == 1
 
 
 def komorka(wiersz, kolumna):
@@ -46,9 +101,53 @@ def komorka(wiersz, kolumna):
     for wy in range(KOM_WYS):
         bity = 0
         for wx in range(KOM_SZER):
-            px = int(x0 + (wx + 0.5) * krok_x / KOM_SZER)
-            py = int(y0 + (wy + 0.5) * krok_y / KOM_WYS)
-            if tusz(px, py):
+            # Bierzemy caly wycinek, a nie jego srodek: kreski na wyswietlaczu maja
+            # jeden piksel i przy probkowaniu punktowym wypadaly, robiac dziury w logo.
+            ax = x0 + wx * krok_x / KOM_SZER
+            ay = y0 + wy * krok_y / KOM_WYS
+            bx = x0 + (wx + 1) * krok_x / KOM_SZER
+            by = y0 + (wy + 1) * krok_y / KOM_WYS
+
+            zapalony = False
+            px = int(ax)
+            while px <= int(bx) and not zapalony:
+                py = int(ay)
+                while py <= int(by):
+                    if tusz(px, py):
+                        zapalony = True
+                        break
+                    py += 1
+                px += 1
+
+            if zapalony:
+                bity |= 1 << (KOM_SZER - 1 - wx)
+        wynik.append(bity)
+    return tuple(wynik)
+
+
+# Skladamy caly ekran w docelowej rozdzielczosci i scieniamy go tam, gdzie bedzie
+# rysowany - inaczej powiekszenie z 9,6 piksela na 12 rozdmuchuje kreski do dwoch.
+SIATKA_SZER = KOLUMN * KOM_SZER
+SIATKA_WYS = WIERSZY * KOM_WYS
+siatka = [[0] * SIATKA_SZER for _ in range(SIATKA_WYS)]
+
+for w in range(WIERSZY):
+    for k in range(KOLUMN):
+        bity = komorka(w, k)
+        for wy in range(KOM_WYS):
+            for wx in range(KOM_SZER):
+                if (bity[wy] >> (KOM_SZER - 1 - wx)) & 1:
+                    siatka[w * KOM_WYS + wy][k * KOM_SZER + wx] = 1
+
+siatka = scienij(siatka, SIATKA_SZER, SIATKA_WYS)
+
+
+def z_siatki(wiersz, kolumna):
+    wynik = []
+    for wy in range(KOM_WYS):
+        bity = 0
+        for wx in range(KOM_SZER):
+            if siatka[wiersz * KOM_WYS + wy][kolumna * KOM_SZER + wx]:
                 bity |= 1 << (KOM_SZER - 1 - wx)
         wynik.append(bity)
     return tuple(wynik)
@@ -66,7 +165,7 @@ for w in range(WIERSZY):
         # (pasmo, temperatura) nie odpowiadaja swoim kodom.
         if kod < 0x80:
             continue
-        zebrane[kod].append(komorka(w, k))
+        zebrane[kod].append(z_siatki(w, k))
 
 # gdy kod wystapil kilka razy, bierzemy najczestszy wyglad
 kafelki = {}
@@ -91,7 +190,7 @@ linie = []
 for kod in sorted(kafelki):
     wiersze = kafelki[kod][0]
     linie.append("        { 0x%02X, new ushort[] { %s } }," % (
-        kod, ", ".join("0x%03X" % w for w in wiersze)))
+        kod, ", ".join("0x%04X" % w for w in wiersze)))
 
 zrodlo = """namespace RotorPanel;
 

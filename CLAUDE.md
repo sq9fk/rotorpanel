@@ -146,11 +146,19 @@ czekanie na nastepny naglowek opoznialo podglad o cale odpytanie, bo kolejna ram
 dopiero przy nastepnym pulsie. `CzytnikSpe` bierze wiec typowa dlugosc (367 bajtow), gdy juz ja
 ma, a na synchronizacje czeka tylko wtedy, gdy ramka jest krotsza.
 
-**Kafelkami rysujemy tylko logo, reszte znakami.** Nauczony kafelek pionowej kreski (`0x8F`)
-ma zapalona jedynie ostatnia kolumne i przy skalowaniu do komorki gubil ja - separatory miedzy
-polami paska stanu po prostu znikaly, choc kod byl w slowniku i w ramce. Kreski, ramki, strzalki
-i stopien ida wiec znakami ramek (sa przy okazji ostrzejsze), a mapy bitowe zostaja dla kodow od
-`0xB0`, czyli dla logo, ktorego zadnym znakiem nie zastapisz.
+**Ucz kafelki w tej samej rozdzielczosci, w jakiej je rysujesz.** Komorka na ekranie ma
+12 na 22 piksele i tyle samo maja kafelki - rysujemy je jeden do jednego, bez skalowania.
+Wczesniej uczylem ich w 10 na 14 i skalowalem: jednopikselowe kreski gubily kolumny (znikaly
+separatory), a logo mialo przerwy i nierowna grubosc. Siatke stawiamy na calkowitych
+wielokrotnosciach rozmiaru komorki, wiec pionowe kreski lacza sie miedzy wierszami.
+
+**Kreski scieniamy dwa razy.** Na zrzucie maja dwa-trzy piksele, wiec `narzedzia/ucz-kafelki.py`
+robi Zhang-Suen najpierw na samym zrzucie, potem jeszcze raz na zlozonej siatce w docelowej
+skali. Bez tego drugiego przejscia powiekszenie z 9,6 piksela na 12 rozdmuchiwalo kreski.
+
+**Kafelki rysujemy dla wszystkich nauczonych kodow.** Po przejsciu na rysowanie jeden do jednego nie ma juz powodu
+zastepowac ich znakami - kreski, ramki, strzalki i logo ida z map bitowych. Znak jest tylko
+zapasem, gdy kodu nie ma w slowniku.
 
 **Kafelki graficzne sa nauczone ze zrzutu, nie zgadniete.** `narzedzia/ucz-kafelki.py` dopasowuje
 zrzut ekranu do siatki 40x8 i wiaze kazda komorke z kodem z ramki `0x6A`; wynik to `KafelkiSpe.cs`.
