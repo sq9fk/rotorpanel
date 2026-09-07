@@ -32,7 +32,13 @@ public sealed class StrumienTelnet : Stream
 
     private const byte BezPrzeplywu = 1;    // SET-CONTROL: brak sterowania przeplywem
     private const byte DtrWlacz     = 8;
-    private const byte RtsWlacz     = 11;
+
+    // 11 to w RFC 2217 **wylaczenie** RTS - nazwa "RtsWlacz" klamala, choc wartosc
+    // byla wlasciwa. I dobrze, bo na tej linii wisi wlacznik zasilania wzmacniacza:
+    // AetherSDR ma to sprawdzone na stole (design note SS9) - DTR wysoko, RTS nisko
+    // w spoczynku, a wlaczanie jedzie impulsem na samym RTS. Trzymanie RTS wysoko
+    // wystawia na wzmacniaczu ostrzezenie "Power switch held by remote".
+    private const byte RtsWylacz    = 11;
 
     private enum Stan { Dane, PoIac, Negocjacja, Podnegocjacja, PodnegocjacjaIac }
 
@@ -86,7 +92,7 @@ public sealed class StrumienTelnet : Stream
         // te linie opuszczone, dopoki klient ich nie podniesie - stad te trzy polecenia.
         polecenia.AddRange(Podnegocjacja(PolecSterowanie, BezPrzeplywu));
         polecenia.AddRange(Podnegocjacja(PolecSterowanie, DtrWlacz));
-        polecenia.AddRange(Podnegocjacja(PolecSterowanie, RtsWlacz));
+        polecenia.AddRange(Podnegocjacja(PolecSterowanie, RtsWylacz));
 
         var tablica = polecenia.ToArray();
         await _siec.WriteAsync(tablica, 0, tablica.Length, ct);

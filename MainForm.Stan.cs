@@ -168,10 +168,11 @@ public partial class MainForm
 
         // Przy znanym modelu robimy miejsce na drugi przycisk - sterowanie panelem.
         var przelacz = PrzyciskPrzelaczania(karta, m, u.Spe ? 8 : 21);
+        Button sterowanie = null;
 
         if (u.Spe)
         {
-            var sterowanie = Ui.Przycisk("Sterowanie…", 92, glowny: false);
+            sterowanie = Ui.Przycisk("Sterowanie…", 92, glowny: false);
             sterowanie.Location = new Point(408, 40);
             sterowanie.Click += (_, _) =>
             {
@@ -184,6 +185,7 @@ public partial class MainForm
         _ui["u" + u.Nr] = new Wiersz
         {
             Mostek = m, Dioda = dioda, Stan = stan, Ruch = ruch, Przelacz = przelacz,
+            Sterowanie = sterowanie,
             Spe = u.Spe ? etykietaTrasy : null, Klopot = klopot, Trasa = trasa
         };
         return karta;
@@ -197,6 +199,23 @@ public partial class MainForm
     private void OdswiezSpe(Wiersz u, Mostek m)
     {
         if (u.Spe is null) return;
+
+        // Gdy do pary wpiety jest program kliencki, sterowanie z naszej strony jest
+        // wylaczone - wzmacniacz ma jednego pana naraz, a nasze pulsy RCU zabieralyby
+        // klientowi ramki. Otwarte okno zamykamy samo.
+        if (u.Sterowanie is not null)
+        {
+            bool klient = m.KlientNaPorcie;
+            u.Sterowanie.Enabled = !klient;
+            u.Sterowanie.ForeColor = klient ? Theme.TekstSzary : Theme.Tekst;
+            u.Sterowanie.Cursor = klient ? Cursors.Default : Cursors.Hand;
+
+            _dymek.SetToolTip(u.Sterowanie, klient
+                ? "Portem steruje program po drugiej stronie pary — zamknij go, żeby przejąć."
+                : "Klawiatura panelu i podgląd wyświetlacza.");
+
+            if (klient) SpeForm.ZamknijOtwarte(m);
+        }
 
         var status = m.Status;
         bool swiezy = status is not null &&

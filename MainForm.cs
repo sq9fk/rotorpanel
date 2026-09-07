@@ -26,6 +26,7 @@ public partial class MainForm : Form
         public Label Stan;
         public Label Ruch;
         public Button Przelacz;
+        public Button Sterowanie;
         public Znacznik[] Trx;
         public Label Spe;
         public Znacznik Klopot;

@@ -321,6 +321,51 @@ stanu". Teraz pętla bierze **najwcześniejszy** nagłówek `AA AA AA`, patrzy n
 (`0x43` status, `0x6A` ekran) i dopiero wtedy decyduje. Potwierdzenia i wszystko inne idą do
 klienta.
 
+**Ustaw 8N1 na swojej stronie pary com0com — inaczej ginie ósmy bit każdego bajtu.**
+To była przyczyna tego, że **żaden** zewnętrzny program nie działał przez mostek: ani SPE Term,
+ani AetherSDR. com0com nie dziedziczy ustawień z drugiej strony pary, a świeżo otwarty port ma
+domyślne **1200 7-E-1**; przy siedmiu bitach danych sterownik obcina najstarszy bit. Zmierzone
+w śladzie: AetherSDR wysyłał `0x90` (zapytanie o status), a do wzmacniacza szło `0x10` — czyli
+**strzałka w prawo**, 1523 razy w trzy minuty. Term wysyłał `0x80` (włączenie podglądu ekranu),
+a szło `0x00`. Dlatego oba programy tylko pingowały i poddawały się, a wzmacniacz przez ten czas
+wędrował po menu.
+
+Mylące było to, że **nasze własne odpytywanie działało poprawnie** — piszemy prosto do gniazda
+TCP i przez parę w ogóle nie przechodzimy. Karta pokazywała stan, licznik UART kontrolera rósł
+w obie strony, a klient nie dostawał nic. Jeśli kiedyś znów pojawi się taki obraz — u nas dobrze,
+u klienta pusto — najpierw sprawdź, co naprawdę wychodzi z pary, a nie co powinno.
+
+`PortIo.UstawOsiemBitow` woła `SetCommState` zaraz po otwarciu. To **co innego** niż odczytywanie
+parametrów z pary, żeby podać je dalej przez RFC 2217 — tamtego nie da się zrobić i tamten kod
+słusznie poszedł.
+
+**Zapis na port nie może czekać na odczyt.** Domyślne `ReadAsync` i `WriteAsync` klasy `Stream`
+przepuszczają obie operacje przez **jeden wspólny semafor na strumień**. Pompa odczytu prawie
+zawsze siedzi w `ReadFile`, więc każdy zapis czekał, aż tamten skończy — przy limicie odczytu
+200 ms dawało to medianę 92 ms i średnią 312 ms na sześciobajtową ramkę. `StrumienPortu` ma
+własne `ReadAsync`/`WriteAsync` omijające ten semafor, a limit odczytu zszedł do 25 ms. To jest
+też prawdziwa przyczyna zapisu zmierzonego kiedyś jako „2,77 s na sześć bajtów" — kolejka
+`Oddaj`/`PisarzPortu` leczyła objaw.
+
+**Nie oddawaj klientowi ramek w kawałkach.** `CzytnikSpe` zostawiał sobie zawsze dwa ostatnie
+bajty „na wypadek przeciętego nagłówka", przez co sześciobajtowe potwierdzenie szło do klienta
+jako 4 i 2 bajty, oddalone o kilkadziesiąt milisekund. Teraz zatrzymujemy **tylko końcowe bajty
+`0xAA`**, bo tylko one mogą być początkiem nagłówka.
+
+**Gdy do pary wpięty jest klient, milczymy i blokujemy sterowanie.** Wzmacniacz ma jednego pana
+naraz. Klienta wykrywamy trzema sposobami, od najszybszego: świeży ruch od strony portu (do 5 s),
+linie CTS/DSR, a po dziesięciu sekundach ciszy — próba otwarcia drugiej strony pary. Ten ostatni
+sposób jest jedynym, który wykryje klienta trzymającego port otwarty i milczącego, i **to on
+decyduje, kiedy sterowanie wraca**. Linie sterujące nie wystarczą: zmierzone — SPE Term ich nie
+podnosi. Próby nie robimy przy pracującym kliencie, żeby nie podebrać mu portu w chwili, gdy sam
+go otwiera.
+
+**Ślad diagnostyczny mostka.** Pusty plik `slad.wlacz` obok programu włącza zapis do `slad.txt`:
+bajty na każdym odcinku osobno, czas każdego zapisu na port i podgląd pierwszych bajtów ramki.
+Bez niego cała ta sprawa byłaby nie do rozwiązania — trzy kolejne hipotezy (zjadanie ramek
+statusu, linie DTR/RTS, opóźnienia) okazały się nietrafione albo niewystarczające, a rozstrzygnął
+dopiero widok tego, co naprawdę wychodzi z pary.
+
 **Zdejmuj ze strumienia tylko tyle ramek statusu, ile sam zamówiłeś.** `Mostek` przy
 `Urzadzenie.Spe` wstrzykuje własne zapytanie `0x90` raz na sekundę, a `CzytnikSpe` wyjmuje
 odpowiedzi, żeby nie trafiły do klienta, który o nie nie prosił. Pierwsza wersja zjadała

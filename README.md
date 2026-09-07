@@ -191,6 +191,20 @@ Odpowiedzi na własne zapytania mostek **zdejmuje ze strumienia** — program po
 pary portów o nie nie prosił i nie ma powodu ich oglądać. Wszystko inne przechodzi nietknięte,
 więc program sterujący (na przykład SPE Term) działa równolegle.
 
+### Program kliencki na drugiej stronie pary
+
+Przez mostek może pracować zewnętrzny program — SPE Term albo
+[AetherSDR](https://github.com/aethersdr/AetherSDR). Wtedy **RotorPanel milknie**: przestaje
+odpytywać wzmacniacz o status, przycisk *Sterowanie…* jest wyszarzony, a otwarte okno sterowania
+zamyka się samo. Wzmacniacz ma jednego pana naraz — dwa źródła poleceń gubią sobie nawzajem
+ramki. Sterowanie wraca, gdy druga strona pary jest naprawdę wolna, a nie gdy klient chwilowo
+zamilkł.
+
+Gdyby program kliencki nie odczytywał nic mimo działającego mostka, pomaga ślad diagnostyczny:
+połóż obok pliku programu pusty plik `slad.wlacz`, a mostek zapisze do `slad.txt` ruch na każdym
+odcinku osobno wraz z czasami. Tak właśnie znalazła się przyczyna, dla której żaden klient
+początkowo nie działał — para com0com obcinała ósmy bit każdego bajtu.
+
 ### Kontroler i mostek nie dzielą się portem
 
 Zmierzone na RC-1216H: samo połączenie TCP, nawet z powitaniem Telnetu, niczego nie psuje —

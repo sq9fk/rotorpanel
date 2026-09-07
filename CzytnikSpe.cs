@@ -28,6 +28,9 @@ public sealed class CzytnikSpe
 
     public StatusSpe Status { get; private set; }
 
+    /// <summary>Ile wlasnych zapytan czeka na odpowiedz - do sladu diagnostycznego.</summary>
+    public int WlasneOczekujace => Volatile.Read(ref _wlasneOczekujace);
+
     /// <summary>Kiedy przyszla ramka statusu, o ktora nie pytalismy my.</summary>
     public DateTime OstatniObcyStatus { get; private set; } = DateTime.MinValue;
 
@@ -71,8 +74,15 @@ public sealed class CzytnikSpe
 
             if (poczatek < 0)
             {
-                // Koncowka moze byc poczatkiem naglowka przecietego miedzy odczytami.
-                int zostaw = Math.Min(2, _reszta.Count);
+                // Trzymamy tylko koncowe bajty synchronizacji - one moga byc poczatkiem
+                // naglowka przecietego miedzy odczytami. Wczesniej zostawaly zawsze dwa
+                // ostatnie bajty, przez co szesciobajtowe potwierdzenie szlo do klienta
+                // w kawalkach 4 i 2, oddalonych od siebie o kilkadziesiat milisekund.
+                int zostaw = 0;
+                while (zostaw < 2 && zostaw < _reszta.Count &&
+                       _reszta[_reszta.Count - 1 - zostaw] == Sync)
+                    zostaw++;
+
                 Oddaj(wyjscie, _reszta.Count - zostaw);
                 return wyjscie.ToArray();
             }

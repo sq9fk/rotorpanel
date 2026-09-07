@@ -34,6 +34,18 @@ public sealed class Mostek : IDisposable
     // Strumien do urzadzenia, zeby okno sterowania mialo gdzie wyslac kod klawisza.
     private volatile Stream _biezacaSiec;
 
+    // Strona pary od nas - z niej odczytujemy, czy ktos siedzi po drugiej stronie.
+    private volatile StrumienPortu _portPary;
+
+    // Kiedy ostatnio cokolwiek przyszlo od strony portu. To najpewniejszy dowod,
+    // ze klient jest podlaczony i pracuje - linie sterujace potrafia milczec.
+    private long _ostatniRuchKlienta;
+
+    // Wynik ostatniego sprawdzenia, czy druga strona pary jest zajeta, i jego czas.
+    // Sprawdzanie otwiera port, wiec robimy to najwyzej raz na dwie sekundy.
+    private bool _stronaKlientaZajeta;
+    private DateTime _kiedyBadanaStrona = DateTime.MinValue;
+
     public Polaczenie Punkt { get; }
     public string Adres => _cfg.AdresDla(Punkt);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
@@ -43,6 +55,47 @@ public sealed class Mostek : IDisposable
 
     /// <summary>Ostatni odczytany stan wzmacniacza SPE albo null.</summary>
     public StatusSpe Status => _status;
+
+    /// <summary>
+    /// Czy do drugiej strony pary com0com wpiety jest program kliencki. Wykrywane
+    /// dwojako: po liniach sterujacych portu (com0com laczy je miedzy stronami, wiec
+    /// otwarcie portu przez klienta podnosi nam CTS/DSR) albo po tym, ze przychodza
+    /// ramki statusu, o ktore nie pytalismy. Gdy klient jest, nie wtracamy sie:
+    /// wzmacniacz ma jednego pana naraz.
+    /// </summary>
+    public bool KlientNaPorcie
+    {
+        get
+        {
+            if (Stan != StanMostka.Polaczony) return false;
+
+            // Swiezy ruch od strony portu - klient nie tylko jest, ale pracuje.
+            long ostatni = Interlocked.Read(ref _ostatniRuchKlienta);
+            var odRuchu = ostatni == 0 ? TimeSpan.MaxValue
+                                       : DateTime.UtcNow - new DateTime(ostatni);
+            if (odRuchu < TimeSpan.FromSeconds(5)) return true;
+
+            if (_czytnikSpe?.KlientPytaSam == true) return true;
+
+            var port = _portPary;
+            if (port is not null && port.DrugaStronaAktywna()) return true;
+
+            // Klient moze miec port otwarty i milczec - wtedy widac go tylko po tym,
+            // ze nie da sie tego portu otworzyc. Stad pytanie: sterowanie wraca dopiero,
+            // gdy druga strona pary jest naprawde wolna.
+            // Probujemy dopiero po dluzszej ciszy. Kazda proba na moment otwiera port,
+            // wiec przy pracujacym kliencie moglibysmy mu go podebrac w chwili, gdy
+            // sam go otwiera - a tego robic nie wolno.
+            if (odRuchu > TimeSpan.FromSeconds(10) &&
+                DateTime.UtcNow - _kiedyBadanaStrona > TimeSpan.FromSeconds(5))
+            {
+                _kiedyBadanaStrona = DateTime.UtcNow;
+                _stronaKlientaZajeta = !string.IsNullOrWhiteSpace(Punkt.Com) &&
+                                       PortIo.Zajety(Punkt.Com);
+            }
+            return _stronaKlientaZajeta;
+        }
+    }
 
     /// <summary>Ostatnia zawartosc wyswietlacza albo null.</summary>
     public EkranSpe Ekran => _czytnikSpe?.Ekran;
@@ -112,6 +165,7 @@ public sealed class Mostek : IDisposable
 
                 port = PortIo.Otworz(Punkt.Dev);
                 _biezacyPort = port;
+                _portPary = port as StrumienPortu;
 
                 klient = new TcpClient();
                 _biezacyKlient = klient;
@@ -156,6 +210,7 @@ public sealed class Mostek : IDisposable
                 _biezacyPort = null;
                 _biezacaSiec = null;
                 _czytnikSpe = null;
+                _portPary = null;
 
                 try { siec?.Dispose(); } catch { }
                 try { klient?.Close(); } catch { }
@@ -205,11 +260,17 @@ public sealed class Mostek : IDisposable
                 continue;
             }
 
+            if (zPortu) Interlocked.Exchange(ref _ostatniRuchKlienta, DateTime.UtcNow.Ticks);
+
             if (czytnik is null)
             {
                 if (zPortu) Interlocked.Add(ref _tx, n);
                 else        Interlocked.Add(ref _rx, n);
             }
+
+            if (Slad.Wlaczony)
+                Slad.Zapisz((zPortu ? "port->siec " : "siec->port ") + n + " B: " +
+                            Slad.Podglad(bufor, n));
 
             if (czytnik is not null)
             {
@@ -219,6 +280,12 @@ public sealed class Mostek : IDisposable
                 var dalej = czytnik.Przepusc(bufor, n);
                 _status = czytnik.Status ?? _status;
                 Interlocked.Add(ref _rx, dalej.Length);
+
+                if (Slad.Wlaczony)
+                    Slad.Zapisz("  czytnik przepuscil " + dalej.Length + " z " + n +
+                                " B, wlasnych zapytan w toku " + czytnik.WlasneOczekujace +
+                                ", klient pyta sam: " + czytnik.KlientPytaSam);
+
                 if (dalej.Length == 0) continue;
 
                 Oddaj(dokad, dalej, ct);
@@ -257,6 +324,10 @@ public sealed class Mostek : IDisposable
         if (_kolejkaPortu.Count > 256) _kolejkaPortu.TryDequeue(out _);
         _kolejkaPortu.Enqueue(dane);
         _budzikPortu.Release();
+
+        if (Slad.Wlaczony)
+            Slad.Zapisz("  do kolejki portu " + dane.Length + " B, w kolejce " +
+                        _kolejkaPortu.Count);
     }
 
     private async Task PisarzPortu(Stream port, CancellationToken ct)
@@ -268,12 +339,19 @@ public sealed class Mostek : IDisposable
 
             try
             {
+                var zegar = System.Diagnostics.Stopwatch.StartNew();
                 await port.WriteAsync(dane, 0, dane.Length, ct);
                 await port.FlushAsync(ct);
+                if (Slad.Wlaczony)
+                    Slad.Zapisz("  zapisano na port " + dane.Length + " B w " +
+                                zegar.ElapsedMilliseconds + " ms");
             }
             catch (OperationCanceledException) { return; }
             catch (ObjectDisposedException) { return; }
-            catch { /* port zniknal - petla mostka to zauwazy */ }
+            catch (Exception ex)
+            {
+                Slad.Zapisz("  BLAD zapisu na port: " + ex.Message);
+            }
         }
     }
 
@@ -324,15 +402,19 @@ public sealed class Mostek : IDisposable
             // Przy otwartym podgladzie ekranu w ogole nie pytamy o status. Zmierzone:
             // zapytanie wciskajace sie miedzy puls a klatke opoznialo ja o ponad sekunde,
             // a stan i tak widac wtedy na samym ekranie wzmacniacza.
-            // Gdy po drugiej stronie pary siedzi program, ktory sam odpytuje o status
-            // (SPE Term, AetherSDR), nie dokladamy wlasnych zapytan - stan czytamy
-            // z jego ramek po drodze. Wzmacniacz ma wtedy o polowe mniej roboty,
-            // a zmierzone wczesniej: nadmiar ruchu gubi mu odpowiedzi.
-            if (_trybEkranu || czytnik.KlientPytaSam)
+            // Gdy do pary wpiety jest program kliencki (SPE Term, AetherSDR), milkniemy
+            // zupelnie - on jest wtedy panem lacza. Wykrywamy go po ruchu od strony
+            // portu: linie CTS/DSR potrafia milczec (zmierzone - Term ich nie podnosi),
+            // a wlasnych ramek statusu klient wcale nie musi zamawiac. Stan czytamy z jego ramek po drodze,
+            // a wzmacniacz nie dostaje podwojnego ruchu; zmierzone wczesniej: nadmiar
+            // zapytan gubi mu odpowiedzi.
+            if (_trybEkranu || KlientNaPorcie)
             {
                 await Task.Delay(500, ct);
                 continue;
             }
+
+            Slad.Zapisz("wysylam wlasne zapytanie 0x90");
 
             await _bramka.WaitAsync(ct);
             try
