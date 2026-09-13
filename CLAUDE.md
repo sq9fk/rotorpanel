@@ -91,6 +91,32 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Nastawa 208, ktorej nikt nie wydal: policzone, nie zgadniete.** Uczciwy rozkaz "obroc na
+208" to `57 30 35 36 38 01 30 30 30 30 01 2F 20`. Przeliczone dla wszystkich azymutow 0-359
+i wszystkich przeklaman, jakie moze dac lacze szeregowe (`narzedzia`-owy odpowiednik siedzi
+w stanowisku testowym, klasa `Skad208`):
+
+* **pojedynczy przekrecony bit** daje 208 tylko w **6** przypadkach i zawsze z azymutu
+  sasiedniego: 108, 168, 188, 200, 209, 218. Z dowolnego innego azymutu jeden bit 208 nie da,
+* **obciety bit 7** (lacze siedmiobitowe, ktore raz juz nas ugryzlo przy com0com) - **0**
+  przypadkow. Ta sciezka jest wykluczona,
+* **dostawiony bit parzystosci** - **0** przypadkow,
+* **sklejka ogona jednej ramki z glowa nastepnej** - **0** przypadkow.
+
+Wniosek: jesli sterownik dostaje 208, to ramka jest **poprawna i ktos ja naprawde wyslal**.
+Szukaj wiec nie przeklamania bitow, tylko **krzyzowania sie strumieni**: rozkaz dla jednego
+rotora trafiajacy do drugiego. Pierwsze miejsce do sprawdzenia jest po stronie Pi - regula
+udev dla PL2303 bez numeru seryjnego wiaze urzadzenie **po sciezce USB**, wiec po przelaczeniu
+sie urzadzenia `/dev/antA3S` moze wskazywac inny sterownik. To tlumaczy tez, czemu objaw
+wymaga **dwoch** pracujacych portow i czemu chodzi w parze z zolta dioda: przeenumerowanie
+urzadzenia zrywa polaczenie ser2neta.
+
+**Slad musi mowic, ktorego mostka dotyczy linia.** Przy dwoch pracujacych mostkach linie
+mieszaja sie ze soba i nie da sie powiedziec, do ktorego portu poszedl ktory bajt - a to jest
+pierwsze pytanie przy podejrzeniu przecieku. Kazda linia ma teraz podpis
+`etykieta [CNCB10 -> 192.168.6.3:4001]`, a dla mostkow rotorowych `SladSpid` rozbiera ramke
+na czytelne "NASTAWA 208 st." zamiast samego heksu.
+
 **Dane sprzed zestawienia lacza sa nieaktualne i nie wolno ich przepuscic.** Port jest
 otwierany **przed** polaczeniem z ser2netem i przez cala faze laczenia nikt z niego nie czyta -
 sterownik portu odklada wiec wszystko, co klient zdazy wpisac. PstRotator powtarza nastawe co

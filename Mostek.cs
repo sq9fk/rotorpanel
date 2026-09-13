@@ -143,7 +143,7 @@ public sealed class Mostek : IDisposable
                 _klientWykryty = wynik;
 
                 if (Slad.Wlaczony && zegar.ElapsedMilliseconds > 5)
-                    Slad.Zapisz("badanie klienta trwalo " + zegar.ElapsedMilliseconds + " ms");
+                    Zapisz("badanie klienta trwalo " + zegar.ElapsedMilliseconds + " ms");
             }
             catch { /* port zniknal - przy nastepnym badaniu sie wyjasni */ }
             finally { Interlocked.Exchange(ref _badanieWToku, 0); }
@@ -215,6 +215,23 @@ public sealed class Mostek : IDisposable
     }
 
     private bool OdpytywacSpe => Punkt is Urzadzenie { Spe: true };
+
+    /// <summary>
+    /// Podpis mostka w sladzie. Przy dwoch pracujacych mostkach linie sladu mieszaja sie
+    /// ze soba i bez tego nie sposob powiedziec, do ktorego portu poszedl ktory bajt -
+    /// a to jest pierwsze pytanie przy podejrzeniu, ze ruch przecieka miedzy mostkami.
+    /// </summary>
+    private string Podpis => Punkt.Etykieta + " [" + Punkt.Dev + " " + (char)0x2192 + " " +
+                             Adres + ":" + Punkt.Port + "] ";
+
+    private void Zapisz(string tekst) => Slad.Zapisz(Podpis + tekst);
+
+    /// <summary>Slad porcji danych; dla rotorow z rozebrana ramka SPID.</summary>
+    private void ZapiszRamke(string kierunek, byte[] dane, int ile)
+    {
+        string opis = OdpytywacSpe ? "" : "   " + SladSpid.Opis(dane, ile);
+        Slad.Zapisz(Podpis + kierunek + " " + ile + " B: " + Slad.Podglad(dane, ile) + opis);
+    }
 
     public Mostek(Config cfg, Polaczenie punkt)
     {
@@ -293,8 +310,7 @@ public sealed class Mostek : IDisposable
                 // StrumienPortu.Wyczysc. Musi poleciec, zanim ruszy pompa.
                 int zalegalo = (port as StrumienPortu)?.Wyczysc() ?? 0;
                 if (zalegalo > 0)
-                    Slad.Zapisz("port " + Punkt.Dev + ": odrzucono " + zalegalo +
-                                " B zalegle z czasu laczenia");
+                    Zapisz("odrzucono " + zalegalo + " B zaleglych z czasu laczenia");
 
                 _kolejkaPortu = new System.Collections.Concurrent.ConcurrentQueue<byte[]>();
                 _budzikPortu = new SemaphoreSlim(0);
@@ -385,13 +401,12 @@ public sealed class Mostek : IDisposable
                 if (odSynchronizacji.ElapsedMilliseconds > 1000)
                 {
                     czekamNaCisze = false;
-                    Slad.Zapisz("port->siec cisza nie nadeszla w 1 s - przepuszczam dalej");
+                    Zapisz("port->siec cisza nie nadeszla w 1 s - przepuszczam dalej");
                 }
                 else
                 {
                     if (Slad.Wlaczony)
-                        Slad.Zapisz("port->siec ODRZUCONO " + n + " B przed pierwsza cisza: " +
-                                    Slad.Podglad(bufor, n));
+                        ZapiszRamke("port->siec ODRZUCONO przed cisza:", bufor, n);
                     continue;
                 }
             }
@@ -405,8 +420,7 @@ public sealed class Mostek : IDisposable
             }
 
             if (Slad.Wlaczony)
-                Slad.Zapisz((zPortu ? "port->siec " : "siec->port ") + n + " B: " +
-                            Slad.Podglad(bufor, n));
+                ZapiszRamke(zPortu ? "port->siec" : "siec->port", bufor, n);
 
             if (czytnik is not null)
             {
@@ -418,7 +432,7 @@ public sealed class Mostek : IDisposable
                 Interlocked.Add(ref _rx, dalej.Length);
 
                 if (Slad.Wlaczony)
-                    Slad.Zapisz("  czytnik przepuscil " + dalej.Length + " z " + n +
+                    Zapisz("  czytnik przepuscil " + dalej.Length + " z " + n +
                                 " B, wlasnych zapytan w toku " + czytnik.WlasneOczekujace +
                                 ", klient pyta sam: " + czytnik.KlientPytaSam);
 
@@ -462,8 +476,7 @@ public sealed class Mostek : IDisposable
         _budzikPortu.Release();
 
         if (Slad.Wlaczony)
-            Slad.Zapisz("  do kolejki portu " + dane.Length + " B, w kolejce " +
-                        _kolejkaPortu.Count);
+            Zapisz("  do kolejki portu " + dane.Length + " B, w kolejce " + _kolejkaPortu.Count);
     }
 
     private async Task PisarzPortu(Stream port, CancellationToken ct)
@@ -479,14 +492,14 @@ public sealed class Mostek : IDisposable
                 await port.WriteAsync(dane, 0, dane.Length, ct);
                 await port.FlushAsync(ct);
                 if (Slad.Wlaczony)
-                    Slad.Zapisz("  zapisano na port " + dane.Length + " B w " +
-                                zegar.ElapsedMilliseconds + " ms");
+                    Zapisz("  zapisano na port " + dane.Length + " B w " +
+                           zegar.ElapsedMilliseconds + " ms");
             }
             catch (OperationCanceledException) { return; }
             catch (ObjectDisposedException) { return; }
             catch (Exception ex)
             {
-                Slad.Zapisz("  BLAD zapisu na port: " + ex.Message);
+                Zapisz("  BLAD zapisu na port: " + ex.Message);
             }
         }
     }
@@ -580,7 +593,7 @@ public sealed class Mostek : IDisposable
                 continue;
             }
 
-            Slad.Zapisz("wysylam wlasne zapytanie 0x90");
+            Zapisz("wysylam wlasne zapytanie 0x90");
 
             await _bramka.WaitAsync(ct);
             try
