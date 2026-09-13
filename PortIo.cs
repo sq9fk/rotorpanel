@@ -50,6 +50,25 @@ public static class PortIo
     private static extern bool EscapeCommFunction(SafeFileHandle h, uint funkcja);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern bool PurgeComm(SafeFileHandle h, uint co);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern bool ClearCommError(SafeFileHandle h, out uint bledy, out COMSTAT stan);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct COMSTAT
+    {
+        public uint Flagi;
+        public uint cbInQue;
+        public uint cbOutQue;
+    }
+
+    internal const uint PURGE_TXABORT = 0x0001;
+    internal const uint PURGE_RXABORT = 0x0002;
+    internal const uint PURGE_TXCLEAR = 0x0004;
+    internal const uint PURGE_RXCLEAR = 0x0008;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetCommState(SafeFileHandle h, ref DCB dcb);
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -236,6 +255,33 @@ internal sealed class StrumienPortu : Stream
     public override void Flush() { }
     public override long Seek(long o, SeekOrigin s) => throw new NotSupportedException();
     public override void SetLength(long v) => throw new NotSupportedException();
+
+    /// <summary>
+    /// Wyrzuca to, co zalega w buforach portu, i zwraca, ile bajtow bylo do odbioru.
+    ///
+    /// **To jest zabezpieczenie, nie sprzatanie.** Port jest otwarty przez caly czas
+    /// laczenia z ser2netem, a w tym czasie nikt z niego nie czyta - sterownik portu
+    /// odklada wiec wszystko, co program kliencki zdazy wpisac. PstRotator powtarza
+    /// nastawe co sekunde, dopoki rotor nie stanie na azymucie, wiec kilkanascie sekund
+    /// zoltej diody to kilkanascie ramek "obroc sie na X" czekajacych w buforze. W chwili
+    /// zestawienia lacza poszlyby wszystkie naraz do sterownika rotora - i antena
+    /// zaczelaby sie krecic na polecenie sprzed minuty.
+    ///
+    /// Dane sprzed zestawienia lacza sa z definicji nieaktualne. Nastawa, ktora nie
+    /// dotarla, ma przepasc, a nie dotrzec pozniej.
+    /// </summary>
+    public int Wyczysc()
+    {
+        int zalegalo = 0;
+        try
+        {
+            if (PortIo.ClearCommError(_h, out _, out var stan)) zalegalo = (int)stan.cbInQue;
+            PortIo.PurgeComm(_h, PortIo.PURGE_RXCLEAR | PortIo.PURGE_TXCLEAR |
+                                 PortIo.PURGE_RXABORT | PortIo.PURGE_TXABORT);
+        }
+        catch { /* port mogl wlasnie zniknac */ }
+        return zalegalo;
+    }
 
     public override int Read(byte[] bufor, int offset, int ile)
     {

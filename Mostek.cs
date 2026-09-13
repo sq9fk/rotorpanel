@@ -289,6 +289,13 @@ public sealed class Mostek : IDisposable
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
                 _czytnikSpe = czytnik;
 
+                // Bufor portu zbieral dane przez caly czas laczenia - patrz
+                // StrumienPortu.Wyczysc. Musi poleciec, zanim ruszy pompa.
+                int zalegalo = (port as StrumienPortu)?.Wyczysc() ?? 0;
+                if (zalegalo > 0)
+                    Slad.Zapisz("port " + Punkt.Dev + ": odrzucono " + zalegalo +
+                                " B zalegle z czasu laczenia");
+
                 _kolejkaPortu = new System.Collections.Concurrent.ConcurrentQueue<byte[]>();
                 _budzikPortu = new SemaphoreSlim(0);
                 var pisarz = PisarzPortu(port, ct);
@@ -348,6 +355,19 @@ public sealed class Mostek : IDisposable
                              CancellationToken ct)
     {
         var bufor = new byte[1024];
+
+        // Zaczynamy od granicy ramki. Czyszczenie bufora moglo trafic w srodek ramki,
+        // ktora klient wlasnie wpisywal - jej ogon, puszczony dalej, przesunalby
+        // sterownikowi caly strumien i kolejna ramka zlozylaby mu sie z polowek dwoch
+        // roznych. Cisza na porcie (odczyt bez danych, limit 25 ms) to jedyny znak
+        // granicy, jaki mamy bez wnikania w protokol.
+        bool czekamNaCisze = zPortu;
+
+        // Bezpiecznik: gdyby klient z jakiegos powodu nadawal bez przerwy, mostek nie
+        // moze utknac w odrzucaniu na zawsze - to byloby gorsze niz to, przed czym
+        // bronimy, bo wygladaloby na dzialajace polaczenie, ktore nic nie przepuszcza.
+        var odSynchronizacji = System.Diagnostics.Stopwatch.StartNew();
+
         while (!ct.IsCancellationRequested)
         {
             int n = await skad.ReadAsync(bufor, 0, bufor.Length, ct);
@@ -356,7 +376,24 @@ public sealed class Mostek : IDisposable
             {
                 // Z portu zero oznacza cisze na linii, z sieci - zerwane polaczenie.
                 if (!zPortu) return;
+                czekamNaCisze = false;
                 continue;
+            }
+
+            if (czekamNaCisze)
+            {
+                if (odSynchronizacji.ElapsedMilliseconds > 1000)
+                {
+                    czekamNaCisze = false;
+                    Slad.Zapisz("port->siec cisza nie nadeszla w 1 s - przepuszczam dalej");
+                }
+                else
+                {
+                    if (Slad.Wlaczony)
+                        Slad.Zapisz("port->siec ODRZUCONO " + n + " B przed pierwsza cisza: " +
+                                    Slad.Podglad(bufor, n));
+                    continue;
+                }
             }
 
             if (zPortu) Interlocked.Exchange(ref _ostatniRuchKlienta, DateTime.UtcNow.Ticks);

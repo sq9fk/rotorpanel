@@ -562,6 +562,13 @@ powrotem do rejestru.
 wydano, albo wydanie nie podaje sumy. Program celowo niczego wtedy nie podmienia — pobierz nową
 wersję ręcznie ze [strony wydań](https://github.com/sq9fk/rotorpanel/releases).
 
+**Po odzyskaniu połączenia rotor dostaje starą nastawę.** Tak było do wersji 1.10.1: port
+jest otwarty przez cały czas łączenia, a program sterujący pisze do niego dalej — te bajty
+czekały w buforze i szły do sterownika w chwili zestawienia łącza. Od 1.10.2 bufor jest
+czyszczony tuż przed ruszeniem transmisji, a pierwsza porcja po połączeniu jest odrzucana aż
+do ciszy na linii, żeby nie wysłać sterownikowi ogona przeciętej ramki. Nastawa, która nie
+dotarła, ma przepaść — nie dotrzeć minutę później.
+
 **Mostek łączy się i natychmiast rozłącza.** Sprawdź, czy `ser2net` po stronie Pi na pewno
 działa — każdy port przyjmuje **jedno** połączenie na raz.
 

@@ -91,6 +91,26 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Dane sprzed zestawienia lacza sa nieaktualne i nie wolno ich przepuscic.** Port jest
+otwierany **przed** polaczeniem z ser2netem i przez cala faze laczenia nikt z niego nie czyta -
+sterownik portu odklada wiec wszystko, co klient zdazy wpisac. PstRotator powtarza nastawe co
+sekunde, dopoki rotor nie stanie na azymucie, wiec kilkanascie sekund zoltej diody to
+kilkanascie ramek "obroc sie na X" czekajacych w buforze; w chwili zestawienia lacza szly
+wszystkie naraz do sterownika i **antena ruszala na polecenie sprzed minuty**. Objaw zgloszony
+przez uzytkownika: w momencie zapalenia zoltej diody sterownik dostaje w kolko te sama nastawe.
+
+Poprawka ma dwie czesci i obie sa potrzebne:
+
+* `StrumienPortu.Wyczysc` (PurgeComm) kasuje bufory portu **tuz przed ruszeniem pomp**,
+  nie przy otwarciu - miedzy otwarciem a polaczeniem mija cala faza laczenia.
+* Pompa z portu odrzuca wszystko **do pierwszej ciszy** na linii (odczyt bez danych, limit
+  25 ms). Czyszczenie moglo trafic w srodek ramki, a jej ogon przesunalby sterownikowi caly
+  strumien: kolejna ramka zlozylaby mu sie z polowek dwoch roznych. Cisza to jedyna granica
+  ramki, jaka mamy bez wnikania w protokol - mostek wozi tez SPE i nie moze znac tresci.
+
+Bezpiecznik: jesli cisza nie nadejdzie przez sekunde, przepuszczamy mimo wszystko. Mostek,
+ktory wyglada na polaczony i nic nie przepuszcza, bylby gorszy niz to, przed czym bronimy.
+
 **Nie pytaj `Control.DeviceDpi` o powiekszenie ekranu.** W .NET Framework ta wlasciwosc
 sledzi monitor okna dopiero wtedy, gdy program ma w `app.config` sekcje `DpiAwareness` -
 a bez niej zwraca DPI z chwili startu procesu, czyli **monitora glownego**. Na maszynie,
