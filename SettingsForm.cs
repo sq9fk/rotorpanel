@@ -124,8 +124,10 @@ public partial class SettingsForm : Form
         OdswiezListeRotorow();
         WypelnijAnteny();
 
-        Ui.DopasujDoEkranu(this, new Size(1000, 852));
-        Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(1000, 852));
+        Ui.SkalujPodEkran(this);
+        var tresc = Ui.Px(this, new Size(1000, 852));
+        Ui.DopasujDoEkranu(this, tresc);
+        Load += (_, _) => Ui.DopasujDoEkranu(this, tresc);
     }
 
     private static TextBox Pole(string tekst, Point poz, int szerokosc) => new()

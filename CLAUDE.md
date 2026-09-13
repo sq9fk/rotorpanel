@@ -91,6 +91,47 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Okna skladaj w jednostkach dla 100%, a na koniec przeskaluj.** Czcionki podajemy
+w punktach, wiec przy powiekszeniu ekranu 150% system rysuje je o polowe wieksze - ale
+wspolrzedne i rozmiary kontrolek sa w pikselach i same nie urosna. Zmierzone na ekranie
+1920x768 przy 150%: **48 napisow nie miescilo sie w swoich ramkach** (przyciski pokazywaly
+"Sterowa" zamiast "Sterowanie", naglowki sekcji byly przyciete w pol wysokosci). Poprawka to
+jedno wywolanie `Ui.SkalujPodEkran(this)` na koncu konstruktora - `Control.Scale` przelicza
+wspolrzedne, rozmiary i marginesy calego drzewa. Dwie rzeczy, ktore trzeba o nim wiedziec,
+bo obie sa sprawdzone pomiarem, nie domyslem:
+
+* **Czcionek nie rusza.** Po `Scale(1,5)` czcionka 9 pt zostaje 9 pt, a kontrolka 200x18
+  robi sie 300x27. To jest dokladnie to, czego chcemy: punkty skaluja sie same z DPI.
+  Gdyby skalowal takze czcionki, tekst uroslby dwa razy (1,5 x 1,5).
+* **Siatek nie rusza.** Szerokosci kolumn, wysokosc wierszy i wysokosc naglowka zostaja
+  co do piksela takie same - stad "SPE Exper..." w kolumnie szerokiej na 180 px. Poprawia
+  je `SkalujSiatki` recznie.
+
+Kontrolki dokladane **po** przeskalowaniu okna (karty listy w oknie glownym powstaja na nowo
+po kazdej zmianie ustawien) nie dostana skali z zadnej innej strony - trzeba je przepuscic
+przez `Ui.Skaluj`. Stale ukladu przeliczaj przez `Ui.Px`.
+
+Do sprawdzania jest jeden uchwyt: `Ui.SkalaWymuszona`. Na maszynie ze 100% inaczej nie da
+sie zobaczyc, co okna zrobia przy 150%; w dzialajacym programie zostaje `null`.
+
+**Okno stanu jest wyjatkiem - ono nie skaluje, tylko mierzy.** `UkladStanu` liczy wysokosci
+z `Font.Height`, a szerokosci z `TextRenderer.MeasureText`, bo musi jeszcze zdecydowac,
+czy tabela idzie na jedna czy dwie kolumny. Nie wolno wiec wolac na nim `SkalujPodEkran` -
+uklad dostalby skale dwa razy.
+
+**Lista w oknie glownym dobiera liczbe kolumn do miejsca.** Szesc anten plus wzmacniacz to
+626 jednostek wysokosci, czyli 939 px przy 150% - na ekranie wysokim na 768 px jedna kolumna
+nie ma szans, a szerokosci jest tam az nadto. `IleKolumn` bierze najmniejsza liczbe kolumn
+(do trzech), przy ktorej lista miesci sie w pionie, o ile starczy szerokosci; `PrzeliczKolumny`
+robi to samo przy kazdej zmianie rozmiaru okna, wiec rozciagniecie okna w bok cos daje.
+Zmierzone dla 1920x768 przy 150%: 1720x732, dwie kolumny, wszystko widac.
+
+**Decyzja o ukladzie nie moze zalezec od paska przewijania, ktory sama wywoluje.** Dwie
+kolumny wystawialy pionowy pasek, ten zabieral 17 px szerokosci, przy nastepnej zmianie
+rozmiaru brakowalo tych kilkunastu pikseli i uklad wracal do jednej kolumny **na stale**.
+`PrzeliczKolumny` liczy wiec miejsce tak, jakby paskow nie bylo, a samo ukladanie chroni
+flaga `_ukladamListe` przed wejsciem w siebie.
+
 **Kontrolka, ktora niczego nie przyjmuje, nie moze brac fokusu.** `Control` jest domyslnie
 zaznaczalny, wiec `PasekLed` i `Led` stawaly sie `ActiveControl` okna. Przewijane okno nie
 pozwala wyprowadzic aktywnej kontrolki poza widok, wiec okno stanu przewijalo sie **tylko do

@@ -209,7 +209,8 @@ public sealed class SpeForm : Form
 
         FormClosed += (_, _) => { _zegar.Dispose(); _puls.Dispose(); };
 
-        Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(516, 520));
+        Ui.SkalujPodEkran(this);
+        Load += (_, _) => Ui.DopasujDoEkranu(this, Ui.Px(this, new Size(516, 520)));
 
         // Ctrl+S zapisuje biezaca ramke ekranu. Mapy bitowe znakow wlasnych uczy sie
         // ze zdjecia panelu zestawionego z ramka z tej samej chwili - bez ramki

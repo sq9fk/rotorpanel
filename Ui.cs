@@ -280,7 +280,96 @@ public static class Ui
     /// dalo sie zapisac zmian - a przy oknie wyzszym niz ekran samo wysrodkowanie
     /// wypychalo jeszcze pasek tytulu nad gorna krawedz.
     /// </summary>
-    public static void DopasujDoEkranu(Form okno, Size tresc)
+    /// <summary>
+    /// Ile pikseli przypada na jednostke ukladu. Okna sa skladane we wspolrzednych
+    /// dla powiekszenia 100% (96 dpi) i dopiero na koncu skalowane - patrz
+    /// <see cref="SkalujPodEkran"/>.
+    /// </summary>
+    /// <summary>
+    /// Skala uzyta zamiast odczytanej z ekranu. Ustawiana **tylko** przy sprawdzaniu ukladu
+    /// dla powiekszen, ktorych nie ma pod reka: na maszynie ze 100% inaczej nie da sie
+    /// zobaczyc, co okna zrobia przy 150%. W dzialajacym programie zostaje null.
+    /// </summary>
+    public static float? SkalaWymuszona;
+
+    public static float Skala(Control kontrolka)
+        => SkalaWymuszona ?? kontrolka.DeviceDpi / 96f;
+
+    public static int Px(Control kontrolka, int jednostki)
+        => (int)Math.Round(jednostki * Skala(kontrolka));
+
+    public static Size Px(Control kontrolka, Size rozmiar)
+        => new(Px(kontrolka, rozmiar.Width), Px(kontrolka, rozmiar.Height));
+
+    /// <summary>
+    /// Powieksza gotowy uklad okna do biezacego powiekszenia ekranu.
+    ///
+    /// Czcionki podajemy w punktach, wiec system rysuje je przy 150% o polowe wieksze -
+    /// ale wspolrzedne i rozmiary kontrolek sa w pikselach i same nie urosna. Efekt byl
+    /// taki, ze przy 150% napisy wychodzily poza swoje ramki: przyciski pokazywaly
+    /// "Sterowa" zamiast "Sterowanie", a naglowki sekcji byly przyciete. <c>Control.Scale</c>
+    /// przelicza wspolrzedne, rozmiary i marginesy calego drzewa, a czcionek **nie** rusza -
+    /// czyli dokladnie to, czego potrzeba (sprawdzone pomiarem: po Scale(1,5) czcionka 9 pt
+    /// zostaje 9 pt, a kontrolka 200x18 robi sie 300x27).
+    ///
+    /// Wywoluj raz, po zbudowaniu okna, a przed <see cref="DopasujDoEkranu"/>.
+    /// </summary>
+    public static void SkalujPodEkran(Form okno)
+    {
+        float k = Skala(okno);
+        if (k <= 1.001f) return;
+
+        // Ograniczenia rozmiaru sa w pikselach sprzed skalowania i zablokowalyby wzrost.
+        okno.MinimumSize = Size.Empty;
+        okno.MaximumSize = Size.Empty;
+
+        okno.Scale(new SizeF(k, k));
+        SkalujSiatki(okno, k);
+    }
+
+    /// <summary>Skaluje poddrzewo dolozone juz po przeskalowaniu okna.</summary>
+    public static void Skaluj(Control kontrolka, float k)
+    {
+        if (k <= 1.001f) return;
+        kontrolka.Scale(new SizeF(k, k));
+        SkalujSiatki(kontrolka, k);
+    }
+
+    /// <summary>
+    /// Siatki trzeba poprawic osobno: <c>Control.Scale</c> zmienia rozmiar samej kontrolki,
+    /// ale **nie** rusza szerokosci kolumn ani wysokosci wierszy - zmierzone, zostaja
+    /// dokladnie takie same. Przy 150% dawalo to obciete naglowki kolumn i wartosci
+    /// w rodzaju "SPE Exper..." w kolumnie szerokiej na 180 px.
+    /// </summary>
+    private static void SkalujSiatki(Control rodzic, float k)
+    {
+        if (rodzic is DataGridView siatka)
+        {
+            siatka.ColumnHeadersHeight = (int)Math.Round(siatka.ColumnHeadersHeight * k);
+            siatka.RowTemplate.Height = (int)Math.Round(siatka.RowTemplate.Height * k);
+
+            foreach (DataGridViewColumn kolumna in siatka.Columns)
+            {
+                if (kolumna.MinimumWidth > 2)
+                    kolumna.MinimumWidth = (int)Math.Round(kolumna.MinimumWidth * k);
+                kolumna.Width = (int)Math.Round(kolumna.Width * k);
+            }
+
+            foreach (DataGridViewRow wiersz in siatka.Rows)
+                wiersz.Height = (int)Math.Round(wiersz.Height * k);
+
+            return;
+        }
+
+        foreach (Control dziecko in rodzic.Controls) SkalujSiatki(dziecko, k);
+    }
+
+    /// <param name="mozeRosnac">
+    /// Czy okno wolno rozciagnac ponad rozmiar tresci. Domyslnie nie - wtedy ciagniecie
+    /// za krawedz dawaloby tylko puste miejsce. Okno glowne przekazuje tu prawde, bo jego
+    /// lista przeklada karty na kolumny i potrafi ta szerokosc wykorzystac.
+    /// </param>
+    public static void DopasujDoEkranu(Form okno, Size tresc, bool mozeRosnac = false)
     {
         okno.AutoScroll = true;
         okno.AutoScrollMinSize = tresc;
@@ -300,7 +389,9 @@ public static class Ui
         int mieszczaSie = obszar.Height - rama.Height;
         int zapas = tresc.Height > mieszczaSie ? SystemInformation.VerticalScrollBarWidth : 0;
 
-        okno.MaximumSize = new Size(tresc.Width + zapas + rama.Width, tresc.Height + rama.Height);
+        okno.MaximumSize = mozeRosnac
+            ? Size.Empty
+            : new Size(tresc.Width + zapas + rama.Width, tresc.Height + rama.Height);
         okno.ClientSize = new Size(
             Math.Max(320, Math.Min(tresc.Width + zapas, obszar.Width - rama.Width)),
             Math.Max(240, Math.Min(tresc.Height, mieszczaSie)));

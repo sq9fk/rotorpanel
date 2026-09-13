@@ -371,6 +371,21 @@ roboczego i włącza paski przewijania, zamiast chować dolne przyciski pod kraw
 Okna główne, Ustawień, par COM i sterowania SPE można też zmieniać rozmiar ręcznie.
 
 
+### Powiększenie ekranu i wielkość okien
+
+Program jest świadomy powiększenia ekranu (**PerMonitorV2**): przy 125 %, 150 % czy 200 %
+okna są składane w pełnym rozmiarze, a nie rozmywane przez system. Wszystkie napisy,
+przyciski i siatki rosną razem z powiększeniem.
+
+Lista w oknie głównym **dobiera liczbę kolumn do miejsca**. Na niskim ekranie — na przykład
+1920×768 przy 150 %, gdzie jedna kolumna kart miałaby 939 px wysokości — karty układają się
+obok siebie, po dwie albo trzy, zamiast kazać przewijać. To samo dzieje się przy zmianie
+rozmiaru okna: rozciągnięcie w bok przekłada karty na więcej kolumn, zwężenie — z powrotem.
+
+Okna, które nie mają czym wypełnić dodatkowego miejsca (Ustawienia, Pary COM, Sterowanie),
+można zmniejszać, ale nie rozciągać ponad rozmiar treści — zamiast tego dostają paski
+przewijania, gdy nie mieszczą się na ekranie.
+
 ### Zasobnik systemowy
 
 Program startuje **zminimalizowany**, jako ikona przy zegarze. Kolor igły kompasu pokazuje

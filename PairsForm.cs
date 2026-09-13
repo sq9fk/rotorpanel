@@ -65,7 +65,8 @@ public class PairsForm : Form
 
         Odswiez();
 
-        Load += (_, _) => Ui.DopasujDoEkranu(this, new Size(620, 400));
+        Ui.SkalujPodEkran(this);
+        Load += (_, _) => Ui.DopasujDoEkranu(this, Ui.Px(this, new Size(620, 400)));
     }
 
     private void BudujListe()
