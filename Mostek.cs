@@ -64,6 +64,12 @@ public sealed class Mostek : IDisposable
     private int _obcePrzejecia;
     private long _pierwszePrzejecie;
 
+    // Ostatnie bajty w obie strony - kontekst dla pulapki na podejrzane rozkazy.
+    // Sama ramka nie wystarcza: trzeba widziec, co ja poprzedzalo.
+    private readonly Pulapka.Bufor _doSterownika = new(256);
+    private readonly Pulapka.Bufor _odSterownika = new(256);
+    private System.Diagnostics.Stopwatch _odPolaczenia = System.Diagnostics.Stopwatch.StartNew();
+
     public Polaczenie Punkt { get; }
     public string Adres => _cfg.AdresDla(Punkt);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
@@ -293,6 +299,7 @@ public sealed class Mostek : IDisposable
             TcpClient klient = null;
             Stream siec = null;
             var zegarPolaczenia = System.Diagnostics.Stopwatch.StartNew();
+            _odPolaczenia = zegarPolaczenia;
 
             try
             {
@@ -496,6 +503,16 @@ public sealed class Mostek : IDisposable
             }
 
             if (zPortu) Interlocked.Exchange(ref _ostatniRuchKlienta, DateTime.UtcNow.Ticks);
+
+            // Pulapka dziala zawsze, takze przy wylaczonym sladzie - inaczej zlapanie
+            // rzadkiego objawu wymaga szczescia. Mostki SPE pomijamy, bo to inny protokol.
+            if (!OdpytywacSpe)
+            {
+                (zPortu ? _doSterownika : _odSterownika).Dopisz(bufor, n);
+
+                if (zPortu && Pulapka.Podejrzany(bufor, n, out string powod))
+                    Pulapka.Zapisz(Podpis, powod, _doSterownika, _odSterownika, _odPolaczenia.Elapsed);
+            }
 
             if (czytnik is null)
             {

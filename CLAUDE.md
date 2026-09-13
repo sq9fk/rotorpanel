@@ -106,6 +106,14 @@ pierwszym zerwaniu, potem 500, 1000 i 2000 ms, a licznik zeruje sie po polaczeni
 przetrwalo ponad piec sekund. Przy niedostepnym Pi nie dobijamy sie wiec bez konca, a przy
 pojedynczym kopnieciu przerwa jest osmiokrotnie krotsza.
 
+**Rzadki objaw lap pulapka, nie sladem.** Slad trzeba wlaczyc **przed** zdarzeniem, wiec
+zlapanie czegos, co zdarza sie raz na kilkanascie minut, wymaga szczescia albo megabajtow
+zapisu. `Pulapka` dziala odwrotnie: chodzi **zawsze**, nic nie zapisuje, dopoki nie zobaczy
+rozkazu, ktorego nie powinno byc - nastawy 208 stopni albo cyfr spoza ASCII (zerowy bajt
+czytany jak cyfra daje na bajcie dokladnie 208). Wtedy dopisuje do `podejrzane.txt` sama ramke
+**oraz 256 ostatnich bajtow w obie strony** i czas od zestawienia lacza. Bez tego kontekstu nie
+da sie odroznic rozkazu, ktory ktos naprawde wyslal, od ramki zlozonej z kawalkow dwoch innych.
+
 **Obrona przed przejeciem portu jest trojwarstwowa i zadna warstwa nie wystarcza sama.**
 Port ser2neta ma jednego wlasciciela, wiec pytanie brzmi nie "czy ktos go zabierze", tylko
 "co sie stanie, gdy sprobuje":
