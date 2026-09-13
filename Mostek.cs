@@ -54,6 +54,9 @@ public sealed class Mostek : IDisposable
     private long _kiedyBadanyPort;
     private int _badanieWToku;
 
+    /// <summary>Ile razy z rzedu polaczenie padlo od razu - do stopniowania zwloki.</summary>
+    private int _nieudanePodejscia;
+
     public Polaczenie Punkt { get; }
     public string Adres => _cfg.AdresDla(Punkt);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
@@ -274,6 +277,7 @@ public sealed class Mostek : IDisposable
             Stream port = null;
             TcpClient klient = null;
             Stream siec = null;
+            var zegarPolaczenia = System.Diagnostics.Stopwatch.StartNew();
 
             try
             {
@@ -348,7 +352,19 @@ public sealed class Mostek : IDisposable
             if (ct.IsCancellationRequested) break;
 
             Volatile.Write(ref _stan, (int)StanMostka.Laczenie);
-            try { await Task.Delay(2000, ct); }
+
+            // Kazda sekunda bez lacza to sekunda, w ktorej program sterujacy nie dostaje
+            // odpowiedzi na zapytanie o pozycje - a PstRotator czyta wtedy swoj pusty bufor
+            // i pokazuje 208 stopni (`0x00 - '0'` daje na bajcie 208). Dlatego po zerwaniu
+            // wracamy od razu, a dopiero gdy nie idzie, zwalniamy do dwoch sekund; inaczej
+            // przy niedostepnym Pi dobijalibysmy sie bez przerwy.
+            bool bylaUdana = zegarPolaczenia.Elapsed > TimeSpan.FromSeconds(5);
+            _nieudanePodejscia = bylaUdana ? 0 : Math.Min(_nieudanePodejscia + 1, 3);
+
+            int zwloka = _nieudanePodejscia switch { 0 => 250, 1 => 500, 2 => 1000, _ => 2000 };
+            if (Slad.Wlaczony) Zapisz("ponowne laczenie za " + zwloka + " ms");
+
+            try { await Task.Delay(zwloka, ct); }
             catch (OperationCanceledException) { break; }
         }
 

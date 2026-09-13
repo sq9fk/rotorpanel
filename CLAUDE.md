@@ -99,6 +99,23 @@ bajt jak cyfre ASCII, dostaje 208, **zawsze te sama wartosc, bo wejsciem jest pu
 "nastawa 208" pojawia sie dokladnie wtedy, gdy lacze pada i program sterujacy nie dostaje
 odpowiedzi. Szukaj wiec nie zrodla liczby 208, tylko **zrodla zerwania lacza**.
 
+**Po zerwaniu wracaj od razu, nie po dwoch sekundach.** Kazda sekunda bez lacza to sekunda,
+w ktorej program sterujacy nie dostaje odpowiedzi na zapytanie o pozycje - a wtedy czyta swoj
+pusty bufor i wychodzi mu 208 stopni (patrz wyzej). Zwloka jest teraz stopniowana: 250 ms po
+pierwszym zerwaniu, potem 500, 1000 i 2000 ms, a licznik zeruje sie po polaczeniu, ktore
+przetrwalo ponad piec sekund. Przy niedostepnym Pi nie dobijamy sie wiec bez konca, a przy
+pojedynczym kopnieciu przerwa jest osmiokrotnie krotsza.
+
+**Gdy ser2net zamyka polaczenie "bez bledu", winowajca jest na zewnatrz.** Zmierzone na zywym
+systemie po poprawce sondy: mostki nadal padaly, ale slad pokazywal czyste zamkniecie przez
+druga strone, w rytmie **60 sekund**, po dwa zdarzenia na cykl (odstepy 16 i 44 s), i - co
+rozstrzygajace - **dwa polaczenia do dwoch roznych portow konczyly sie w tej samej
+milisekundzie**. Tak nie wyglada awaria sieci ani nasz blad; tak wyglada ktos, kto co minute
+laczy sie do tych portow (monitoring, skaner, druga kopia programu). ser2net z `kickolduser`
+oddaje port nowemu klientowi, wiec kazde takie sprawdzenie kopie mostek. Po stronie Pi widac to
+w `journalctl -u ser2net` (adres klienta przy "Accepted connection") albo przez
+`tcpdump -n 'tcp port 4001 and tcp[tcpflags] & tcp-syn != 0'`.
+
 **Sonda ser2neta zrywala wlasne mostki.** `SprawdzSer2net` pomijala badanie tylko dla mostka
 **polaczonego**, a mostek w trakcie laczenia (zolta dioda) sondowala - czyli otwierala **drugie**
 polaczenie TCP do tego samego portu. ser2net z `kickolduser` zrywa wtedy pierwsze, i mostek
