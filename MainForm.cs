@@ -120,13 +120,21 @@ public partial class MainForm : Form
         // ekranu. Musi isc **przed** BudujListe, bo lista dokladana pozniej skaluje sie
         // osobno - inaczej karty zbudowane w konstruktorze dostalyby skale dwa razy.
         Ui.SkalujPodEkran(this);
+        OdswiezTytul();
 
         BudujListe();
         UtworzTray();
 
         // Program startuje do zasobnika, wiec przy budowaniu listy nie wiadomo jeszcze,
         // na ktorym monitorze okno sie pokaze. Przy pokazaniu wiadomo.
-        Shown += (_, _) => Ui.DopasujDoEkranu(this, _trescOkna, mozeRosnac: true);
+        Shown += (_, _) =>
+        {
+            // Dopiero teraz wiadomo, na ktorym monitorze okno stoi.
+            Ui.PoprawSkale(this);
+            OdswiezTytul();
+            PrzeliczKolumny();
+            Ui.DopasujDoEkranu(this, _trescOkna, mozeRosnac: true);
+        };
         Resize += (_, _) => PrzeliczKolumny();
 
         if (_cfg.AutoPolacz)
@@ -137,6 +145,21 @@ public partial class MainForm : Form
         _timer.Start();
 
         SprawdzAktualizacjeWTle();
+    }
+
+    /// <summary>
+    /// Tytul niesie wersje i - gdy ekran nie jest przy 100% - powiekszenie, ktore program
+    /// wykryl. Bez tego nie sposob z drugiej strony ekranu odroznic "aktualizacja nie weszla"
+    /// od "program zle odczytal powiekszenie", a te dwie rzeczy wygladaja identycznie.
+    /// </summary>
+    private void OdswiezTytul()
+    {
+        string tytul = "Rotory " + Aktualizacja.WersjaBiezaca.ToString(3);
+
+        int procent = (int)Math.Round(Ui.Skala(this) * 100);
+        if (procent != 100) tytul += "  " + (char)0x00B7 + "  " + procent + "%";
+
+        Text = tytul;
     }
 
     /// <summary>Punkt z ukladu 100% przeliczony na piksele biezacego ekranu.</summary>

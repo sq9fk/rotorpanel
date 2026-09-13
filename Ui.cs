@@ -293,7 +293,50 @@ public static class Ui
     public static float? SkalaWymuszona;
 
     public static float Skala(Control kontrolka)
-        => SkalaWymuszona ?? kontrolka.DeviceDpi / 96f;
+        => SkalaWymuszona ?? DpiEkranu(kontrolka) / 96f;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr okno);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(Point punkt, uint tryb);
+
+    [System.Runtime.InteropServices.DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int rodzaj, out uint x, out uint y);
+
+    /// <summary>
+    /// Prawdziwe DPI ekranu, na ktorym okno sie pokaze.
+    ///
+    /// **Nie pytaj o to `Control.DeviceDpi`.** W .NET Framework ta wlasciwosc sledzi monitor
+    /// okna dopiero wtedy, gdy program ma w `app.config` sekcje `DpiAwareness` - a bez niej
+    /// zwraca DPI z chwili startu procesu, czyli **monitora glownego**. Na maszynie, gdzie
+    /// pulpit ma 100%, a drugi ekran (GPD) 150%, dawalo to 96: system rysowal czcionki
+    /// w pelnej wielkosci, a program uwazal, ze skalowac nie ma czego, i caly uklad zostawal
+    /// maly. Objaw byl taki sam jak przed poprawka skalowania, wiec latwo o mylny trop.
+    ///
+    /// Pytamy wiec system wprost: o DPI okna, a zanim okno ma uchwyt - o DPI monitora pod
+    /// kursorem, bo tam okno zwykle sie pojawi. Po pokazaniu okna sprawdzamy to jeszcze raz
+    /// (<see cref="PoprawSkale"/>), bo dopiero wtedy wiadomo na pewno.
+    /// </summary>
+    public static int DpiEkranu(Control kontrolka)
+    {
+        try
+        {
+            if (kontrolka is { IsHandleCreated: true })
+            {
+                uint dpi = GetDpiForWindow(kontrolka.Handle);
+                if (dpi >= 48) return (int)dpi;
+            }
+
+            const uint NajblizszyMonitor = 2;
+            var monitor = MonitorFromPoint(Cursor.Position, NajblizszyMonitor);
+            if (GetDpiForMonitor(monitor, 0, out uint poziomo, out _) == 0 && poziomo >= 48)
+                return (int)poziomo;
+        }
+        catch { /* starszy system albo brak shcore - zostaje wartosc z WinForms */ }
+
+        return kontrolka?.DeviceDpi ?? 96;
+    }
 
     public static int Px(Control kontrolka, int jednostki)
         => (int)Math.Round(jednostki * Skala(kontrolka));
@@ -317,8 +360,32 @@ public static class Ui
     public static void SkalujPodEkran(Form okno)
     {
         float k = Skala(okno);
-        if (k <= 1.001f) return;
+        _zastosowana[okno] = k;
+        okno.FormClosed += (_, _) => _zastosowana.Remove(okno);
 
+        if (k <= 1.001f) return;
+        Zastosuj(okno, k);
+    }
+
+    /// <summary>Skala, ktora dostalo juz okno - do policzenia poprawki po pokazaniu.</summary>
+    private static readonly Dictionary<Form, float> _zastosowana = new();
+
+    /// <summary>
+    /// Sprawdza po pokazaniu okna, czy zgadywana skala byla trafna. Okno moglo sie pojawic
+    /// na innym monitorze niz ten pod kursorem - wtedy dokladamy sama roznice.
+    /// </summary>
+    public static void PoprawSkale(Form okno)
+    {
+        float byla = _zastosowana.TryGetValue(okno, out float z) ? z : 1f;
+        float teraz = Skala(okno);
+        if (Math.Abs(teraz / byla - 1f) < 0.01f) return;
+
+        Zastosuj(okno, teraz / byla);
+        _zastosowana[okno] = teraz;
+    }
+
+    private static void Zastosuj(Form okno, float k)
+    {
         // Ograniczenia rozmiaru sa w pikselach sprzed skalowania i zablokowalyby wzrost.
         okno.MinimumSize = Size.Empty;
         okno.MaximumSize = Size.Empty;

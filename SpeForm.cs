@@ -210,6 +210,7 @@ public sealed class SpeForm : Form
         FormClosed += (_, _) => { _zegar.Dispose(); _puls.Dispose(); };
 
         Ui.SkalujPodEkran(this);
+        Shown += (_, _) => Ui.PoprawSkale(this);
         Load += (_, _) => Ui.DopasujDoEkranu(this, Ui.Px(this, new Size(516, 520)));
 
         // Ctrl+S zapisuje biezaca ramke ekranu. Mapy bitowe znakow wlasnych uczy sie

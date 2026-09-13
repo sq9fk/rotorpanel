@@ -91,6 +91,21 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Nie pytaj `Control.DeviceDpi` o powiekszenie ekranu.** W .NET Framework ta wlasciwosc
+sledzi monitor okna dopiero wtedy, gdy program ma w `app.config` sekcje `DpiAwareness` -
+a bez niej zwraca DPI z chwili startu procesu, czyli **monitora glownego**. Na maszynie,
+gdzie pulpit ma 100%, a drugi ekran 150%, dawalo to 96: system rysowal czcionki w pelnej
+wielkosci, a program uwazal, ze nie ma czego skalowac. Objaw byl **identyczny** jak przed
+poprawka skalowania - latwo uznac, ze poprawka nie dziala, i szukac bledu nie tam, gdzie
+trzeba. `Ui.DpiEkranu` pyta wiec system wprost: `GetDpiForWindow` dla okna z uchwytem,
+a wczesniej `GetDpiForMonitor` dla monitora pod kursorem. Po pokazaniu okna `Ui.PoprawSkale`
+sprawdza to jeszcze raz i doklada roznice, bo dopiero wtedy wiadomo, na ktorym monitorze
+okno naprawde stoi.
+
+**Tytul okna glownego niesie wersje i wykryte powiekszenie.** "Rotory 1.10.1 · 150%".
+Bez tego z drugiej strony ekranu nie da sie odroznic trzech roznych rzeczy, ktore wygladaja
+tak samo: aktualizacja nie weszla, program zle odczytal powiekszenie, uklad ma blad.
+
 **Okna skladaj w jednostkach dla 100%, a na koniec przeskaluj.** Czcionki podajemy
 w punktach, wiec przy powiekszeniu ekranu 150% system rysuje je o polowe wieksze - ale
 wspolrzedne i rozmiary kontrolek sa w pikselach i same nie urosna. Zmierzone na ekranie

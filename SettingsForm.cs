@@ -127,6 +127,7 @@ public partial class SettingsForm : Form
         Ui.SkalujPodEkran(this);
         var tresc = Ui.Px(this, new Size(1000, 852));
         Ui.DopasujDoEkranu(this, tresc);
+        Shown += (_, _) => Ui.PoprawSkale(this);
         Load += (_, _) => Ui.DopasujDoEkranu(this, tresc);
     }
 

@@ -377,6 +377,12 @@ Program jest świadomy powiększenia ekranu (**PerMonitorV2**): przy 125 %, 150 
 okna są składane w pełnym rozmiarze, a nie rozmywane przez system. Wszystkie napisy,
 przyciski i siatki rosną razem z powiększeniem.
 
+Powiększenie odczytujemy dla **tego monitora, na którym okno się pojawia** — przy dwóch
+ekranach o różnym powiększeniu (np. pulpit 100 % i przenośny 150 %) liczy się ten drugi.
+Tytuł okna głównego pokazuje wersję i wykryte powiększenie, na przykład
+`Rotory 1.10.1 · 150%` — przy 100 % procentów nie ma. Jeśli kiedyś układ okien nie będzie
+pasował do ekranu, to pierwsze miejsce do sprawdzenia.
+
 Lista w oknie głównym **dobiera liczbę kolumn do miejsca**. Na niskim ekranie — na przykład
 1920×768 przy 150 %, gdzie jedna kolumna kart miałaby 939 px wysokości — karty układają się
 obok siebie, po dwie albo trzy, zamiast kazać przewijać. To samo dzieje się przy zmianie
