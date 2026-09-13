@@ -99,8 +99,33 @@ zobaczyl 208. Pulapka zapisywala oba kierunki w osobnych buforach, wiec kolejnos
 jedna os czasu dla obu kierunkow i zrzuca ja przy **kazdym** nieprawdopodobnym skoku odczytu,
 niezaleznie od tego, czy STOP w ogole wystapil.
 
-**Sterownik odpowiada na STOP ramka w formacie pozycji - i to jest prawdziwe zrodlo
-"ucieczki na 208 stopni".** Zmierzone: po rozkazie `0x0F` Rot1Prog odsyla `57 02 00 08 20`,
+**Odczyt 208 przychodzi po odpowiedzi, ktorej nie bylo - a nie po STOP-ie.** Rozstrzygnal
+dziennik w jednej osi czasu:
+
+```
+00:37:10.735  PC ->  zapytanie        00:37:11.721  PC ->  zapytanie
+00:37:10.931  <-  57 03 02 05 20      (brak odpowiedzi)
+                  = 325               00:37:12.728  PC ->  zapytanie
+                                      00:37:13.018  <-  57 02 00 08 20  = 208
+```
+
+Antena jechala rowno przez 325, jedna odpowiedz przepadla, a nastepna byla bzdurna.
+**Zadnego STOP-a w tym przebiegu nie ma.** Wczesniejszy wniosek ("sterownik odpowiada 208 na
+STOP") byl bledny: STOP takze powoduje pominiecie odpowiedzi, wiec byl **wspolnym skutkiem**,
+nie przyczyna - a korelacja bez kolejnosci tego nie odroznia.
+
+Objaw wychodzi **tylko przy dwoch pracujacych rotorach**, co wskazuje na zaklocenie od drugiego
+silnika w torze sterownik - przejsciowka - Pi. Protokol SPID nie ma sumy kontrolnej, wiec
+przekrecona ramka wyglada jak poprawny azymut.
+
+`Mostek.OdrzucicNieprawdopodobnyOdczyt` odrzuca odczyt, ktory zmienia sie o wiecej niz
+30 stopni miedzy odpytaniami - rotor robi okolo 2,5 stopnia na sekunde, wiec taki skok nie moze
+byc prawda. Ramki nie zapamietujemy, zeby nastepny prawdziwy odczyt porownal sie z ostatnia
+**wiarygodna** pozycja. Po kazdym zestawieniu lacza pamiec pozycji sie zeruje, bo antena mogla
+zostac przekrecona recznie. **To jest proteza, nie naprawa** - i dlatego kazde odrzucenie idzie
+do `podejrzane.txt` razem z dziennikiem.
+
+**[NIEAKTUALNE, zostawione jako przestroga] Sterownik odpowiada na STOP ramka w formacie pozycji.** Zmierzone: po rozkazie `0x0F` Rot1Prog odsyla `57 02 00 08 20`,
 czyli **208** czytane jak azymut, niezaleznie od tego, gdzie antena stoi. W sladzie widac to
 wprost: `295 -> [208] -> 297` i `352 -> [208] -> 348` - antena byla w ruchu i jechala dalej
 swoim torem, a miedzy jej odczyty wpadala ta jedna ramka.

@@ -75,11 +75,8 @@ public sealed class Mostek : IDisposable
     // Odpowiedzi sterownika skladamy w cale ramki, zanim trafia na port - patrz SkladaczSpid.
     private readonly SkladaczSpid _skladacz = new();
 
-    // Sterownik odpowiada na rozkaz STOP ramka w tym samym formacie co pozycja -
-    // zmierzone: `57 02 00 08 20`, czyli "208 stopni", niezaleznie od tego, gdzie
-    // antena naprawde stoi. Program sterujacy bierze to za odczyt i zaczyna gonic
-    // za widmem. Patrz OdrzucicOdpowiedzNaStop.
-    private long _kiedyStop;
+    // Ostatnia wiarygodna pozycja - do odrzucania odczytow fizycznie niemozliwych.
+    // Patrz OdrzucicNieprawdopodobnyOdczyt.
     private int _ostatniaPozycja = -1;
     private System.Diagnostics.Stopwatch _odPolaczenia = System.Diagnostics.Stopwatch.StartNew();
 
@@ -345,6 +342,10 @@ public sealed class Mostek : IDisposable
 
                 if (!OdpytywacSpe) Pulapka.Uzbrojono(Podpis);
 
+                // Po przerwie antena mogla zostac przekrecona recznie - pierwszy odczyt
+                // po polaczeniu nie ma sie do czego porownac i nie wolno go odrzucic.
+                _ostatniaPozycja = -1;
+
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
                 _czytnikSpe = czytnik;
 
@@ -537,9 +538,6 @@ public sealed class Mostek : IDisposable
                 if (zPortu)
                     foreach (var ramka in _rozkazy.Ramki(bufor, n))
                     {
-                        if (ramka.Length >= 13 && ramka[11] == 0x0F)
-                            Interlocked.Exchange(ref _kiedyStop, DateTime.UtcNow.Ticks);
-
                         string opis = Pulapka.OpiszNastawe(ramka, out _);
                         if (opis != null)
                             Pulapka.Zapisz(Podpis, opis, _doSterownika, _odSterownika,
@@ -600,7 +598,7 @@ public sealed class Mostek : IDisposable
                 var gotowe = _skladacz.Dopisz(bufor, n);
                 if (gotowe != null)
                     foreach (var ramka in gotowe)
-                        if (!OdrzucicOdpowiedzNaStop(ramka))
+                        if (!OdrzucicNieprawdopodobnyOdczyt(ramka))
                             Oddaj(dokad, ramka, ct);
             }
         }
@@ -625,59 +623,51 @@ public sealed class Mostek : IDisposable
     }
 
     /// <summary>
-    /// Czy ta ramka to odpowiedz sterownika na STOP, a nie pozycja.
+    /// Czy ten odczyt jest fizycznie niemozliwy, a wiec nie jest odczytem.
     ///
-    /// Zmierzone na zywym torze: po rozkazie STOP (`0x0F`) sterownik odpowiada
-    /// `57 02 00 08 20`, czyli w formacie pozycji - "208 stopni" - **niezaleznie od tego,
-    /// gdzie antena stoi**. W sladzie widac to jak na dloni: `295 -> [208] -> 297`
-    /// i `352 -> [208] -> 348`, a korelacja jest zupelna: na dwadziescia zapisanych
-    /// przebiegow 208 pojawilo sie **wylacznie** w tych dwoch, w ktorych byl STOP.
+    /// Rotor obraca sie okolo 2,5 stopnia na sekunde, a odpytywany jest raz na sekunde -
+    /// skok o ponad 30 stopni miedzy odczytami nie moze byc prawda. Protokol SPID nie ma
+    /// sumy kontrolnej, wiec przekrecona ramka wyglada jak poprawny azymut i nikt dalej
+    /// nie ma jak jej odrzucic.
     ///
-    /// Program sterujacy bierze to za odczyt pozycji i zaczyna korygowac azymut wzgledem
-    /// wartosci, ktorej nigdy nie bylo - stad slynna "ucieczka anteny na 208 stopni".
+    /// Zmierzone na zywym torze (dziennik z 00:37:13): po zapytaniu, na ktore sterownik
+    /// **nie odpowiedzial**, nastepna odpowiedz brzmiala `57 02 00 08 20`, czyli 208 stopni,
+    /// przy antenie jadacej rowno przez 325. Program sterujacy bral to za pozycje i zaczynal
+    /// korygowac azymut wzgledem wartosci, ktorej nigdy nie bylo.
     ///
-    /// Odrzucamy wiec **jedna** ramke: pierwsza po STOP, i tylko wtedy, gdy skacze o wiecej,
-    /// niz rotor zdazy sie obrocic miedzy odpytaniami. Prawdziwa pozycja tuz po zatrzymaniu
-    /// rozni sie o kilka stopni i przechodzi bez zmian. Kazde odrzucenie idzie do
-    /// `podejrzane.txt` - **nic nie znika po cichu**.
+    /// Wczesniej wiazalem to z rozkazem STOP, bo 208 wystepowalo wylacznie w przebiegach ze
+    /// STOP-em. Dziennik w jednej osi czasu pokazal, ze STOP byl **wspolnym skutkiem**, nie
+    /// przyczyna: on tez powoduje pominiecie odpowiedzi. Warunek nie ma juz z nim nic wspolnego.
+    ///
+    /// **To jest proteza, nie naprawa.** Przyczyna siedzi przed mostkiem - w sterowniku,
+    /// przejsciowce albo kablu czujnika - i wychodzi tylko przy dwoch pracujacych rotorach.
+    /// Dlatego kazde odrzucenie trafia do `podejrzane.txt` razem z dziennikiem: filtr na danych
+    /// o polozeniu anteny musi byc rozliczalny co do ramki.
     /// </summary>
-    private bool OdrzucicOdpowiedzNaStop(byte[] ramka)
+    private bool OdrzucicNieprawdopodobnyOdczyt(byte[] ramka)
     {
         if (ramka.Length != 5 || ramka[0] != 0x57 || ramka[4] != 0x20) return false;
 
         int pozycja = ramka[1] * 100 + ramka[2] * 10 + ramka[3];
         int poprzednia = _ostatniaPozycja;
-        _ostatniaPozycja = pozycja;
 
-        // Kazdy nieprawdopodobny skok odczytu zapisujemy z dziennikiem obu kierunkow -
-        // **bez wzgledu na to, czy byl STOP**. Dopiero kolejnosc zdarzen pokazuje,
-        // co jest przyczyna, a co skutkiem.
-        if (poprzednia >= 0 && Math.Abs(pozycja - poprzednia) > 30)
+        if (poprzednia < 0 || Math.Abs(pozycja - poprzednia) <= 30)
         {
-            long ostatni = Interlocked.Read(ref _ostatniZrzut);
-            if (ostatni == 0 || DateTime.UtcNow - new DateTime(ostatni) > TimeSpan.FromSeconds(5))
-            {
-                Interlocked.Exchange(ref _ostatniZrzut, DateTime.UtcNow.Ticks);
-                Pulapka.Zapisz(Podpis,
-                    "SKOK ODCZYTU: " + poprzednia + " -> " + pozycja + " (" +
-                    Slad.Podglad(ramka, 5) + ")",
-                    _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
-            }
+            _ostatniaPozycja = pozycja;
+            return false;
         }
 
-        long stop = Interlocked.Read(ref _kiedyStop);
-        if (stop == 0 || poprzednia < 0) return false;
-
-        if (DateTime.UtcNow - new DateTime(stop) > TimeSpan.FromSeconds(2)) return false;
-        if (Math.Abs(pozycja - poprzednia) <= 30) return false;
-
-        Interlocked.Exchange(ref _kiedyStop, 0);
-        _ostatniaPozycja = poprzednia;      // ta ramka nie jest pozycja, wiec jej nie pamietamy
-
-        Pulapka.Zapisz(Podpis,
-            "ODRZUCONA odpowiedz na STOP: " + Slad.Podglad(ramka, 5) +
-            " (czytana jak pozycja dalaby " + pozycja + ", a poprzednia to " + poprzednia + ")",
-            _doSterownika, _odSterownika, _odPolaczenia.Elapsed);
+        // Tej ramki nie zapamietujemy - nastepny prawdziwy odczyt ma sie porownac
+        // z ostatnia wiarygodna pozycja, a nie ze smieciem.
+        long ostatni = Interlocked.Read(ref _ostatniZrzut);
+        if (ostatni == 0 || DateTime.UtcNow - new DateTime(ostatni) > TimeSpan.FromSeconds(5))
+        {
+            Interlocked.Exchange(ref _ostatniZrzut, DateTime.UtcNow.Ticks);
+            Pulapka.Zapisz(Podpis,
+                "ODRZUCONY ODCZYT: " + poprzednia + " -> " + pozycja + " (" +
+                Slad.Podglad(ramka, 5) + "), skok ponad 30 stopni miedzy odpytaniami",
+                _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
+        }
         return true;
     }
 
