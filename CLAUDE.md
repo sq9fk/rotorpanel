@@ -91,6 +91,14 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Korelacja bez kolejnosci to nie przyczyna.** Wniosek "sterownik odpowiada 208 na STOP"
+opieral sie na tym, ze 208 wystepowalo **wylacznie** w przebiegach ze STOP-em - dwadziescia
+prob, korelacja zupelna. A mimo to moze byc odwrotnie: program sterujacy wysyla STOP **bo**
+zobaczyl 208. Pulapka zapisywala oba kierunki w osobnych buforach, wiec kolejnosci miedzy nimi
+**nie bylo widac** - i to byl blad narzedzia, nie danych. `Pulapka.Dziennik` prowadzi teraz
+jedna os czasu dla obu kierunkow i zrzuca ja przy **kazdym** nieprawdopodobnym skoku odczytu,
+niezaleznie od tego, czy STOP w ogole wystapil.
+
 **Sterownik odpowiada na STOP ramka w formacie pozycji - i to jest prawdziwe zrodlo
 "ucieczki na 208 stopni".** Zmierzone: po rozkazie `0x0F` Rot1Prog odsyla `57 02 00 08 20`,
 czyli **208** czytane jak azymut, niezaleznie od tego, gdzie antena stoi. W sladzie widac to

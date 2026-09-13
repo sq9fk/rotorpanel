@@ -69,6 +69,8 @@ public sealed class Mostek : IDisposable
     private readonly Pulapka.Bufor _doSterownika = new(256);
     private readonly Pulapka.Bufor _odSterownika = new(256);
     private readonly Pulapka.Wykrywacz _rozkazy = new();
+    private readonly Pulapka.Dziennik _dziennik = new();
+    private long _ostatniZrzut;
 
     // Odpowiedzi sterownika skladamy w cale ramki, zanim trafia na port - patrz SkladaczSpid.
     private readonly SkladaczSpid _skladacz = new();
@@ -527,6 +529,7 @@ public sealed class Mostek : IDisposable
             if (!OdpytywacSpe)
             {
                 (zPortu ? _doSterownika : _odSterownika).Dopisz(bufor, n);
+                _dziennik.Dopisz(zPortu ? "PC ->" : "   <- sterownik", bufor, n);
 
                 // Zapisujemy **kazda** nastawe, nie tylko podejrzana. Jest ich kilka na
                 // godzine, a bez pelnej listy nie da sie powiedziec, czy 208 przyszlo
@@ -645,6 +648,22 @@ public sealed class Mostek : IDisposable
         int pozycja = ramka[1] * 100 + ramka[2] * 10 + ramka[3];
         int poprzednia = _ostatniaPozycja;
         _ostatniaPozycja = pozycja;
+
+        // Kazdy nieprawdopodobny skok odczytu zapisujemy z dziennikiem obu kierunkow -
+        // **bez wzgledu na to, czy byl STOP**. Dopiero kolejnosc zdarzen pokazuje,
+        // co jest przyczyna, a co skutkiem.
+        if (poprzednia >= 0 && Math.Abs(pozycja - poprzednia) > 30)
+        {
+            long ostatni = Interlocked.Read(ref _ostatniZrzut);
+            if (ostatni == 0 || DateTime.UtcNow - new DateTime(ostatni) > TimeSpan.FromSeconds(5))
+            {
+                Interlocked.Exchange(ref _ostatniZrzut, DateTime.UtcNow.Ticks);
+                Pulapka.Zapisz(Podpis,
+                    "SKOK ODCZYTU: " + poprzednia + " -> " + pozycja + " (" +
+                    Slad.Podglad(ramka, 5) + ")",
+                    _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
+            }
+        }
 
         long stop = Interlocked.Read(ref _kiedyStop);
         if (stop == 0 || poprzednia < 0) return false;

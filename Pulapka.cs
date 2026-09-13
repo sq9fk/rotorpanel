@@ -132,6 +132,38 @@ public static class Pulapka
     }
 
     /// <summary>
+    /// Dziennik obu kierunkow w **jednej** osi czasu.
+    ///
+    /// Bufory "do sterownika" i "od sterownika" pokazuja, co przeszlo, ale nie pokazuja
+    /// **kolejnosci miedzy nimi** - a to jest roznica miedzy "sterownik odpowiedzial 208 na
+    /// STOP" a "program wyslal STOP, bo zobaczyl 208". Na tym wlasnie sie potknalem:
+    /// korelacja byla zupelna, a mimo to wniosek mogl byc odwrotny.
+    /// </summary>
+    public sealed class Dziennik
+    {
+        private readonly Queue<string> _wpisy = new();
+        private const int Ile = 150;
+
+        public void Dopisz(string kierunek, byte[] dane, int ile)
+        {
+            string opis = SladSpid.Opis(dane, ile);
+            string wpis = DateTime.Now.ToString("HH:mm:ss.fff") + "  " + kierunek + "  " +
+                          Slad.Podglad(dane, ile) + (opis.Length > 0 ? "   " + opis : "");
+
+            lock (_wpisy)
+            {
+                _wpisy.Enqueue(wpis);
+                while (_wpisy.Count > Ile) _wpisy.Dequeue();
+            }
+        }
+
+        public string Wypisz()
+        {
+            lock (_wpisy) return string.Join(Environment.NewLine + "      ", _wpisy);
+        }
+    }
+
+    /// <summary>
     /// Znak, ze pulapka chodzi. Bez tego "nie ma pliku" znaczy dwie rzeczy naraz: albo nic
     /// podejrzanego nie przeszlo, albo wersja z pulapka w ogole nie byla uruchomiona.
     /// </summary>
@@ -143,7 +175,7 @@ public static class Pulapka
     }
 
     public static void Zapisz(string podpis, string powod, Bufor doSterownika, Bufor odSterownika,
-                              TimeSpan odPolaczenia)
+                              TimeSpan odPolaczenia, Dziennik dziennik = null)
     {
         try
         {
@@ -163,6 +195,11 @@ public static class Pulapka
                                      odPolaczenia.TotalSeconds.ToString("0.0") + " s");
                     pisarz.WriteLine("    do sterownika (ostatnie bajty): " + doSterownika.Hex());
                     pisarz.WriteLine("    od sterownika (ostatnie bajty): " + odSterownika.Hex());
+                }
+                if (dziennik != null)
+                {
+                    pisarz.WriteLine("    przebieg w jednej osi czasu (najstarsze u gory):");
+                    pisarz.WriteLine("      " + dziennik.Wypisz());
                 }
                 pisarz.WriteLine();
             }
