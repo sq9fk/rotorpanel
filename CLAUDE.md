@@ -106,6 +106,22 @@ pierwszym zerwaniu, potem 500, 1000 i 2000 ms, a licznik zeruje sie po polaczeni
 przetrwalo ponad piec sekund. Przy niedostepnym Pi nie dobijamy sie wiec bez konca, a przy
 pojedynczym kopnieciu przerwa jest osmiokrotnie krotsza.
 
+**Ramki szukaj w strumieniu, nie w porcji.** Pierwsza wersja pulapki skanowala kazda porcje
+z osobna - a ramka rozkazu ma 13 bajtow i potrafi przyjsc podzielona (w sladzie widac porcje
+po 1 i 4 bajty). Pulapka mogla wiec przepuscic dokladnie to, na co czekala, i "nie ma pliku"
+nic nie dowodzilo. `Pulapka.Wykrywacz` sklada teraz bajty i wyjmuje z nich cale ramki.
+Ta sama zasada dotyczy wszystkiego, co czyta ten strumien.
+
+**Loguj kazda nastawe, nie tylko podejrzana.** Nastaw jest kilka na godzine, a bez pelnej
+listy nie da sie powiedziec, czy dziwna wartosc przyszla z komputera, czy pojawila sie dalej.
+Do tego przy kazdym zestawieniu lacza idzie linia "pulapka uzbrojona" z numerem wersji -
+inaczej brak pliku znaczy dwie rzeczy naraz: nic nie przeszlo albo wersja z pulapka nie byla
+uruchomiona.
+
+**Azymut licz kilkoma dzielnikami.** Zmierzone: PstRotator wysyla `(azymut + 360) * 10`
+przy bajcie rozdzielczosci 1, ale `1136` przy rozdzielczosci 2 to tez 208 stopni. Pomylka
+w dzielniku ukrylaby wlasnie te nastawe, ktorej szukamy.
+
 **Rzadki objaw lap pulapka, nie sladem.** Slad trzeba wlaczyc **przed** zdarzeniem, wiec
 zlapanie czegos, co zdarza sie raz na kilkanascie minut, wymaga szczescia albo megabajtow
 zapisu. `Pulapka` dziala odwrotnie: chodzi **zawsze**, nic nie zapisuje, dopoki nie zobaczy

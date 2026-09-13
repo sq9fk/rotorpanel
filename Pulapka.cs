@@ -1,4 +1,4 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Pulapka na podejrzane rozkazy rotora. Dziala **zawsze**, bez wlaczania sladu.
@@ -59,43 +59,87 @@ public static class Pulapka
     }
 
     /// <summary>
-    /// Czy w porcji jest rozkaz, ktory nie powinien sie tam znalezc. Sprawdzamy dwie rzeczy:
-    /// nastawe rowna 208 stopni (ta, ktorej nikt nie wydaje) oraz cyfry, ktore nie sa cyframi
-    /// ASCII - bo zerowy bajt czytany jak cyfra daje na bajcie dokladnie 208.
+    /// Sklada strumien w ramki. **Nie wolno szukac ramki w pojedynczej porcji** - ramka
+    /// rozkazu ma 13 bajtow i potrafi przyjsc podzielona na dwie porcje (w sladzie widac
+    /// porcje po 1 i 4 bajty). Pierwsza wersja pulapki tego nie uwzgledniala i mogla
+    /// przepuscic dokladnie to, na co czekala.
     /// </summary>
-    public static bool Podejrzany(byte[] dane, int ile, out string powod)
+    public sealed class Wykrywacz
     {
-        powod = null;
+        private readonly List<byte> _bufor = new();
 
-        for (int i = 0; i + 13 <= ile; i++)
+        public List<byte[]> Ramki(byte[] dane, int ile)
         {
-            if (dane[i] != 0x57 || dane[i + 12] != 0x20) continue;
-            if (dane[i + 11] != 0x2F) continue;          // tylko nastawy, nie zapytania
+            var znalezione = new List<byte[]>();
 
-            bool ascii = true;
-            int wartosc = 0;
-            for (int k = 1; k <= 4; k++)
+            for (int i = 0; i < ile; i++) _bufor.Add(dane[i]);
+
+            int od = 0;
+            while (od + 13 <= _bufor.Count)
             {
-                int cyfra = dane[i + k] - '0';
-                if (cyfra < 0 || cyfra > 9) { ascii = false; break; }
-                wartosc = wartosc * 10 + cyfra;
+                if (_bufor[od] != 0x57 || _bufor[od + 12] != 0x20) { od++; continue; }
+                znalezione.Add(_bufor.GetRange(od, 13).ToArray());
+                od += 13;
             }
 
-            if (!ascii)
-            {
-                powod = "nastawa z cyframi spoza ASCII: " + Bajty(dane, i, 13);
-                return true;
-            }
+            _bufor.RemoveRange(0, od);
 
-            double azymut = wartosc / 10.0 - 360;
-            if (Math.Abs(azymut - 208) < 0.05)
-            {
-                powod = "NASTAWA 208 stopni: " + Bajty(dane, i, 13);
-                return true;
-            }
+            // Bez tego niedokonczona ramka rosla by w nieskonczonosc.
+            if (_bufor.Count > 64) _bufor.RemoveRange(0, _bufor.Count - 64);
+
+            return znalezione;
+        }
+    }
+
+    /// <summary>
+    /// Opis nastawy. Azymut liczymy **na kilka sposobow**, bo bajt rozdzielczosci bywa
+    /// rozny, a pomylka w dzielniku ukrylaby wlasnie te nastawe, ktorej szukamy: 5680/10
+    /// to 208, ale 1136 z rozdzielczoscia 2 albo 2272 z rozdzielczoscia 4 to tez 208.
+    /// </summary>
+    public static string OpiszNastawe(byte[] r, out bool podejrzana)
+    {
+        podejrzana = false;
+        if (r.Length < 13 || r[11] != 0x2F) return null;
+
+        bool ascii = true;
+        int wartosc = 0;
+        for (int k = 1; k <= 4; k++)
+        {
+            int cyfra = r[k] - '0';
+            if (cyfra < 0 || cyfra > 9) { ascii = false; break; }
+            wartosc = wartosc * 10 + cyfra;
         }
 
-        return false;
+        if (!ascii)
+        {
+            podejrzana = true;
+            return "NASTAWA z cyframi spoza ASCII (zerowy bajt czytany jak cyfra daje 208): " +
+                   Bajty(r, 0, 13);
+        }
+
+        int rozdzielczosc = r[5] > 0 ? r[5] : 1;
+        var warianty = new List<string>();
+        foreach (int dzielnik in new[] { 1, 2, 4, 10, 10 * rozdzielczosc })
+        {
+            double az = (double)wartosc / dzielnik - 360;
+            warianty.Add("/" + dzielnik + " = " + az.ToString("0.#"));
+            if (Math.Abs(az - 208) < 0.05) podejrzana = true;
+        }
+
+        return (podejrzana ? "NASTAWA 208 " : "nastawa ") + Bajty(r, 0, 13) +
+               "   cyfry " + wartosc + ", rozdzielczosc " + rozdzielczosc +
+               ", azymut " + string.Join("  ", warianty);
+    }
+
+    /// <summary>
+    /// Znak, ze pulapka chodzi. Bez tego "nie ma pliku" znaczy dwie rzeczy naraz: albo nic
+    /// podejrzanego nie przeszlo, albo wersja z pulapka w ogole nie byla uruchomiona.
+    /// </summary>
+    public static void Uzbrojono(string podpis)
+    {
+        Zapisz(podpis, "pulapka uzbrojona, wersja " +
+               System.Reflection.Assembly.GetExecutingAssembly().GetName().Version, null, null,
+               TimeSpan.Zero);
     }
 
     public static void Zapisz(string podpis, string powod, Bufor doSterownika, Bufor odSterownika,
@@ -113,9 +157,13 @@ public static class Pulapka
                 using var pisarz = new StreamWriter(plik, append: true);
                 pisarz.WriteLine("=== " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "  " + podpis);
                 pisarz.WriteLine("    " + powod);
-                pisarz.WriteLine("    od zestawienia lacza: " + odPolaczenia.TotalSeconds.ToString("0.0") + " s");
-                pisarz.WriteLine("    do sterownika (ostatnie bajty): " + doSterownika.Hex());
-                pisarz.WriteLine("    od sterownika (ostatnie bajty): " + odSterownika.Hex());
+                if (doSterownika != null)
+                {
+                    pisarz.WriteLine("    od zestawienia lacza: " +
+                                     odPolaczenia.TotalSeconds.ToString("0.0") + " s");
+                    pisarz.WriteLine("    do sterownika (ostatnie bajty): " + doSterownika.Hex());
+                    pisarz.WriteLine("    od sterownika (ostatnie bajty): " + odSterownika.Hex());
+                }
                 pisarz.WriteLine();
             }
         }

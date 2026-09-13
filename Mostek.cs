@@ -68,6 +68,7 @@ public sealed class Mostek : IDisposable
     // Sama ramka nie wystarcza: trzeba widziec, co ja poprzedzalo.
     private readonly Pulapka.Bufor _doSterownika = new(256);
     private readonly Pulapka.Bufor _odSterownika = new(256);
+    private readonly Pulapka.Wykrywacz _rozkazy = new();
     private System.Diagnostics.Stopwatch _odPolaczenia = System.Diagnostics.Stopwatch.StartNew();
 
     public Polaczenie Punkt { get; }
@@ -330,6 +331,8 @@ public sealed class Mostek : IDisposable
                 _blad = "";
                 Volatile.Write(ref _stan, (int)StanMostka.Polaczony);
 
+                if (!OdpytywacSpe) Pulapka.Uzbrojono(Podpis);
+
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
                 _czytnikSpe = czytnik;
 
@@ -510,8 +513,17 @@ public sealed class Mostek : IDisposable
             {
                 (zPortu ? _doSterownika : _odSterownika).Dopisz(bufor, n);
 
-                if (zPortu && Pulapka.Podejrzany(bufor, n, out string powod))
-                    Pulapka.Zapisz(Podpis, powod, _doSterownika, _odSterownika, _odPolaczenia.Elapsed);
+                // Zapisujemy **kazda** nastawe, nie tylko podejrzana. Jest ich kilka na
+                // godzine, a bez pelnej listy nie da sie powiedziec, czy 208 przyszlo
+                // z komputera, czy pojawilo sie gdzies dalej.
+                if (zPortu)
+                    foreach (var ramka in _rozkazy.Ramki(bufor, n))
+                    {
+                        string opis = Pulapka.OpiszNastawe(ramka, out _);
+                        if (opis != null)
+                            Pulapka.Zapisz(Podpis, opis, _doSterownika, _odSterownika,
+                                           _odPolaczenia.Elapsed);
+                    }
             }
 
             if (czytnik is null)
