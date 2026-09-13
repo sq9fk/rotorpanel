@@ -91,6 +91,30 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Sterownik odpowiada na STOP ramka w formacie pozycji - i to jest prawdziwe zrodlo
+"ucieczki na 208 stopni".** Zmierzone: po rozkazie `0x0F` Rot1Prog odsyla `57 02 00 08 20`,
+czyli **208** czytane jak azymut, niezaleznie od tego, gdzie antena stoi. W sladzie widac to
+wprost: `295 -> [208] -> 297` i `352 -> [208] -> 348` - antena byla w ruchu i jechala dalej
+swoim torem, a miedzy jej odczyty wpadala ta jedna ramka.
+
+Korelacja jest zupelna: na **dwadziescia** zapisanych przebiegow 208 pojawilo sie **wylacznie
+w tych dwoch, w ktorych uzytkownik nacisnal STOP** - w pozostalych osiemnastu ani razu.
+Stad tez warunek "tylko gdy krece dwoma naraz": przy dwoch rotorach STOP jest naciskany
+znacznie czesciej.
+
+Droga do tego wniosku prowadzila przez cztery bledne hipotezy - zalegle rozkazy w buforze,
+wlasna sonda portow, dzielenie ramek przy 1200 bodach, wreszcie zaklocenia od drugiego silnika.
+Dwie z nich byly prawdziwymi bledami i zostaly naprawione, ale zadna nie byla **ta** przyczyna.
+Rozstrzygnelo zdanie uzytkownika, ze **skacze odczyt, a nie nastawa**, i drugie, ze dzieje sie
+to **tylko przy dwoch rotorach** - dopiero wtedy policzylem korelacje ze STOP-em zamiast
+szukac przeklamanych bajtow.
+
+`Mostek.OdrzucicOdpowiedzNaStop` odrzuca **jedna** ramke: pierwsza po STOP i tylko wtedy, gdy
+skacze o wiecej, niz rotor zdazy sie obrocic miedzy odpytaniami (30 stopni, okno dwoch sekund).
+Prawdziwa pozycja tuz po zatrzymaniu rozni sie o kilka stopni i przechodzi bez zmian. Kazde
+odrzucenie ida do `podejrzane.txt` - **nic nie znika po cichu**, bo filtr na danych o polozeniu
+anteny musi byc rozliczalny.
+
 **Nie dziel ramki tylko dlatego, ze tak przyszla z sieci.** To byla przyczyna odczytu
 208 stopni - i szukalem jej daleko, bo pytanie brzmialo "kto wysyla taka nastawe", a wlasciwe
 brzmialo "kto czyta taka pozycje".

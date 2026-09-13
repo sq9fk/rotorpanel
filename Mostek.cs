@@ -72,6 +72,13 @@ public sealed class Mostek : IDisposable
 
     // Odpowiedzi sterownika skladamy w cale ramki, zanim trafia na port - patrz SkladaczSpid.
     private readonly SkladaczSpid _skladacz = new();
+
+    // Sterownik odpowiada na rozkaz STOP ramka w tym samym formacie co pozycja -
+    // zmierzone: `57 02 00 08 20`, czyli "208 stopni", niezaleznie od tego, gdzie
+    // antena naprawde stoi. Program sterujacy bierze to za odczyt i zaczyna gonic
+    // za widmem. Patrz OdrzucicOdpowiedzNaStop.
+    private long _kiedyStop;
+    private int _ostatniaPozycja = -1;
     private System.Diagnostics.Stopwatch _odPolaczenia = System.Diagnostics.Stopwatch.StartNew();
 
     public Polaczenie Punkt { get; }
@@ -527,6 +534,9 @@ public sealed class Mostek : IDisposable
                 if (zPortu)
                     foreach (var ramka in _rozkazy.Ramki(bufor, n))
                     {
+                        if (ramka.Length >= 13 && ramka[11] == 0x0F)
+                            Interlocked.Exchange(ref _kiedyStop, DateTime.UtcNow.Ticks);
+
                         string opis = Pulapka.OpiszNastawe(ramka, out _);
                         if (opis != null)
                             Pulapka.Zapisz(Podpis, opis, _doSterownika, _odSterownika,
@@ -586,7 +596,9 @@ public sealed class Mostek : IDisposable
                 // 208 stopni - patrz SkladaczSpid.
                 var gotowe = _skladacz.Dopisz(bufor, n);
                 if (gotowe != null)
-                    foreach (var ramka in gotowe) Oddaj(dokad, ramka, ct);
+                    foreach (var ramka in gotowe)
+                        if (!OdrzucicOdpowiedzNaStop(ramka))
+                            Oddaj(dokad, ramka, ct);
             }
         }
     }
@@ -607,6 +619,47 @@ public sealed class Mostek : IDisposable
 
         if (Slad.Wlaczony)
             Zapisz("  do kolejki portu " + dane.Length + " B, w kolejce " + _kolejkaPortu.Count);
+    }
+
+    /// <summary>
+    /// Czy ta ramka to odpowiedz sterownika na STOP, a nie pozycja.
+    ///
+    /// Zmierzone na zywym torze: po rozkazie STOP (`0x0F`) sterownik odpowiada
+    /// `57 02 00 08 20`, czyli w formacie pozycji - "208 stopni" - **niezaleznie od tego,
+    /// gdzie antena stoi**. W sladzie widac to jak na dloni: `295 -> [208] -> 297`
+    /// i `352 -> [208] -> 348`, a korelacja jest zupelna: na dwadziescia zapisanych
+    /// przebiegow 208 pojawilo sie **wylacznie** w tych dwoch, w ktorych byl STOP.
+    ///
+    /// Program sterujacy bierze to za odczyt pozycji i zaczyna korygowac azymut wzgledem
+    /// wartosci, ktorej nigdy nie bylo - stad slynna "ucieczka anteny na 208 stopni".
+    ///
+    /// Odrzucamy wiec **jedna** ramke: pierwsza po STOP, i tylko wtedy, gdy skacze o wiecej,
+    /// niz rotor zdazy sie obrocic miedzy odpytaniami. Prawdziwa pozycja tuz po zatrzymaniu
+    /// rozni sie o kilka stopni i przechodzi bez zmian. Kazde odrzucenie idzie do
+    /// `podejrzane.txt` - **nic nie znika po cichu**.
+    /// </summary>
+    private bool OdrzucicOdpowiedzNaStop(byte[] ramka)
+    {
+        if (ramka.Length != 5 || ramka[0] != 0x57 || ramka[4] != 0x20) return false;
+
+        int pozycja = ramka[1] * 100 + ramka[2] * 10 + ramka[3];
+        int poprzednia = _ostatniaPozycja;
+        _ostatniaPozycja = pozycja;
+
+        long stop = Interlocked.Read(ref _kiedyStop);
+        if (stop == 0 || poprzednia < 0) return false;
+
+        if (DateTime.UtcNow - new DateTime(stop) > TimeSpan.FromSeconds(2)) return false;
+        if (Math.Abs(pozycja - poprzednia) <= 30) return false;
+
+        Interlocked.Exchange(ref _kiedyStop, 0);
+        _ostatniaPozycja = poprzednia;      // ta ramka nie jest pozycja, wiec jej nie pamietamy
+
+        Pulapka.Zapisz(Podpis,
+            "ODRZUCONA odpowiedz na STOP: " + Slad.Podglad(ramka, 5) +
+            " (czytana jak pozycja dalaby " + pozycja + ", a poprzednia to " + poprzednia + ")",
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed);
+        return true;
     }
 
     /// <summary>
