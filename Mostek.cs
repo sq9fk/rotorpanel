@@ -75,9 +75,11 @@ public sealed class Mostek : IDisposable
     // Odpowiedzi sterownika skladamy w cale ramki, zanim trafia na port - patrz SkladaczSpid.
     private readonly SkladaczSpid _skladacz = new();
 
-    // Ostatnia wiarygodna pozycja - do odrzucania odczytow fizycznie niemozliwych.
+    // Ostatnia wiarygodna pozycja, czas jej przyjecia i licznik odrzucen z rzedu.
     // Patrz OdrzucicNieprawdopodobnyOdczyt.
     private int _ostatniaPozycja = -1;
+    private DateTime _kiedyPozycja = DateTime.MinValue;
+    private int _odrzuconeZRzedu;
     private System.Diagnostics.Stopwatch _odPolaczenia = System.Diagnostics.Stopwatch.StartNew();
 
     public Polaczenie Punkt { get; }
@@ -345,6 +347,8 @@ public sealed class Mostek : IDisposable
                 // Po przerwie antena mogla zostac przekrecona recznie - pierwszy odczyt
                 // po polaczeniu nie ma sie do czego porownac i nie wolno go odrzucic.
                 _ostatniaPozycja = -1;
+                _kiedyPozycja = DateTime.MinValue;
+                _odrzuconeZRzedu = 0;
 
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
                 _czytnikSpe = czytnik;
@@ -625,24 +629,26 @@ public sealed class Mostek : IDisposable
     /// <summary>
     /// Czy ten odczyt jest fizycznie niemozliwy, a wiec nie jest odczytem.
     ///
-    /// Rotor obraca sie okolo 2,5 stopnia na sekunde, a odpytywany jest raz na sekunde -
-    /// skok o ponad 30 stopni miedzy odczytami nie moze byc prawda. Protokol SPID nie ma
-    /// sumy kontrolnej, wiec przekrecona ramka wyglada jak poprawny azymut i nikt dalej
-    /// nie ma jak jej odrzucic.
+    /// Rotor robi okolo 2,5 stopnia na sekunde, wiec miedzy odczytami moze zmienic sie
+    /// o tyle, ile minelo czasu. **Prog musi zalezec od czasu, nie byc stala** - i to byl moj
+    /// blad w 1.11.3: sztywne 30 stopni. Gdy antena zostala przekrecona w czasie, gdy nikt nie
+    /// odpytywal (program zamkniety, recznie z panelu), pierwszy odczyt po przerwie roznil sie
+    /// o 60 stopni, wiec zostal odrzucony - a poniewaz odrzuconej ramki nie zapamietujemy,
+    /// **nastepne tez**, i filtr zablokowal sie na dobre. W sladzie widac to jak na dloni:
+    /// antena jechala rowno 302, 305, 310, 313, 316, 319, 321, 326, 329, a filtr porownywal
+    /// wszystko z pozycja 360 sprzed przerwy i odrzucal po kolei.
     ///
-    /// Zmierzone na zywym torze (dziennik z 00:37:13): po zapytaniu, na ktore sterownik
-    /// **nie odpowiedzial**, nastepna odpowiedz brzmiala `57 02 00 08 20`, czyli 208 stopni,
-    /// przy antenie jadacej rowno przez 325. Program sterujacy bral to za pozycje i zaczynal
-    /// korygowac azymut wzgledem wartosci, ktorej nigdy nie bylo.
+    /// Dwa zabezpieczenia, obydwa potrzebne:
     ///
-    /// Wczesniej wiazalem to z rozkazem STOP, bo 208 wystepowalo wylacznie w przebiegach ze
-    /// STOP-em. Dziennik w jednej osi czasu pokazal, ze STOP byl **wspolnym skutkiem**, nie
-    /// przyczyna: on tez powoduje pominiecie odpowiedzi. Warunek nie ma juz z nim nic wspolnego.
+    /// * **prog rosnie z czasem** - piec stopni na sekunde (dwa razy wiecej, niz rotor potrafi)
+    ///   plus dziesiec stopni tolerancji, a po minucie ciszy nie odrzucamy juz nic,
+    /// * **po trzech odrzuceniach z rzedu przyjmujemy odczyt i synchronizujemy sie od nowa** -
+    ///   bo skoro sterownik uparcie mowi to samo, to zla pamiec mamy my, nie on. Filtr, ktory
+    ///   potrafi sie zablokowac, jest gorszy od braku filtra.
     ///
-    /// **To jest proteza, nie naprawa.** Przyczyna siedzi przed mostkiem - w sterowniku,
-    /// przejsciowce albo kablu czujnika - i wychodzi tylko przy dwoch pracujacych rotorach.
-    /// Dlatego kazde odrzucenie trafia do `podejrzane.txt` razem z dziennikiem: filtr na danych
-    /// o polozeniu anteny musi byc rozliczalny co do ramki.
+    /// **To proteza na czas szukania usterki sprzetowej**, nie naprawa: przyczyna siedzi przed
+    /// mostkiem i wychodzi tylko przy dwoch pracujacych rotorach. Kazde odrzucenie idzie do
+    /// `podejrzane.txt` razem z dziennikiem obu kierunkow.
     /// </summary>
     private bool OdrzucicNieprawdopodobnyOdczyt(byte[] ramka)
     {
@@ -651,21 +657,34 @@ public sealed class Mostek : IDisposable
         int pozycja = ramka[1] * 100 + ramka[2] * 10 + ramka[3];
         int poprzednia = _ostatniaPozycja;
 
-        if (poprzednia < 0 || Math.Abs(pozycja - poprzednia) <= 30)
+        double sekundy = _kiedyPozycja == DateTime.MinValue
+            ? double.MaxValue
+            : (DateTime.UtcNow - _kiedyPozycja).TotalSeconds;
+
+        double dopuszczalny = sekundy >= 60 ? double.MaxValue : 5 * sekundy + 10;
+
+        bool wiarygodny = poprzednia < 0 ||
+                          Math.Abs(pozycja - poprzednia) <= dopuszczalny ||
+                          _odrzuconeZRzedu >= 3;
+
+        if (wiarygodny)
         {
             _ostatniaPozycja = pozycja;
+            _kiedyPozycja = DateTime.UtcNow;
+            _odrzuconeZRzedu = 0;
             return false;
         }
 
-        // Tej ramki nie zapamietujemy - nastepny prawdziwy odczyt ma sie porownac
-        // z ostatnia wiarygodna pozycja, a nie ze smieciem.
+        _odrzuconeZRzedu++;
+
         long ostatni = Interlocked.Read(ref _ostatniZrzut);
         if (ostatni == 0 || DateTime.UtcNow - new DateTime(ostatni) > TimeSpan.FromSeconds(5))
         {
             Interlocked.Exchange(ref _ostatniZrzut, DateTime.UtcNow.Ticks);
             Pulapka.Zapisz(Podpis,
                 "ODRZUCONY ODCZYT: " + poprzednia + " -> " + pozycja + " (" +
-                Slad.Podglad(ramka, 5) + "), skok ponad 30 stopni miedzy odpytaniami",
+                Slad.Podglad(ramka, 5) + "), po " + sekundy.ToString("0.0") +
+                " s dopuszczalne bylo " + dopuszczalny.ToString("0") + " st.",
                 _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
         }
         return true;

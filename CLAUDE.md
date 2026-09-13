@@ -118,8 +118,20 @@ Objaw wychodzi **tylko przy dwoch pracujacych rotorach**, co wskazuje na zakloce
 silnika w torze sterownik - przejsciowka - Pi. Protokol SPID nie ma sumy kontrolnej, wiec
 przekrecona ramka wyglada jak poprawny azymut.
 
-`Mostek.OdrzucicNieprawdopodobnyOdczyt` odrzuca odczyt, ktory zmienia sie o wiecej niz
-30 stopni miedzy odpytaniami - rotor robi okolo 2,5 stopnia na sekunde, wiec taki skok nie moze
+**Prog odrzucania musi zalezec od czasu, a filtr nie moze sie zablokowac.** Wersja 1.11.3
+miala sztywne 30 stopni i to bylo zle: gdy antena zostala przekrecona w czasie, gdy nikt nie
+odpytywal, pierwszy odczyt po przerwie roznil sie o 60 stopni, wiec zostal odrzucony - a skoro
+odrzuconej ramki nie zapamietujemy, nastepne tez, i filtr **zablokowal sie na dobre**. W sladzie
+bylo to widac natychmiast: antena jechala rowno 302, 305, 310, 313, 316, 319, 321, 326, 329,
+a filtr porownywal wszystko z pozycja 360 sprzed przerwy. Zrobilem gorzej, niz bylo.
+
+Teraz prog rosnie z czasem (piec stopni na sekunde plus dziesiec tolerancji, a po minucie ciszy
+nie odrzucamy nic), a po **trzech odrzuceniach z rzedu** przyjmujemy odczyt i synchronizujemy
+sie od nowa - skoro sterownik uparcie mowi swoje, to zla pamiec mamy my. **Filtr, ktory potrafi
+sie zablokowac, jest gorszy od braku filtra.**
+
+`Mostek.OdrzucicNieprawdopodobnyOdczyt` odrzuca odczyt, ktory zmienia sie bardziej, niz rotor
+zdazy sie obrocic - rotor robi okolo 2,5 stopnia na sekunde, wiec taki skok nie moze
 byc prawda. Ramki nie zapamietujemy, zeby nastepny prawdziwy odczyt porownal sie z ostatnia
 **wiarygodna** pozycja. Po kazdym zestawieniu lacza pamiec pozycji sie zeruje, bo antena mogla
 zostac przekrecona recznie. **To jest proteza, nie naprawa** - i dlatego kazde odrzucenie idzie
