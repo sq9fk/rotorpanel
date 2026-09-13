@@ -569,6 +569,13 @@ czyszczony tuż przed ruszeniem transmisji, a pierwsza porcja po połączeniu je
 do ciszy na linii, żeby nie wysłać sterownikowi ogona przeciętej ramki. Nastawa, która nie
 dotarła, ma przepaść — nie dotrzeć minutę później.
 
+**Mostki rozłączają się równo co minutę, a rotor „ucieka" na 208°.** Do wersji 1.10.5 program
+sprawdzał dostępność portów ser2neta, otwierając do nich połączenie TCP. Każdy port przyjmuje
+jednego klienta i przy `kickolduser` oddaje go nowemu — więc **druga kopia programu, otwarta
+na innym komputerze i nawet niepołączona, co 60 sekund zrywała mostki tej pierwszej**. Program
+sterujący nie dostawał wtedy odpowiedzi i pokazywał 208° (to nie azymut, tylko `0x00 − '0'`
+policzone na bajcie). Od 1.10.6 portów nie badamy w ogóle.
+
 **Mostek łączy się i natychmiast rozłącza.** Sprawdź, czy `ser2net` po stronie Pi na pewno
 działa — każdy port przyjmuje **jedno** połączenie na raz.
 

@@ -6,10 +6,20 @@ public partial class MainForm
     // --------------------------------------------------------------- ser2net
 
     /// <summary>
-    /// Stan portow ser2net. Portow z dzialajacym mostkiem NIE badamy - kazdy port
-    /// przyjmuje jedno polaczenie, a przy ustawieniu kickolduser proba nawiazania
-    /// drugiego rozlaczylaby wlasny mostek. Dzialajacy mostek i tak jest dowodem,
-    /// ze port odpowiada.
+    /// Stan portow ser2net. **Nie badamy ich zadnym wlasnym polaczeniem.**
+    ///
+    /// Kazdy port ser2neta przyjmuje jednego klienta, a przy ustawieniu `kickolduser` nowe
+    /// polaczenie **wyrzuca** poprzednie. Sprawdzanie dostepnosci bylo wiec strzelaniem
+    /// w stope: program z zatrzymanymi mostkami nie mial czego pomijac, wiec co 60 sekund
+    /// laczyl sie po kolei do wszystkich portow - i kopal mostki **innej kopii programu**,
+    /// uruchomionej na drugim komputerze. Zmierzone w sladzie u uzytkownika: trzy mostki
+    /// zrywane w tej samej milisekundzie, czysto, w rytmie dokladnie 60 sekund. Sprawdzanie,
+    /// ktore psuje to, co sprawdza, jest gorsze niz brak sprawdzania.
+    ///
+    /// Dlatego dioda mowi tylko to, co wiemy **za darmo**, z wlasnych mostkow: polaczony
+    /// mostek jest dowodem, ze port odpowiada, a mostek, ktory sie nie moze polaczyc, niesie
+    /// gotowy komunikat bledu. Gdy wszystkie sa zatrzymane, uczciwa odpowiedz brzmi
+    /// "nie wiem" - i tak jest napisane.
     /// </summary>
     private void OdswiezSer2net()
     {
@@ -25,69 +35,55 @@ public partial class MainForm
 
         _opisSer2net.Text = "ser2net " + _cfg.PiIp;
 
-        string stan = _osiagalnePorty < 0
-            ? "sprawdzanie…"
-            : _osiagalnePorty + " z " + _wszystkiePorty + " portów odpowiada";
-        Podpowiedz(_diodaSer2net, _opisSer2net, _cfg.PiIp + " — " + stan);
-
-        _diodaSer2net.Kolor =
-            _osiagalnePorty < 0            ? Theme.Pomarancz :
-            _osiagalnePorty == 0           ? Color.FromArgb(0xB3, 0x26, 0x1E) :
-            _osiagalnePorty < _wszystkiePorty ? Theme.Pomarancz :
-                                             Theme.Zielony;
-
-        if (_badanieSer2net || DateTime.UtcNow < _nastepneSer2net) return;
-
-        _badanieSer2net = true;
-        SprawdzSer2net(rotory);
-    }
-
-    private async void SprawdzSer2net(List<Rotor> rotory)
-    {
-        int osiagalne = 0;
+        int polaczone = 0, wbledzie = 0, zatrzymane = 0;
         var opisy = new List<string>();
 
         foreach (var rotor in rotory)
         {
-            string adres = _cfg.AdresDla(rotor);
             var mostek = _mostki.FirstOrDefault(m => ReferenceEquals(m.Punkt, rotor));
-
-            bool ok;
+            string adres = _cfg.AdresDla(rotor) + ":" + rotor.Port;
             string skad;
 
-            // Sondowanie otwiera **drugie** polaczenie TCP do tego samego portu ser2net,
-            // a ser2net z kickolduser zrywa wtedy to pierwsze - czyli nasz wlasny mostek.
-            // Wczesniej warunek pomijal tylko mostek **polaczony**, wiec mostek w trakcie
-            // laczenia (zolta dioda) byl sondowany i wylatywal w chwili, gdy sie podnosil;
-            // przy nastepnym przebiegu sondy to samo, i tak w kolko. W sladzie widac bylo
-            // trzy mostki zrywane w tej samej milisekundzie.
-            //
-            // Regula jest prosta: port, ktorego pilnuje mostek, nalezy do mostka.
-            // Jego stan mowi o dostepnosci portu wiecej niz sonda i nic nie kosztuje.
-            if (mostek != null && mostek.Stan != StanMostka.Zatrzymany)
+            switch (mostek?.Stan)
             {
-                ok = mostek.Stan == StanMostka.Polaczony;
-                skad = ok ? "mostek połączony" : "mostek łączy się";
-            }
-            else
-            {
-                ok = await SterownikAnten.Dostepny(adres + ":" + rotor.Port, 2500);
-                skad = ok ? "odpowiada" : "brak odpowiedzi";
+                case StanMostka.Polaczony:
+                    polaczone++;
+                    skad = "odpowiada — mostek połączony";
+                    break;
+
+                case StanMostka.Laczenie when mostek.Blad.Length > 0:
+                    wbledzie++;
+                    skad = "nie odpowiada: " + mostek.Blad;
+                    break;
+
+                case StanMostka.Laczenie:
+                    skad = "łączenie…";
+                    break;
+
+                default:
+                    zatrzymane++;
+                    skad = "nie sprawdzam — mostek zatrzymany";
+                    break;
             }
 
-            if (ok) osiagalne++;
-            opisy.Add(rotor.Etykieta + " " + adres + ":" + rotor.Port + " — " + skad);
+            opisy.Add(rotor.Etykieta + " " + adres + " — " + skad);
         }
 
-        if (IsDisposed) return;
+        _diodaSer2net.Kolor =
+            polaczone == rotory.Count      ? Theme.Zielony :
+            wbledzie == rotory.Count       ? Color.FromArgb(0xB3, 0x26, 0x1E) :
+            zatrzymane == rotory.Count     ? Theme.Szary :
+                                             Theme.Pomarancz;
 
-        _osiagalnePorty = osiagalne;
-        _wszystkiePorty = rotory.Count;
-        _badanieSer2net = false;
-        _nastepneSer2net = DateTime.UtcNow.AddSeconds(osiagalne == rotory.Count ? 60 : 20);
+        string podsumowanie =
+            zatrzymane == rotory.Count ? "mostki zatrzymane — nie sprawdzam portów"
+                                       : polaczone + " z " + rotory.Count + " portów odpowiada";
 
-        string dymek = string.Join(Environment.NewLine, opisy);
-        Podpowiedz(_diodaSer2net, _opisSer2net, dymek);
+        Podpowiedz(_diodaSer2net, _opisSer2net,
+            _cfg.PiIp + " — " + podsumowanie + Environment.NewLine +
+            string.Join(Environment.NewLine, opisy) + Environment.NewLine +
+            "Portów nie badamy własnym połączeniem: ser2net oddaje port nowemu klientowi " +
+            "i zerwałoby to mostek — także w innej kopii programu.");
     }
 
     // ------------------------------------------------------- sterownik anten

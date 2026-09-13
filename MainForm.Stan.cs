@@ -3,18 +3,14 @@
 /// <summary>Karty anten oraz odswiezanie stanu: mostki, ser2net i sterownik anten.</summary>
 public partial class MainForm
 {
-    private DateTime _nastepneSer2net = DateTime.MinValue;
     private DateTime _nastepneSterownik = DateTime.MinValue;
-    private bool _badanieSer2net, _badanieSterownika;
-    private int _osiagalnePorty = -1, _wszystkiePorty;
+    private bool _badanieSterownika;
     private bool? _sterownikOsiagalny;
     private StanSterownika _stanSterownika;
 
     private void ZerujStanySieci()
     {
-        _nastepneSer2net = DateTime.MinValue;
         _nastepneSterownik = DateTime.MinValue;
-        _osiagalnePorty = -1;
         _sterownikOsiagalny = null;
     }
 

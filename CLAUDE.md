@@ -106,26 +106,27 @@ pierwszym zerwaniu, potem 500, 1000 i 2000 ms, a licznik zeruje sie po polaczeni
 przetrwalo ponad piec sekund. Przy niedostepnym Pi nie dobijamy sie wiec bez konca, a przy
 pojedynczym kopnieciu przerwa jest osmiokrotnie krotsza.
 
-**Gdy ser2net zamyka polaczenie "bez bledu", winowajca jest na zewnatrz.** Zmierzone na zywym
-systemie po poprawce sondy: mostki nadal padaly, ale slad pokazywal czyste zamkniecie przez
-druga strone, w rytmie **60 sekund**, po dwa zdarzenia na cykl (odstepy 16 i 44 s), i - co
-rozstrzygajace - **dwa polaczenia do dwoch roznych portow konczyly sie w tej samej
-milisekundzie**. Tak nie wyglada awaria sieci ani nasz blad; tak wyglada ktos, kto co minute
-laczy sie do tych portow (monitoring, skaner, druga kopia programu). ser2net z `kickolduser`
-oddaje port nowemu klientowi, wiec kazde takie sprawdzenie kopie mostek. Po stronie Pi widac to
-w `journalctl -u ser2net` (adres klienta przy "Accepted connection") albo przez
-`tcpdump -n 'tcp port 4001 and tcp[tcpflags] & tcp-syn != 0'`.
+**Nie badaj portow ser2neta zadnym wlasnym polaczeniem. Nigdy.** To byla przyczyna slynnej
+"nastawy 208": nie przeklamanie bajtow, tylko **program, ktory sam sobie (i innej swojej kopii)
+zrywal lacze**.
 
-**Sonda ser2neta zrywala wlasne mostki.** `SprawdzSer2net` pomijala badanie tylko dla mostka
-**polaczonego**, a mostek w trakcie laczenia (zolta dioda) sondowala - czyli otwierala **drugie**
-polaczenie TCP do tego samego portu. ser2net z `kickolduser` zrywa wtedy pierwsze, i mostek
-wylatywal w chwili, gdy sie podnosil; przy nastepnym przebiegu sondy to samo. W sladzie z zywego
-systemu widac **trzy mostki zrywane w tej samej milisekundzie** (21:35:00.822) i dziesiec
-zerwan w 104 sekundy. To tez tlumaczy, czemu objaw wymaga dwoch pracujacych portow: przy jednym
-przebieg sondy jest krotki, przy trzech zawsze ktorys mostek jest w trakcie laczenia.
+Droga do tego wniosku ma trzy etapy i warto ja zapamietac, bo dwa pierwsze byly bledne:
 
-Regula: **port, ktorego pilnuje mostek, nalezy do mostka** - nie sonduj go w zadnym stanie.
-Stan mostka mowi o dostepnosci portu wiecej niz sonda i nic nie kosztuje.
+1. Najpierw podejrzenie padlo na zaleglosci w buforze portu. Odpadlo, gdy uzytkownik
+   powiedzial, ze **208 nigdy nie bylo jego nastawa**.
+2. Potem na sonde, ktora pomijala tylko mostek **polaczony**, a sondowala mostek w trakcie
+   laczenia. To bylo prawda i wymagalo poprawki, ale po niej zerwania **zostaly**.
+3. Rozstrzygnal slad z wlasnym powodem rozlaczenia: ser2net zamykal polaczenie **czysto**,
+   w rytmie **dokladnie 60 sekund**, a dwa polaczenia do dwoch roznych portow konczyly sie
+   **w tej samej milisekundzie**. 60 sekund to nasz wlasny odstep miedzy sprawdzeniami
+   (`osiagalne == rotory.Count ? 60 : 20`), a jeden przebieg laczy sie po kolei do wszystkich
+   portow - w sieci lokalnej w ulamkach milisekundy. Sprawcą była **druga kopia programu na
+   innym komputerze**, z zatrzymanymi mostkami: nie miala czego pomijac, wiec badala wszystko.
+
+Dlatego badania nie ma w ogole. Dioda mowi to, co wiemy za darmo: polaczony mostek jest dowodem,
+ze port odpowiada, mostek z bledem niesie gotowy komunikat, a gdy wszystkie sa zatrzymane,
+uczciwa odpowiedz brzmi "nie wiem" - i tak jest napisane w podpowiedzi. **Sprawdzanie, ktore
+psuje to, co sprawdza, jest gorsze niz brak sprawdzania.**
 
 **Rozkaz nastawy ma azymut w dziesiatych czesciach stopnia.** Zmierzone na zywym torze:
 `57 36 36 30 30 01 ... 2F 20` to `6600` czyli **300,0 st.**, a `3800` to 20,0 st. Czyli cztery
