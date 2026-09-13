@@ -85,7 +85,9 @@ public static class Slad
     /// <summary>Pierwsze bajty porcji, zeby dalo sie rozpoznac ramke.</summary>
     public static string Podglad(byte[] dane, int ile)
     {
-        int n = Math.Min(ile, 12);
+        // 16, bo ramka rozkazu rotora ma 13 bajtow - przy 12 ucinalo ja tuz przed
+        // bajtem rozkazu i w sladzie nie bylo widac, czy to zapytanie, czy nastawa.
+        int n = Math.Min(ile, 16);
         var s = new System.Text.StringBuilder();
         for (int i = 0; i < n; i++) s.Append(dane[i].ToString("X2")).Append(' ');
         if (ile > n) s.Append("...");

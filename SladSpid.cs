@@ -1,4 +1,4 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Rozbior ramek SPID na potrzeby sladu. **Nic nie filtruje i niczego nie zmienia** -
@@ -59,21 +59,28 @@ public static class SladSpid
         return opis.ToString();
     }
 
-    /// <summary>Cyfry ASCII rozkazu: wartosc to (az + 360) * rozdzielczosc.</summary>
+    /// <summary>
+    /// Cyfry ASCII rozkazu. Zmierzone na zywym torze (PstRotator - Rot1Prog): cztery cyfry
+    /// to azymut **w dziesiatych czesciach stopnia**, przesuniety o 360 - `6600` to 300,0 st.,
+    /// `3800` to 20,0 st. Wczesniej dzielilem przez rozdzielczosc i w sladzie wychodzily
+    /// bzdury w rodzaju "6240 st.".
+    ///
+    /// Zerowe bajty w polach cyfr **nie sa** cyframi i celowo tego nie udajemy: `0x00 - '0'`
+    /// daje na bajcie 208 i wlasnie stad bierze sie slynna "ucieczka na 208 stopni".
+    /// </summary>
     private static string AzymutAscii(byte[] d, int od)
     {
         int wartosc = 0;
         for (int k = 0; k < 4; k++)
         {
             int cyfra = d[od + k] - '0';
-            if (cyfra < 0 || cyfra > 9) return "? (cyfry " + Bajt(d[od]) + " " + Bajt(d[od + 1]) +
-                                               " " + Bajt(d[od + 2]) + " " + Bajt(d[od + 3]) + ")";
+            if (cyfra < 0 || cyfra > 9)
+                return "CYFRY NIE-ASCII " + Bajt(d[od]) + " " + Bajt(d[od + 1]) + " " +
+                       Bajt(d[od + 2]) + " " + Bajt(d[od + 3]) +
+                       " (bajt zerowy czytany jak cyfra daje 208)";
             wartosc = wartosc * 10 + cyfra;
         }
-
-        int rozdzielczosc = d[od + 4];
-        if (rozdzielczosc <= 0) return "? (rozdzielczosc " + Bajt(d[od + 4]) + ")";
-        return (wartosc / rozdzielczosc - 360).ToString();
+        return (wartosc / 10.0 - 360).ToString("0.0");
     }
 
     /// <summary>Cyfry odpowiedzi sa surowe, nie w ASCII.</summary>

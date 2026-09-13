@@ -55,10 +55,19 @@ public partial class MainForm
             bool ok;
             string skad;
 
-            if (mostek != null && mostek.Stan == StanMostka.Polaczony)
+            // Sondowanie otwiera **drugie** polaczenie TCP do tego samego portu ser2net,
+            // a ser2net z kickolduser zrywa wtedy to pierwsze - czyli nasz wlasny mostek.
+            // Wczesniej warunek pomijal tylko mostek **polaczony**, wiec mostek w trakcie
+            // laczenia (zolta dioda) byl sondowany i wylatywal w chwili, gdy sie podnosil;
+            // przy nastepnym przebiegu sondy to samo, i tak w kolko. W sladzie widac bylo
+            // trzy mostki zrywane w tej samej milisekundzie.
+            //
+            // Regula jest prosta: port, ktorego pilnuje mostek, nalezy do mostka.
+            // Jego stan mowi o dostepnosci portu wiecej niz sonda i nic nie kosztuje.
+            if (mostek != null && mostek.Stan != StanMostka.Zatrzymany)
             {
-                ok = true;
-                skad = "mostek połączony";
+                ok = mostek.Stan == StanMostka.Polaczony;
+                skad = ok ? "mostek połączony" : "mostek łączy się";
             }
             else
             {

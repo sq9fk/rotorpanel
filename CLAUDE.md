@@ -91,6 +91,30 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**"Ucieczka na 208 stopni" to nie azymut, tylko arytmetyka na pustym buforze.**
+`0x00 - '0'` = `0x00 - 0x30` = `0xD0` = **208** przy odejmowaniu bez znaku na bajcie. Jedyna
+stala, zawsze obecna ramka w tym torze to zapytanie o pozycje
+`57 00 00 00 00 00 00 00 00 00 00 1F 20` - w polach cyfr **same zera**. Kto potraktuje zerowy
+bajt jak cyfre ASCII, dostaje 208, **zawsze te sama wartosc, bo wejsciem jest pustka**. Stad
+"nastawa 208" pojawia sie dokladnie wtedy, gdy lacze pada i program sterujacy nie dostaje
+odpowiedzi. Szukaj wiec nie zrodla liczby 208, tylko **zrodla zerwania lacza**.
+
+**Sonda ser2neta zrywala wlasne mostki.** `SprawdzSer2net` pomijala badanie tylko dla mostka
+**polaczonego**, a mostek w trakcie laczenia (zolta dioda) sondowala - czyli otwierala **drugie**
+polaczenie TCP do tego samego portu. ser2net z `kickolduser` zrywa wtedy pierwsze, i mostek
+wylatywal w chwili, gdy sie podnosil; przy nastepnym przebiegu sondy to samo. W sladzie z zywego
+systemu widac **trzy mostki zrywane w tej samej milisekundzie** (21:35:00.822) i dziesiec
+zerwan w 104 sekundy. To tez tlumaczy, czemu objaw wymaga dwoch pracujacych portow: przy jednym
+przebieg sondy jest krotki, przy trzech zawsze ktorys mostek jest w trakcie laczenia.
+
+Regula: **port, ktorego pilnuje mostek, nalezy do mostka** - nie sonduj go w zadnym stanie.
+Stan mostka mowi o dostepnosci portu wiecej niz sonda i nic nie kosztuje.
+
+**Rozkaz nastawy ma azymut w dziesiatych czesciach stopnia.** Zmierzone na zywym torze:
+`57 36 36 30 30 01 ... 2F 20` to `6600` czyli **300,0 st.**, a `3800` to 20,0 st. Czyli cztery
+cyfry ASCII = (azymut + 360) * 10. Odpowiedz sterownika ma format inny - piec bajtow z cyframi
+**surowymi** (`57 H1 H2 H3 20`, azymut = H1*100 + H2*10 + H3 - 360). Nie myl tych dwoch.
+
 **Nastawa 208, ktorej nikt nie wydal: policzone, nie zgadniete.** Uczciwy rozkaz "obroc na
 208" to `57 30 35 36 38 01 30 30 30 30 01 2F 20`. Przeliczone dla wszystkich azymutow 0-359
 i wszystkich przeklaman, jakie moze dac lacze szeregowe (`narzedzia`-owy odpowiednik siedzi

@@ -328,6 +328,12 @@ public sealed class Mostek : IDisposable
             catch (Exception ex) { _blad = ex.Message; }
             finally
             {
+                // Bez tego slad milczy o najwazniejszym: czemu lacze padlo. Przy zrywaniu
+                // przez ser2net (kickolduser) i przy zwyklym zaniku sieci wyglada to inaczej.
+                if (Slad.Wlaczony)
+                    Zapisz("polaczenie zakonczone" +
+                           (_blad.Length > 0 ? ": " + _blad : " bez bledu (druga strona zamknela)"));
+
                 _biezacyKlient = null;
                 _biezacyPort = null;
                 _biezacaSiec = null;
