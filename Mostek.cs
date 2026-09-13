@@ -69,6 +69,9 @@ public sealed class Mostek : IDisposable
     private readonly Pulapka.Bufor _doSterownika = new(256);
     private readonly Pulapka.Bufor _odSterownika = new(256);
     private readonly Pulapka.Wykrywacz _rozkazy = new();
+
+    // Odpowiedzi sterownika skladamy w cale ramki, zanim trafia na port - patrz SkladaczSpid.
+    private readonly SkladaczSpid _skladacz = new();
     private System.Diagnostics.Stopwatch _odPolaczenia = System.Diagnostics.Stopwatch.StartNew();
 
     public Polaczenie Punkt { get; }
@@ -351,7 +354,12 @@ public sealed class Mostek : IDisposable
                 var pytania = czytnik is null ? Task.Delay(Timeout.Infinite, ct)
                                               : OdpytujSpe(siec, czytnik, ct);
 
-                await Task.WhenAny(wGore, wDol, pytania, pisarz);
+                // Odczyt z sieci potrafi stanac na sekunde, wiec zalegly ogon ramki
+                // musi miec kto wypchnac.
+                var dopychacz = OdpytywacSpe ? Task.Delay(Timeout.Infinite, ct)
+                                             : DopychajRamki(port, ct);
+
+                await Task.WhenAny(wGore, wDol, pytania, pisarz, dopychacz);
             }
             catch (OperationCanceledException) { break; }
             catch (ObjectDisposedException) { break; }
@@ -565,11 +573,20 @@ public sealed class Mostek : IDisposable
                 }
                 finally { _bramka.Release(); }
             }
-            else
+            else if (OdpytywacSpe)
             {
                 var kopia = new byte[n];
                 Array.Copy(bufor, kopia, n);
                 Oddaj(dokad, kopia, ct);
+            }
+            else
+            {
+                // Rotor: oddajemy cale ramki albo nic. Kawalek ramki wpisany na port
+                // konczy sie tym, ze program sterujacy czyta pusty bufor i pokazuje
+                // 208 stopni - patrz SkladaczSpid.
+                var gotowe = _skladacz.Dopisz(bufor, n);
+                if (gotowe != null)
+                    foreach (var ramka in gotowe) Oddaj(dokad, ramka, ct);
             }
         }
     }
@@ -590,6 +607,28 @@ public sealed class Mostek : IDisposable
 
         if (Slad.Wlaczony)
             Zapisz("  do kolejki portu " + dane.Length + " B, w kolejce " + _kolejkaPortu.Count);
+    }
+
+    /// <summary>
+    /// Wypycha na port ogon ramki, ktory nie doczekal sie dokonczenia. Patrz
+    /// <see cref="SkladaczSpid.Dopchnij"/> - bez tego czekalby do nastepnej odpowiedzi.
+    /// </summary>
+    private async Task DopychajRamki(Stream port, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await Task.Delay(50, ct);
+
+            var zalegle = _skladacz.Dopchnij();
+            if (zalegle == null) continue;
+
+            foreach (var ramka in zalegle)
+            {
+                if (Slad.Wlaczony)
+                    ZapiszRamke("siec->port OGON po ciszy", ramka, ramka.Length);
+                Oddaj(port, ramka, ct);
+            }
+        }
     }
 
     private async Task PisarzPortu(Stream port, CancellationToken ct)

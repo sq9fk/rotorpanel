@@ -91,6 +91,27 @@ na host i port. Adres URL sam składa się dopiero w momencie pobierania nazw.
 **Nazwy anten są tylko do odczytu.** Jedynym źródłem jest sterownik przełącznicy. Ręczna edycja
 rozjechałaby się z rzeczywistością przy pierwszym pobraniu.
 
+**Nie dziel ramki tylko dlatego, ze tak przyszla z sieci.** To byla przyczyna odczytu
+208 stopni - i szukalem jej daleko, bo pytanie brzmialo "kto wysyla taka nastawe", a wlasciwe
+brzmialo "kto czyta taka pozycje".
+
+Sterownik nadaje **1200 bodow**, wiec pieciobajtowa odpowiedz `57 H1 H2 H3 20` idzie laczem
+ponad 40 ms i dociera do nas w kawalkach. Mostek oddawal kazdy kawalek osobno, a zapis na pare
+com0com potrafi stanac - zmierzone w sladzie: `zapisano na port 1 B w 203 ms` i `4 B w 589 ms`.
+Program sterujacy dostawal wiec `57`, czekal, nie doczekiwal sie reszty i czytal swoj pusty
+bufor. Zerowy bajt wziety za cyfre ASCII daje `0x00 - '0' = 0xD0 = 208` - stad **zawsze ta sama
+liczba**, bo pustka jest zawsze taka sama. Potem PstRotator, wierzac, ze antena stoi na 208,
+kazal jej tam pojechac - i stad **fizyczny** obrot, mimo ze nikt takiej nastawy nie wydal.
+
+`SkladaczSpid` oddaje teraz **cala ramke naraz albo nic**, z zaworem bezpieczenstwa: ogon,
+ktory nie doczekal sie dokonczenia przez 120 ms, idzie dalej taki, jaki jest (inaczej doklejalby
+sie do nastepnej odpowiedzi). Sprawdzone osmioma przypadkami, w tym odpowiedzia przychodzaca
+bajt po bajcie i niepelna ramka, ktora **nie wychodzi**, dopoki nie minie cisza.
+
+To tlumaczy tez dwie rzeczy, ktore przez caly czas mnie mylily: objaw wymagal **dwoch
+pracujacych portow** (wiecej ruchu to dluzsze przerwy miedzy kawalkami) i chodzil w parze
+z **zolta dioda** (po zestawieniu lacza pierwsze ramki sa najbardziej poszarpane).
+
 **"Ucieczka na 208 stopni" to nie azymut, tylko arytmetyka na pustym buforze.**
 `0x00 - '0'` = `0x00 - 0x30` = `0xD0` = **208** przy odejmowaniu bez znaku na bajcie. Jedyna
 stala, zawsze obecna ramka w tym torze to zapytanie o pozycje
