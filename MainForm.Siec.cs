@@ -66,10 +66,16 @@ public partial class MainForm
                     break;
             }
 
+            if (mostek is { ObcePrzejecia: > 0 })
+                skad += "; port przejmowany przez inny program (" + mostek.ObcePrzejecia + "×)";
+
             opisy.Add(rotor.Etykieta + " " + adres + " — " + skad);
         }
 
+        bool przejmowany = _mostki.Any(m => m.ObcePrzejecia > 0);
+
         _diodaSer2net.Kolor =
+            przejmowany                    ? Theme.Pomarancz :
             polaczone == rotory.Count      ? Theme.Zielony :
             wbledzie == rotory.Count       ? Color.FromArgb(0xB3, 0x26, 0x1E) :
             zatrzymane == rotory.Count     ? Theme.Szary :

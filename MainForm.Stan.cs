@@ -344,6 +344,18 @@ public partial class MainForm
             if (!string.IsNullOrEmpty(m.Blad)) ostatniBlad = m.Punkt.Etykieta + ": " + m.Blad;
         }
 
+        // Przejmowanie portu przez inny program nie jest bledem mostka - polaczenie
+        // dziala, tylko co chwile ktos je zabiera. Bez tej informacji objawia sie to
+        // wylacznie jako program sterujacy bez odpowiedzi, co jest mylace.
+        if (ostatniBlad.Length == 0)
+        {
+            var przejmowany = _mostki.FirstOrDefault(m => m.ObcePrzejecia > 0);
+            if (przejmowany != null)
+                ostatniBlad = przejmowany.Punkt.Etykieta + ": port " + przejmowany.Punkt.Port +
+                              " przejmowany przez inny program (" + przejmowany.ObcePrzejecia +
+                              "× w ostatnich minutach)";
+        }
+
         _stopka.Text = ostatniBlad;
         _stopka.ForeColor = string.IsNullOrEmpty(ostatniBlad)
             ? Theme.TekstSzary

@@ -57,12 +57,27 @@ public sealed class Mostek : IDisposable
     /// <summary>Ile razy z rzedu polaczenie padlo od razu - do stopniowania zwloki.</summary>
     private int _nieudanePodejscia;
 
+    // Czyste zamkniecie przez druga strone znaczy, ze ser2net oddal port komus innemu
+    // (kickolduser). Pojedyncze zdarza sie przy restarcie ser2neta; powtarzajace sie
+    // znaczy, ze ktos walczy z nami o port - i to warto pokazac, bo inaczej objawia sie
+    // to tylko jako program sterujacy bez odpowiedzi.
+    private int _obcePrzejecia;
+    private long _pierwszePrzejecie;
+
     public Polaczenie Punkt { get; }
     public string Adres => _cfg.AdresDla(Punkt);
     public StanMostka Stan => (StanMostka)Volatile.Read(ref _stan);
     public long Rx => Interlocked.Read(ref _rx);
     public long Tx => Interlocked.Read(ref _tx);
     public string Blad => _blad;
+
+    /// <summary>
+    /// Ile razy druga strona zamknela nam polaczenie czysto, bez bledu, w ostatnich
+    /// minutach. Rosnie tylko wtedy, gdy zdarza sie to wielokrotnie - jednorazowe
+    /// zamkniecie (restart ser2neta) nie jest jeszcze podejrzane.
+    /// </summary>
+    public int ObcePrzejecia => Volatile.Read(ref _obcePrzejecia) >= 3
+        ? Volatile.Read(ref _obcePrzejecia) : 0;
 
     /// <summary>Ostatni odczytany stan wzmacniacza SPE albo null.</summary>
     public StatusSpe Status => _status;
@@ -290,6 +305,7 @@ public sealed class Mostek : IDisposable
                 klient = new TcpClient();
                 _biezacyKlient = klient;
                 await PolaczAsync(klient, Adres, Punkt.Port, ct);
+                WlaczKeepAlive(klient);
 
                 siec = klient.GetStream();
 
@@ -338,6 +354,9 @@ public sealed class Mostek : IDisposable
                     Zapisz("polaczenie zakonczone" +
                            (_blad.Length > 0 ? ": " + _blad : " bez bledu (druga strona zamknela)"));
 
+                if (_blad.Length == 0 && Volatile.Read(ref _stan) == (int)StanMostka.Polaczony)
+                    PoliczPrzejecie();
+
                 _biezacyKlient = null;
                 _biezacyPort = null;
                 _biezacaSiec = null;
@@ -369,6 +388,49 @@ public sealed class Mostek : IDisposable
         }
 
         Volatile.Write(ref _stan, (int)StanMostka.Zatrzymany);
+    }
+
+    /// <summary>
+    /// Wlacza podtrzymywanie polaczenia TCP: po 10 s ciszy sonda co 2 s.
+    ///
+    /// Ma znaczenie po stronie ser2neta. Gdy komputer padnie albo zniknie siec, jego sesja
+    /// zostaje na Pi jako zywa i **blokuje port** - domyslne keepalive w Linuksie rusza po
+    /// dwoch godzinach. Z wlaczonym podtrzymywaniem martwa sesja znika w kilkanascie sekund
+    /// i port wraca do uzytku. To jest warunek, ktory pozwala **wylaczyc `kickolduser`**
+    /// po stronie ser2neta, a to z kolei jedyny sposob, zeby przypadkowe polaczenie z innego
+    /// programu nie wyrzucalo dzialajacego mostka.
+    /// </summary>
+    private static void WlaczKeepAlive(TcpClient klient)
+    {
+        try
+        {
+            var ustawienia = new byte[12];
+            BitConverter.GetBytes(1u).CopyTo(ustawienia, 0);        // wlaczone
+            BitConverter.GetBytes(10000u).CopyTo(ustawienia, 4);    // po 10 s ciszy
+            BitConverter.GetBytes(2000u).CopyTo(ustawienia, 8);     // sonda co 2 s
+            klient.Client.IOControl(IOControlCode.KeepAliveValues, ustawienia, null);
+        }
+        catch { /* starszy system - zostaja domyslne */ }
+    }
+
+    /// <summary>
+    /// Zlicza czyste zamkniecia przez druga strone w oknie pieciu minut. Trzy takie
+    /// zamkniecia to juz nie przypadek: ser2net oddaje port jednemu klientowi naraz,
+    /// wiec ktos inny laczy sie do niego cyklicznie i za kazdym razem nas wypycha.
+    /// </summary>
+    private void PoliczPrzejecie()
+    {
+        long teraz = DateTime.UtcNow.Ticks;
+        long pierwsze = Interlocked.Read(ref _pierwszePrzejecie);
+
+        if (pierwsze == 0 || new TimeSpan(teraz - pierwsze) > TimeSpan.FromMinutes(5))
+        {
+            Interlocked.Exchange(ref _pierwszePrzejecie, teraz);
+            Volatile.Write(ref _obcePrzejecia, 1);
+            return;
+        }
+
+        Volatile.Write(ref _obcePrzejecia, Volatile.Read(ref _obcePrzejecia) + 1);
     }
 
     /// <summary>

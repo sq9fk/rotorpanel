@@ -106,6 +106,25 @@ pierwszym zerwaniu, potem 500, 1000 i 2000 ms, a licznik zeruje sie po polaczeni
 przetrwalo ponad piec sekund. Przy niedostepnym Pi nie dobijamy sie wiec bez konca, a przy
 pojedynczym kopnieciu przerwa jest osmiokrotnie krotsza.
 
+**Obrona przed przejeciem portu jest trojwarstwowa i zadna warstwa nie wystarcza sama.**
+Port ser2neta ma jednego wlasciciela, wiec pytanie brzmi nie "czy ktos go zabierze", tylko
+"co sie stanie, gdy sprobuje":
+
+1. **Program nie prosi** - zadnego badania portow (nizej). To usuwa jedynego znanego sprawce.
+2. **ser2net nie oddaje** - `kickolduser: false` w konfiguracji. Wtedy przypadkowe polaczenie
+   z innego programu dostaje odmowe, zamiast wypychac dzialajacy mostek. Warunkiem jest punkt
+   trzeci, inaczej martwa sesja zablokuje port na godziny.
+3. **Martwa sesja znika sama** - mostek wlacza keepalive TCP (`WlaczKeepAlive`: 10 s ciszy,
+   sonda co 2 s). Gdy komputer padnie albo zniknie siec, ser2net zobaczy to w kilkanascie
+   sekund zamiast po dwoch godzinach domyslnego keepalive Linuksa. Bez tego `kickolduser`
+   jest potrzebny i kolko sie zamyka.
+
+Do tego **widocznosc**: `Mostek.ObcePrzejecia` liczy czyste zamkniecia przez druga strone
+w oknie pieciu minut i dopiero trzecie uznaje za podejrzane (jedno zdarza sie przy restarcie
+ser2neta). Wtedy dioda ser2neta robi sie pomaranczowa, a w stopce okna stoi wprost "port 4001
+przejmowany przez inny program (3x)". Bez tego objaw wyglada wylacznie jak program sterujacy
+bez odpowiedzi - czyli jak nastawa 208 - i szuka sie nie tam, gdzie trzeba.
+
 **Nie badaj portow ser2neta zadnym wlasnym polaczeniem. Nigdy.** To byla przyczyna slynnej
 "nastawy 208": nie przeklamanie bajtow, tylko **program, ktory sam sobie (i innej swojej kopii)
 zrywal lacze**.
