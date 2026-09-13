@@ -114,10 +114,15 @@ Port ser2neta ma jednego wlasciciela, wiec pytanie brzmi nie "czy ktos go zabier
 2. **ser2net nie oddaje** - `kickolduser: false` w konfiguracji. Wtedy przypadkowe polaczenie
    z innego programu dostaje odmowe, zamiast wypychac dzialajacy mostek. Warunkiem jest punkt
    trzeci, inaczej martwa sesja zablokuje port na godziny.
-3. **Martwa sesja znika sama** - mostek wlacza keepalive TCP (`WlaczKeepAlive`: 10 s ciszy,
-   sonda co 2 s). Gdy komputer padnie albo zniknie siec, ser2net zobaczy to w kilkanascie
-   sekund zamiast po dwoch godzinach domyslnego keepalive Linuksa. Bez tego `kickolduser`
-   jest potrzebny i kolko sie zamyka.
+3. **Martwa sesja musi znikac** - i tu uwaga na latwa pomylke, ktora sam popelnilem:
+   keepalive TCP wykrywa martwego rozmowce **tylko tej stronie, ktora wysyla sondy**.
+   `WlaczKeepAlive` (10 s ciszy, sonda co 2 s) chroni wiec **nas**: gdy Pi zniknie, mostek
+   dowiaduje sie o tym w kilkanascie sekund zamiast siedziec na martwym gniezdzie. Nie
+   przyspiesza natomiast sprzatania po **naszej** martwej sesji po stronie Pi - gdy padnie
+   komputer, sond nie ma kto wysylac. Tamta strona potrzebuje wlasnego srodka: `timeout`
+   w konfiguracji ser2neta (zamyka polaczenie po N sekundach bez danych) albo keepalive
+   wlaczonego u siebie. Bez tego `kickolduser: false` oznacza, ze po padzie komputera port
+   bywa zablokowany az do domyslnych dwoch godzin keepalive Linuksa.
 
 Do tego **widocznosc**: `Mostek.ObcePrzejecia` liczy czyste zamkniecia przez druga strone
 w oknie pieciu minut i dopiero trzecie uznaje za podejrzane (jedno zdarza sie przy restarcie
