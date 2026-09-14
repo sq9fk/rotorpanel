@@ -90,9 +90,9 @@ public sealed class Mostek : IDisposable
 
     // Ostatnia wiarygodna pozycja, czas jej przyjecia i licznik odrzucen z rzedu.
     // Patrz ZanotujZapytanie. Zapytania wyslane, na ktore nie ma jeszcze odpowiedzi.
-    private sealed class Wymiana { public long Tik; public bool Zgloszona; }
-    private readonly Queue<Wymiana> _wymiany = new();
-    private int _brakow, _spoznionych, _ileWymian;
+    private readonly Queue<long> _wymiany = new();
+    private int _brakow, _spoznionych, _ileWymian, _zapytan, _odpowiedzi, _zdlawionych;
+    private long _ostatnieZapytanie;
     private double _sumaMs, _minMs = double.MaxValue, _maxMs;
     private long _ostatniZrzutBraku;
 
@@ -375,6 +375,9 @@ public sealed class Mostek : IDisposable
                 {
                     _wymiany.Clear();
                     _ileWymian = 0; _sumaMs = 0; _minMs = double.MaxValue; _maxMs = 0;
+                    _zapytan = 0; _odpowiedzi = 0;
+                    Volatile.Write(ref _zdlawionych, 0);
+                    Interlocked.Exchange(ref _ostatnieZapytanie, 0);
                 }
                 Volatile.Write(ref _brakow, 0);
                 Volatile.Write(ref _spoznionych, 0);
@@ -630,12 +633,15 @@ public sealed class Mostek : IDisposable
                     var rozkazy = _skladaczRozkazow.Dopisz(bufor, n);
                     if (rozkazy != null)
                     {
+                        bool cokolwiek = false;
                         foreach (var ramka in rozkazy)
                         {
+                            if (ZadlawicZapytanie(ramka)) continue;
                             ZanotujZapytanie(ramka);
                             await dokad.WriteAsync(ramka, 0, ramka.Length, ct);
+                            cokolwiek = true;
                         }
-                        await dokad.FlushAsync(ct);
+                        if (cokolwiek) await dokad.FlushAsync(ct);
                     }
                 }
                 finally { _bramka.Release(); }
@@ -689,8 +695,76 @@ public sealed class Mostek : IDisposable
     /// </summary>
     public int BrakiOdpowiedzi => Volatile.Read(ref _brakow);
 
-    /// <summary>Ile z nich przyszlo jednak pozniej - czyli byl zator, a nie zguba.</summary>
+    /// <summary>Ile odpowiedzi przyszlo po terminie, gdy juz nikt na nie nie czekal.</summary>
     public int SpoznioneOdpowiedzi => Volatile.Read(ref _spoznionych);
+
+    /// <summary>Ile zapytan o pozycje pominelismy, bo szly za gesto.</summary>
+    public int ZdlawioneZapytania => Volatile.Read(ref _zdlawionych);
+
+    /// <summary>
+    /// Czy to zapytanie o pozycje idzie **za szybko po poprzednim** i lepiej je pominac.
+    ///
+    /// Zmierzone zrzutem pakietow na Pi, 600 zapytan przez dziesiec minut: sterownik odpowiedzial
+    /// 597 razy, za kazdym razem calymi pieciona bajtami, w 220-252 ms. Trzy zapytania zignorowal
+    /// **zupelnie** - zero bajtow. I tu jest rzecz ciekawa:
+    ///
+    /// <code>
+    /// odstep od poprzedniego zapytania    ile    bez odpowiedzi
+    /// ponizej 800 ms                        2          2  (100%)
+    /// 950 ms i wiecej                     596          1  (0,2%)
+    /// </code>
+    ///
+    /// Oba zapytania wyslane gesciej niz co 800 ms przepadly. Sterownik potrzebuje 245 ms na
+    /// odpowiedz i najwyrazniej jeszcze chwili na dojscie do siebie; odpytany za wczesnie
+    /// po prostu milczy. Dlatego mostek pilnuje odstepu za klienta.
+    ///
+    /// **Dlawimy wylacznie zapytania o pozycje** (`1F`). Nastawa i STOP ida zawsze i natychmiast -
+    /// tego nie wolno opozniac ani gubic. Pominiete zapytanie nic nie kosztuje, bo PstRotator
+    /// pyta znowu za sekunde, a sterownik i tak by na nie nie odpowiedzial.
+    ///
+    /// **Podstawa dowodowa jest cienka - dwa przypadki.** Dlatego licznik <see cref="ZdlawioneZapytania"/>
+    /// jest widoczny obok bilansu zapytan i odpowiedzi: jesli dlawienie nie poprawi tego bilansu,
+    /// to jedna linijka do usuniecia.
+    /// </summary>
+    private bool ZadlawicZapytanie(byte[] ramka)
+    {
+        if (!(Punkt is Rotor) || _skladaczRozkazow.Przezroczysty) return false;
+        if (ramka.Length != 13 || ramka[0] != 0x57 || ramka[12] != 0x20 || ramka[11] != 0x1F)
+            return false;
+
+        long teraz = DateTime.UtcNow.Ticks;
+        long poprzednie = Interlocked.Read(ref _ostatnieZapytanie);
+
+        if (poprzednie != 0 &&
+            TimeSpan.FromTicks(teraz - poprzednie).TotalMilliseconds < 800)
+        {
+            Interlocked.Increment(ref _zdlawionych);
+            return true;
+        }
+
+        Interlocked.Exchange(ref _ostatnieZapytanie, teraz);
+        return false;
+    }
+
+    /// <summary>
+    /// Ile zapytan o pozycje wyszlo i ile odpowiedzi wrocilo. **Sama roznica tych dwoch liczb
+    /// jest odporna na wszystko** - nie wymaga dopasowywania odpowiedzi do zapytan, wiec nie da
+    /// sie jej rozjechac. Pierwsza wersja pomiaru liczyla czasy przez kolejke FIFO i gdy raz
+    /// zabraklo odpowiedzi, kazda nastepna byla przypisywana do zapytania sprzed sekundy -
+    /// w podpowiedzi wychodzily wtedy srednie po cztery sekundy, ktore z rzeczywistoscia nie
+    /// mialy nic wspolnego. Licznik nie klamie nawet wtedy, gdy dopasowanie zawiedzie.
+    /// </summary>
+    public string BilansWymian
+    {
+        get
+        {
+            int z = Volatile.Read(ref _zapytan), o = Volatile.Read(ref _odpowiedzi);
+            if (z == 0) return "";
+            return "zapytań " + z + ", odpowiedzi " + o +
+                   (z - o > 0 ? " (brak " + (z - o) + ")" : "") +
+                   (ZdlawioneZapytania > 0 ? ", zdławionych " + ZdlawioneZapytania : "");
+        }
+    }
 
     /// <summary>
     /// Czasy obrotu zapytanie-odpowiedz, w milisekundach. Sam **rozrzut** jest tu informacja:
@@ -737,24 +811,37 @@ public sealed class Mostek : IDisposable
             ramka[12] != 0x20 || ramka[11] != 0x1F) return;
 
         long teraz = DateTime.UtcNow.Ticks;
+        Interlocked.Increment(ref _zapytan);
+
+        int porzucone = 0;
+        double najstarsze = 0;
 
         lock (_wymiany)
         {
-            foreach (var w in _wymiany)
+            // **Porzucamy zamiast dryfowac.** Zapytanie, na ktore odpowiedz nie przyszla
+            // w poltorej sekundy, jest stracone - PstRotator dawno o nim zapomnial. Gdyby
+            // zostalo w kolejce, nastepna odpowiedz zostalaby przypisana wlasnie do niego
+            // i od tej chwili kazdy zmierzony czas bylby zawyzony o caly cykl odpytywania.
+            // Tak wlasnie zepsula sie pierwsza wersja tego pomiaru.
+            while (_wymiany.Count > 0)
             {
-                if (w.Zgloszona) continue;
-                double czeka = TimeSpan.FromTicks(teraz - w.Tik).TotalMilliseconds;
-                if (czeka < 500) continue;
+                double czeka = TimeSpan.FromTicks(teraz - _wymiany.Peek()).TotalMilliseconds;
+                if (czeka < 1500) break;
 
-                w.Zgloszona = true;
-                Interlocked.Increment(ref _brakow);
-                ZglosWymiane("BRAK ODPOWIEDZI (na razie): zapytanie czeka juz " +
-                             czeka.ToString("0") + " ms, a poszlo nastepne");
+                _wymiany.Dequeue();
+                porzucone++;
+                najstarsze = Math.Max(najstarsze, czeka);
             }
 
-            // Bez tego kolejka rosla by w nieskonczonosc przy zupelnie gluchym sterowniku.
-            while (_wymiany.Count >= 8) _wymiany.Dequeue();
-            _wymiany.Enqueue(new Wymiana { Tik = teraz });
+            _wymiany.Enqueue(teraz);
+        }
+
+        if (porzucone > 0)
+        {
+            Interlocked.Add(ref _brakow, porzucone);
+            ZglosWymiane("BRAK ODPOWIEDZI: porzucam " + porzucone +
+                         " zapytanie(a) bez odpowiedzi, najstarsze czekalo " +
+                         najstarsze.ToString("0") + " ms");
         }
     }
 
@@ -767,29 +854,37 @@ public sealed class Mostek : IDisposable
     {
         if (ramka.Length != 5 || ramka[0] != 0x57 || ramka[4] != 0x20) return;
 
+        Interlocked.Increment(ref _odpowiedzi);
         string doZgloszenia = null;
 
         lock (_wymiany)
         {
-            if (_wymiany.Count == 0) return;
-
-            var w = _wymiany.Dequeue();
-            double ms = TimeSpan.FromTicks(DateTime.UtcNow.Ticks - w.Tik).TotalMilliseconds;
-
-            _ileWymian++;
-            _sumaMs += ms;
-            if (ms < _minMs) _minMs = ms;
-            if (ms > _maxMs) _maxMs = ms;
-
-            if (w.Zgloszona)
+            if (_wymiany.Count == 0)
             {
+                // Odpowiedz na zapytanie juz porzucone. Czasu nie da sie tu policzyc
+                // i **nie wolno zgadywac** - to byla droga do tamtych czterosekundowych
+                // srednich, ktore braly sie z dopasowania do cudzego zapytania.
                 Interlocked.Increment(ref _spoznionych);
-                doZgloszenia = "ODPOWIEDZ SPOZNIONA: przyszla po " + ms.ToString("0") +
-                               " ms - nic sie nie zgubilo, to byl zator";
+                doZgloszenia = "ODPOWIEDZ PO TERMINIE: przyszla, gdy nikt juz na nia nie czekal";
             }
-            else if (ms >= 600)
+            else
             {
-                doZgloszenia = "ZATOR: odpowiedz po " + ms.ToString("0") + " ms";
+                bool jednoznaczna = _wymiany.Count == 1;
+                long wyslano = _wymiany.Dequeue();
+                double ms = TimeSpan.FromTicks(DateTime.UtcNow.Ticks - wyslano).TotalMilliseconds;
+
+                // Czas liczymy **tylko z par bez watpliwosci**: jedno zapytanie w locie,
+                // jedna odpowiedz. Przy dwoch czekajacych nie wiadomo, ktora jest ktora,
+                // a zmyslona liczba jest gorsza niz jej brak.
+                if (jednoznaczna)
+                {
+                    _ileWymian++;
+                    _sumaMs += ms;
+                    if (ms < _minMs) _minMs = ms;
+                    if (ms > _maxMs) _maxMs = ms;
+
+                    if (ms >= 600) doZgloszenia = "ZATOR: odpowiedz po " + ms.ToString("0") + " ms";
+                }
             }
         }
 
@@ -808,8 +903,8 @@ public sealed class Mostek : IDisposable
 
         Interlocked.Exchange(ref _ostatniZrzutBraku, DateTime.UtcNow.Ticks);
         Pulapka.Zapisz(Podpis,
-            powod + ". Od zestawienia lacza: brakow " + BrakiOdpowiedzi +
-            ", spoznionych " + SpoznioneOdpowiedzi + ", czasy " + OpisWymiany,
+            powod + ". Od zestawienia lacza: " + BilansWymian +
+            ", po terminie " + SpoznioneOdpowiedzi + ", czasy " + OpisWymiany,
             _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 

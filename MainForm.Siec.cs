@@ -74,10 +74,9 @@ public partial class MainForm
             // my albo ser2net - a zeby to zobaczyc, trzeba miec te trzy tory obok siebie.
             if (mostek != null && mostek.OpisWymiany.Length > 0)
             {
-                skad += "; wymiana " + mostek.OpisWymiany;
-                if (mostek.BrakiOdpowiedzi > 0)
-                    skad += ", bez odpowiedzi " + mostek.BrakiOdpowiedzi +
-                            " (spóźnionych " + mostek.SpoznioneOdpowiedzi + ")";
+                skad += "; wymiana " + mostek.OpisWymiany + "; " + mostek.BilansWymian;
+                if (mostek.SpoznioneOdpowiedzi > 0)
+                    skad += ", po terminie " + mostek.SpoznioneOdpowiedzi;
             }
 
             opisy.Add(rotor.Etykieta + " " + adres + " — " + skad);

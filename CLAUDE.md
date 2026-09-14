@@ -189,6 +189,63 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Zrzut pakietow na Pi zamknal sprawe lacza** (1.11.13). Dziesiec minut ruchu na porcie 4101,
+`tcpdump` na Pi, przy pracujacych wszystkich trzech rotorach:
+
+```
+zapytan                        600
+odpowiedzi pelnych (5 bajtow)  597
+odpowiedzi pustych (0 bajtow)    3
+odpowiedzi niepelnych            0
+retransmisji TCP                 0
+czas do skompletowania ramki   220 / 249 / 252 ms   (min / mediana / max)
+odstep miedzy bajtami ramki     16 /  23 /  26 ms
+```
+
+Co z tego wynika, po kolei:
+
+* **Siec i ser2net sa czyste.** Zero retransmisji, odpowiedz opuszcza Pi w 249 ms - dokladnie
+  tyle, ile zmierzyla sonda wpieta w port szeregowy. Ser2net nie dokłada nic.
+* **`nodelay` dziala, ale byl nieistotny.** Ser2net wysyla **kazdy bajt osobnym segmentem TCP**
+  (piec segmentow `length 1` na odpowiedz), nie czekajac na ACK. Hipoteza o Nagle byla chybiona.
+* **Skladacz ramek jest niezbedny i ma dobry zawor.** Odstep miedzy bajtami to 16-26 ms,
+  **ani razu** nie przekroczyl 120 ms - `SkladaczSpid.Cierpliwosc` nigdy nie wypuszcza ogona
+  w srodku ramki. To domyka przyczyne odczytu 208 z 1.11.0.
+* **PstRotator nie zalewa sterownika.** Odstep miedzy zapytaniami 453-1046 ms, mediana 1000,
+  zadnej paczki zapytan po zatorze. Hipoteza o spietrzeniu zapytan - obalona.
+* **Sterownik ignoruje czesc zapytan calkowicie** - zero bajtow, nie kawalek ramki. I to jest
+  jedyna nieprawidlowosc, jaka w tym zrzucie zostala.
+
+Rozklad tych trzech milczen jest wymowny:
+
+```
+odstep od poprzedniego zapytania    ile    bez odpowiedzi
+ponizej 800 ms                        2          2  (100%)
+950 ms i wiecej                     596          1  (0,2%)
+```
+
+Stad `Mostek.ZadlawicZapytanie`: mostek pilnuje, zeby dwa zapytania **o pozycje** nie poszly
+do sterownika gescej niz co 800 ms. Nastawa i STOP ida zawsze i natychmiast. Pominiete
+zapytanie nic nie kosztuje - PstRotator pyta znowu za sekunde, a sterownik i tak by nie
+odpowiedzial. **Podstawa dowodowa to dwa przypadki**, wiec licznik `ZdlawioneZapytania` stoi
+obok bilansu zapytan i odpowiedzi: jesli dlawienie nie poprawi tego bilansu, jest to jedna
+linijka do usuniecia.
+
+**Pomiar czasu wymiany przez kolejke FIFO rozjezdza sie po pierwszej zgubie - i o tym trzeba
+pamietac.** Pierwsza wersja (1.11.11) trzymala osierocone zapytanie w kolejce i przypisywala
+mu **nastepna** odpowiedz, a potem kolejnym zapytaniom kolejne odpowiedzi - z przesunieciem
+o caly cykl odpytywania. W podpowiedzi wychodzily wtedy srednie po **4247 ms** i "brak
+odpowiedzi 1531 z 2260", podczas gdy zrzut pakietow z tego samego toru pokazywal **trzy**
+milczenia na szescset. Zdradzil to max 7416 ms - rowno osiem cykli, czyli tyle, ile wynosil
+limit kolejki.
+
+Poprawka ma dwie czesci: zapytanie starsze niz poltorej sekundy jest **porzucane** (kolejka
+sie resynchronizuje zamiast dryfowac), a czas mierzymy **wylacznie z par bez watpliwosci** -
+jedno zapytanie w locie, jedna odpowiedz. Nad tym wszystkim stoi `BilansWymian`: gole liczniki
+wyslanych zapytan i otrzymanych odpowiedzi, ktore **nie wymagaja dopasowywania niczego do
+niczego** i dlatego nie klamia nawet wtedy, gdy dopasowanie zawiedzie. Gdy pomiar pochodny
+kloci sie z licznikiem, to licznik ma racje.
+
 **Sterownik odpowiada jak metronom - zmierzone.** Sonda wpieta **wprost w `/dev/antA3S`
 na Pi**, z pominieciem ser2neta, sieci i calej strony windowsowej, dala przy 3479 wymianach:
 
