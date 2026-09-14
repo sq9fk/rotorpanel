@@ -760,8 +760,18 @@ public sealed class Mostek : IDisposable
         {
             int z = Volatile.Read(ref _zapytan), o = Volatile.Read(ref _odpowiedzi);
             if (z == 0) return "";
+
+            // Zapytania wyslane, na ktore odpowiedz ma prawo dopiero nadejsc. Bez tego
+            // odjecia bilans pokazywal "brak 1" przez trzy dziesiate kazdej sekundy - bo
+            // tyle trwa wymiana - i wygladalo to na usterke, a bylo zwykla chwila w locie.
+            int wLocie;
+            lock (_wymiany) wLocie = _wymiany.Count;
+
+            int brak = z - o - wLocie;
+
             return "zapytań " + z + ", odpowiedzi " + o +
-                   (z - o > 0 ? " (brak " + (z - o) + ")" : "") +
+                   (brak > 0 ? " (brak " + brak + ")" : "") +
+                   (o > z ? ", nadmiarowych " + (o - z) : "") +
                    (ZdlawioneZapytania > 0 ? ", zdławionych " + ZdlawioneZapytania : "");
         }
     }

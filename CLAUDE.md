@@ -239,6 +239,14 @@ odpowiedzi 1531 z 2260", podczas gdy zrzut pakietow z tego samego toru pokazywal
 milczenia na szescset. Zdradzil to max 7416 ms - rowno osiem cykli, czyli tyle, ile wynosil
 limit kolejki.
 
+**Wymiana w locie to nie brak odpowiedzi** (1.11.14). Bilans odejmuje zapytania, na ktore
+odpowiedz ma dopiero prawo nadejsc. Bez tego odjecia przez okolo trzy dziesiate kazdej sekundy -
+bo tyle trwa wymiana - kazdy rotor pokazywal "brak 1", co wygladalo na usterke pojawiajaca sie
+losowo na wszystkich trzech naraz, a bylo zwykla chwila miedzy zapytaniem a odpowiedzia.
+Odwrotny przypadek (odpowiedzi wiecej niz zapytan) tez ma wlasny opis - "nadmiarowych" - bo
+oznacza odpowiedz na rozkaz, ktorego nie liczymy jako zapytania: Rot1Prog odpowiada na STOP
+ramka w formacie pozycji i taka odpowiedz nie ma swojego `1F`.
+
 Poprawka ma dwie czesci: zapytanie starsze niz poltorej sekundy jest **porzucane** (kolejka
 sie resynchronizuje zamiast dryfowac), a czas mierzymy **wylacznie z par bez watpliwosci** -
 jedno zapytanie w locie, jedna odpowiedz. Nad tym wszystkim stoi `BilansWymian`: gole liczniki
