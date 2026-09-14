@@ -189,6 +189,52 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Zatory zdarzaja sie kilku mostkom w tej samej milisekundzie - wiec nie robia ich sterowniki**
+(1.11.16). Dwie godziny spokojnego odpytywania, bez nastaw i bez STOP-u, 7100 wymian na kazdym
+z trzech rotorow:
+
+```
+                braki   udzial    czasy min/sr/max
+RAU A3S             2   0,03 %    281 / 305 / 615 ms
+RAK 15m            13   0,18 %    270 / 321 / 615 ms
+RAU 10m            13   0,18 %    257 / 304 / 592 ms
+```
+
+Zadnego 208, zadnego odrzuconego odczytu, zero odpowiedzi po terminie. Ale wpisy ukladaja sie
+parami, co do milisekundy:
+
+```
+20:47:29.383  A3S   ZATOR: odpowiedz po 615 ms
+20:47:29.384  15m   ZATOR: odpowiedz po 615 ms
+20:32:27.423  10m   BRAK ODPOWIEDZI, czekalo 987 ms
+20:32:27.424  15m   BRAK ODPOWIEDZI, czekalo 987 ms
+21:23:35.734  10m   BRAK ODPOWIEDZI, czekalo 994 ms
+21:23:35.735  A3S   BRAK ODPOWIEDZI, czekalo 994 ms
+```
+
+**Dwa niezalezne sterowniki, dwa osobne porty USB, dwa osobne polaczenia TCP - i identyczne
+opoznienie w tej samej milisekundzie.** To nie jest przypadek do obronienia. Zrodlo jest
+wspolne i lezy nad sterownikami.
+
+Slad pokazuje tez, **jak** te bajty przychodza przy zatorze. Normalnie piec bajtow odpowiedzi
+to piec osobnych odczytow co 20 ms (ser2net wysyla kazdy osobnym segmentem TCP - potwierdzone
+zrzutem pakietow). Przy zatorze:
+
+```
+20:47:28.767  PC ->  zapytanie o pozycje
+20:47:29.382     <- sterownik  57 03 06 00     <- cztery bajty jednym odczytem
+20:47:29.382     <- sterownik  20              <- piaty w tej samej milisekundzie
+```
+
+Bajty spietrzyly sie i zostaly wypuszczone jednym strzalem. Pasuja do tego dwa wyjasnienia
+i **z wnetrza mostka sa nie do odroznienia**: albo droga do Pi stanela, albo stanal nasz proces
+i nikt przez chwile nie czytal gniazd. Dlatego powstal `CzujnikZastoju` - zegar tykajacy co
+100 ms, ktorego **spoznione tykniecie** jest dowodem, ze stanelismy my. Jego odczyt idzie do
+kazdego wpisu w `podejrzane.txt`, wiec korelacja jest natychmiastowa: jesli obok zatoru 615 ms
+stoi "ostatni zastoj procesu: 400 ms, 0,2 s temu", wina jest nasza i nie ma po co szukac jej
+w sieci. Jesli czujnik milczy, zostaje siec i Pi - i wtedy rozstrzyga `tcpdump`: **ACK-i
+z komputera** pokazuja, czy bajty doszly na czas, a tylko program je pozno odczytal.
+
 **Sterownik w trybie recznym nie odpowiada na port - i to tlumaczy cisze w dzienniku.**
 Zgloszone przez uzytkownika: *"nie bede w stanie krecic i odczytywac azymutu w tym samym czasie
 z PstRotatora, bo sterownik jest w trybie recznym"*. W dzienniku wyglada to na powazna awarie -

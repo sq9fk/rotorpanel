@@ -38,6 +38,11 @@ internal static class Program
             return;
         }
 
+        // Czujnik musi ruszyc przed mostkami - patrz CzujnikZastoju. Bez niego nie da sie
+        // odroznic "siec przytkana" od "nasz proces stanal", bo z wnetrza mostka obie
+        // wygladaja identycznie: pozny odczyt z gniazda.
+        CzujnikZastoju.Uruchom();
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 

@@ -876,7 +876,8 @@ public sealed class Mostek : IDisposable
         Interlocked.Exchange(ref _ostatniZrzutBraku, DateTime.UtcNow.Ticks);
         Pulapka.Zapisz(Podpis,
             powod + ". Od zestawienia lacza: " + BilansWymian +
-            ", po terminie " + SpoznioneOdpowiedzi + ", czasy " + OpisWymiany,
+            ", po terminie " + SpoznioneOdpowiedzi + ", czasy " + OpisWymiany +
+            Environment.NewLine + "    " + CzujnikZastoju.Opis,
             _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 
