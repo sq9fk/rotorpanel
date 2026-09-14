@@ -6,6 +6,7 @@
   "sterownikAnten": "192.168.1.101",
   "autoPolacz": false,
   "sprawdzajAktualizacje": true,
+  "filtrPozycji": true,
 
   "rotory": [
     { "nr": 1, "nazwa": "Rotor 1", "com": "COM10", "dev": "CNCB10", "ip": "", "port": 4001, "protokol": "surowy" },

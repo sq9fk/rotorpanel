@@ -9,7 +9,7 @@ public partial class SettingsForm : Form
     private readonly Config _cfg;
 
     private TextBox _ip, _sterownik, _setupc;
-    private CheckBox _autoPolacz, _sprawdzajAktualizacje;
+    private CheckBox _autoPolacz, _sprawdzajAktualizacje, _filtrPozycji;
     private Label _info;
 
     private DataGridView _siatkaRotorow, _siatkaUrzadzen, _siatkaAnten;
@@ -102,6 +102,30 @@ public partial class SettingsForm : Form
             BackColor = Color.Transparent
         };
         Controls.Add(_sprawdzajAktualizacje);
+
+        // Filtr kasuje dane o polozeniu anteny, wiec wylacznik musi byc widoczny i opisany -
+        // uzytkownik ma wiedziec, co wylacza i czym za to placi.
+        _filtrPozycji = new CheckBox
+        {
+            Text = "Odrzucaj niemożliwe odczyty pozycji (SPID)",
+            Checked = cfg.FiltrPozycji,
+            Location = new Point(490, 782),
+            // Szerzej, niz wynika z pomiaru samego tekstu: Dpi.Przyciete mierzy napis, ale
+            // nie kwadracik przelacznika, wiec zapas musi byc wpisany recznie.
+            Size = new Size(344, 22),
+            Font = Theme.Zwykly(),
+            ForeColor = Theme.Tekst,
+            BackColor = Color.Transparent
+        };
+        new ToolTip().SetToolTip(_filtrPozycji,
+            "Dotyczy rotorów SPID (Alfa SPID / Rot1Prog)." + Environment.NewLine +
+            "Rotor obraca się około 2,5° na sekundę, więc odczyt, który przeskakuje" + Environment.NewLine +
+            "dalej, niż zdążyłby się obrócić, nie jest odczytem — panel go nie przepuszcza." +
+            Environment.NewLine + Environment.NewLine +
+            "Wyłącz, jeśli chcesz widzieć surowe odczyty ze sterownika," + Environment.NewLine +
+            "na przykład przy szukaniu usterki. Podejrzane odczyty trafiają" + Environment.NewLine +
+            "do pliku podejrzane.txt tak czy owak.");
+        Controls.Add(_filtrPozycji);
 
         _info = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
             new Point(20, 810), new Size(440, 18));

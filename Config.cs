@@ -122,6 +122,20 @@ public partial class Config
     public bool   AutoPolacz     { get; set; }
     public bool   SprawdzajAktualizacje { get; set; } = true;
 
+    /// <summary>
+    /// Czy odrzucac odczyty pozycji, ktorych rotor nie zdazylby wykonac. Patrz
+    /// <c>Mostek.OdrzucicNieprawdopodobnyOdczyt</c>.
+    ///
+    /// Filtr jest **proteza na czas szukania usterki sprzetowej**, a nie czescia protokolu,
+    /// wiec musi dac sie wylaczyc: kasuje dane o polozeniu anteny, a przy diagnostyce sprzetu
+    /// lepiej widziec surowa prawde. Wylaczony nadal **zapisuje** nieprawdopodobne odczyty
+    /// do `podejrzane.txt` - tylko ich nie zatrzymuje.
+    ///
+    /// Domyslnie wlaczony, bo tak dziala od 1.11.3 i tak ma sie zachowac stara konfiguracja
+    /// bez tego pola.
+    /// </summary>
+    public bool   FiltrPozycji { get; set; } = true;
+
     public List<Rotor>      Rotory     { get; set; } = new List<Rotor>();
     public List<Urzadzenie> Urzadzenia { get; set; } = new List<Urzadzenie>();
     public List<Antena>     Anteny     { get; set; } = new List<Antena>();

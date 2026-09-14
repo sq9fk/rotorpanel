@@ -137,6 +137,19 @@ byc prawda. Ramki nie zapamietujemy, zeby nastepny prawdziwy odczyt porownal sie
 zostac przekrecona recznie. **To jest proteza, nie naprawa** - i dlatego kazde odrzucenie idzie
 do `podejrzane.txt` razem z dziennikiem.
 
+**I dlatego tez da sie ja wylaczyc** (1.11.8). W Ustawieniach jest pole *Odrzucaj niemozliwe
+odczyty pozycji (SPID)*, w pliku `filtrPozycji`, domyslnie wlaczone. Dwie rzeczy sa tu wazne:
+
+* **wylacznik zdejmuje kasowanie danych, nie diagnostyke** - przy wylaczonym filtrze
+  nieprawdopodobny odczyt idzie do klienta, ale nadal trafia do `podejrzane.txt` jako
+  `PRZEPUSZCZONY (filtr wylaczony w Ustawieniach)`. Inaczej uzytkownik, ktory wylacza filtr
+  **wlasnie po to, zeby zobaczyc surowa prawde**, straciłby jedyny slad usterki;
+* **wylaczony filtr nadal zapamietuje pozycje** (`Zapamietaj`), inaczej po ponownym wlaczeniu
+  porownanie szloby od pozycji sprzed godziny.
+
+`Config` jest wspoldzielony przez referencje, wiec zmiana dziala **od razu**, bez restartu
+mostkow - `OdrzucicNieprawdopodobnyOdczyt` czyta `_cfg.FiltrPozycji` przy kazdej ramce.
+
 **[NIEAKTUALNE, zostawione jako przestroga] Sterownik odpowiada na STOP ramka w formacie pozycji.** Zmierzone: po rozkazie `0x0F` Rot1Prog odsyla `57 02 00 08 20`,
 czyli **208** czytane jak azymut, niezaleznie od tego, gdzie antena stoi. W sladzie widac to
 wprost: `295 -> [208] -> 297` i `352 -> [208] -> 348` - antena byla w ruchu i jechala dalej

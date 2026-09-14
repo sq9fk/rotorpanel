@@ -684,6 +684,14 @@ public sealed class Mostek : IDisposable
     /// **To proteza na czas szukania usterki sprzetowej**, nie naprawa: przyczyna siedzi przed
     /// mostkiem i wychodzi tylko przy dwoch pracujacych rotorach. Kazde odrzucenie idzie do
     /// `podejrzane.txt` razem z dziennikiem obu kierunkow.
+    ///
+    /// Wlasnie dlatego, ze to proteza, **da sie ja wylaczyc** w Ustawieniach
+    /// (<see cref="Config.FiltrPozycji"/>). Wylaczona przepuszcza wszystko, ale nadal opisuje
+    /// nieprawdopodobne odczyty w `podejrzane.txt` - inaczej wylacznik zabieralby razem
+    /// z filtrem jedyny slad usterki.
+    ///
+    /// Milknie tez sama, gdy <see cref="SkladaczSpid.Przezroczysty"/> - filtr zna protokol SPID
+    /// i nie ma prawa kasowac danych, ktorych nie rozumie.
     /// </summary>
     private bool OdrzucicNieprawdopodobnyOdczyt(byte[] ramka)
     {
@@ -710,25 +718,49 @@ public sealed class Mostek : IDisposable
 
         if (wiarygodny)
         {
-            _ostatniaPozycja = pozycja;
-            _kiedyPozycja = DateTime.UtcNow;
-            _odrzuconeZRzedu = 0;
+            Zapamietaj(pozycja);
+            return false;
+        }
+
+        // Filtr wylaczony w Ustawieniach: odczyt idzie dalej, ale **nadal go opisujemy**.
+        // Wylacznik ma zdejmowac kasowanie danych, a nie diagnostyke - bez zapisu uzytkownik
+        // stracilby jedyny slad usterki, ktorej wlasnie szuka.
+        if (!_cfg.FiltrPozycji)
+        {
+            ZglosNieprawdopodobny("PRZEPUSZCZONY (filtr wylaczony w Ustawieniach)",
+                                  poprzednia, pozycja, ramka, sekundy, dopuszczalny);
+            Zapamietaj(pozycja);
             return false;
         }
 
         _odrzuconeZRzedu++;
-
-        long ostatni = Interlocked.Read(ref _ostatniZrzut);
-        if (ostatni == 0 || DateTime.UtcNow - new DateTime(ostatni) > TimeSpan.FromSeconds(5))
-        {
-            Interlocked.Exchange(ref _ostatniZrzut, DateTime.UtcNow.Ticks);
-            Pulapka.Zapisz(Podpis,
-                "ODRZUCONY ODCZYT: " + poprzednia + " -> " + pozycja + " (" +
-                Slad.Podglad(ramka, 5) + "), po " + sekundy.ToString("0.0") +
-                " s dopuszczalne bylo " + dopuszczalny.ToString("0") + " st.",
-                _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
-        }
+        ZglosNieprawdopodobny("ODRZUCONY ODCZYT", poprzednia, pozycja, ramka, sekundy, dopuszczalny);
         return true;
+    }
+
+    private void Zapamietaj(int pozycja)
+    {
+        _ostatniaPozycja = pozycja;
+        _kiedyPozycja = DateTime.UtcNow;
+        _odrzuconeZRzedu = 0;
+    }
+
+    /// <summary>
+    /// Wpis do <c>podejrzane.txt</c>, nie czesciej niz co piec sekund - przy zerwanym torze
+    /// takich odczytow potrafi byc kilka na sekunde i plik zamienilby sie w dziennik.
+    /// </summary>
+    private void ZglosNieprawdopodobny(string co, int poprzednia, int pozycja, byte[] ramka,
+                                       double sekundy, double dopuszczalny)
+    {
+        long ostatni = Interlocked.Read(ref _ostatniZrzut);
+        if (ostatni != 0 && DateTime.UtcNow - new DateTime(ostatni) <= TimeSpan.FromSeconds(5)) return;
+
+        Interlocked.Exchange(ref _ostatniZrzut, DateTime.UtcNow.Ticks);
+        Pulapka.Zapisz(Podpis,
+            co + ": " + poprzednia + " -> " + pozycja + " (" +
+            Slad.Podglad(ramka, 5) + "), po " + sekundy.ToString("0.0") +
+            " s dopuszczalne bylo " + dopuszczalny.ToString("0") + " st.",
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 
     /// <summary>

@@ -99,6 +99,7 @@ JSON-em bez podwajania znaków.
 | `sterownikAnten` | adres sterownika anten w postaci `host` albo `host:port`, np. `192.168.1.101` |
 | `autoPolacz` | czy zestawiać mostki od razu po uruchomieniu |
 | `sprawdzajAktualizacje` | czy sprawdzać przy starcie, czy jest nowsze wydanie |
+| `filtrPozycji` | czy odrzucać niemożliwe odczyty pozycji rotorów SPID (domyślnie tak) |
 | `rotory[].nr` | numer rotora, do którego odwołują się anteny |
 | `rotory[].nazwa` | nazwa własna, np. „maszt A” |
 | `rotory[].com` | port widoczny dla PstRotatora |

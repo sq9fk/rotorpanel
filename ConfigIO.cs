@@ -36,7 +36,8 @@ public partial class Config
             Setupc         = Json.Tekst(korzen, "setupc"),
             SterownikAnten = NormalizujHost(Json.Tekst(korzen, "sterownikAnten")),
             AutoPolacz     = Json.Flaga(korzen, "autoPolacz", false),
-            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true)
+            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true),
+            FiltrPozycji   = Json.Flaga(korzen, "filtrPozycji", true)
         };
 
         CzytajRotory(cfg, korzen);
@@ -264,6 +265,7 @@ public partial class Config
         korzen.Dodaj("sterownikAnten", SterownikAnten);
         korzen.Dodaj("autoPolacz", AutoPolacz);
         korzen.Dodaj("sprawdzajAktualizacje", SprawdzajAktualizacje);
+        korzen.Dodaj("filtrPozycji", FiltrPozycji);
         korzen.Dodaj("rotory", rotory);
         korzen.Dodaj("urzadzenia", urzadzenia);
         korzen.Dodaj("anteny", anteny);
