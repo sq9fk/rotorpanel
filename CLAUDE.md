@@ -160,6 +160,44 @@ Trzy rzeczy sa tu wazne:
 Zapis ustawien i tak przebudowuje liste i mostki, wiec zmiana dziala od zaraz;
 `OdrzucicNieprawdopodobnyOdczyt` czyta `rotor.FiltrPozycji` przy kazdej ramce.
 
+**Brak odpowiedzi jest wskaznikiem wyprzedzajacym zlego odczytu** (1.11.10). Dziennik
+z 14 wrzesnia 2026, 12:11, mostek A3S, lacze stojace od 46 minut, **nic sie nie krecilo**,
+w buforze "do sterownika" same zapytania `1F` - ani jednej nastawy:
+
+```
+12:11:53.662  PC ->  zapytanie o pozycje        <- bez odpowiedzi
+12:11:54.658  PC ->  zapytanie o pozycje
+12:11:54.663     <- sterownik  57               <- 5 ms po zapytaniu: to odpowiedz na poprzednie
+12:11:54.756     <- sterownik  03 06 00 20
+12:11:55.657  PC ->  zapytanie o pozycje
+12:11:55.863     <- sterownik  57
+12:11:55.963     <- sterownik  02 00 08 20      <- 208
+```
+
+Trzy wnioski, kazdy zmienia obraz sprawy:
+
+* **To nie byla pocieta ramka ani pusty bufor.** Do klienta poszla cala, poprawna ramka
+  `57 02 00 08 20`, przyslana przez sterownik. Stara przyczyna 208 (`0x00 - '0' = 0xD0`)
+  tu nie zachodzi - skladacz zrobil swoje.
+* **`57 02 00 08 20` to prawdopodobnie firmowa odpowiedz "nie mam waznej pozycji", a nie
+  azymut.** To ta sama ramka co do bajtu, ktora wczesniej zapisalismy jako odpowiedz na STOP.
+  Obie obserwacje - po STOP i po zgubionej wymianie - skladaja sie w jedno wyjasnienie.
+* **Warunek "tylko gdy krece dwoma naraz" upadl.** Rotory staly. Zakloceniami od drugiego
+  silnika nie da sie tego wytlumaczyc.
+
+Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na `57` + 90-100 ms
+ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
+gdzie same dane to 42 ms.
+
+Stad `Mostek.ZanotujZapytanie`/`ZanotujOdpowiedz`: gdy wychodzi **nastepne** zapytanie o pozycje,
+a poprzednie wciaz czeka dluzej niz 500 ms, liczymy zgubiona odpowiedz i piszemy do
+`podejrzane.txt`. Nie mierzymy zadnego wlasnego limitu czasu, tylko korzystamy z rytmu klienta -
+to jedyny prog, ktorego nie trzeba zgadywac. Wpis ma **wlasny dlawik** (`_ostatniZrzutBraku`),
+osobny od filtru pozycji: dziura i wywolany przez nia zly odczyt dziela sie zwykle sekunda,
+a wspolny limit pieciosekundowy zjadlby ten drugi wpis - czyli ten, po ktory sie tu przychodzi.
+Licznik `BrakiOdpowiedzi` zeruje sie przy kazdym zestawieniu lacza i pokazuje sie w stopce
+okna glownego, zeby nie trzeba bylo zagladac do pliku.
+
 **[NIEAKTUALNE, zostawione jako przestroga] Sterownik odpowiada na STOP ramka w formacie pozycji.** Zmierzone: po rozkazie `0x0F` Rot1Prog odsyla `57 02 00 08 20`,
 czyli **208** czytane jak azymut, niezaleznie od tego, gdzie antena stoi. W sladzie widac to
 wprost: `295 -> [208] -> 297` i `352 -> [208] -> 348` - antena byla w ruchu i jechala dalej

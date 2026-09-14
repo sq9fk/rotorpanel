@@ -356,6 +356,18 @@ public partial class MainForm
                               "× w ostatnich minutach)";
         }
 
+        // Zgubiona odpowiedz to nie blad mostka - laczenie stoi, sterownik po prostu
+        // nie odpowiedzial. Warto jednak, zeby bylo to widac bez zagladania do pliku:
+        // to wskaznik wyprzedzajacy zlych odczytow pozycji.
+        if (ostatniBlad.Length == 0)
+        {
+            var gubiacy = _mostki.OrderByDescending(m => m.BrakiOdpowiedzi)
+                                 .FirstOrDefault(m => m.BrakiOdpowiedzi > 0);
+            if (gubiacy != null)
+                ostatniBlad = gubiacy.Punkt.Etykieta + ": sterownik nie odpowiedział " +
+                              gubiacy.BrakiOdpowiedzi + "× (szczegóły w podejrzane.txt)";
+        }
+
         _stopka.Text = ostatniBlad;
         _stopka.ForeColor = string.IsNullOrEmpty(ostatniBlad)
             ? Theme.TekstSzary

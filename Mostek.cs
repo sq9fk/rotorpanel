@@ -89,6 +89,11 @@ public sealed class Mostek : IDisposable
     private readonly object _kolejnosc = new();
 
     // Ostatnia wiarygodna pozycja, czas jej przyjecia i licznik odrzucen z rzedu.
+    // Patrz ZglosBrakOdpowiedzi.
+    private long _kiedyZapytanie;
+    private int _brakow;
+    private long _ostatniZrzutBraku;
+
     // Patrz OdrzucicNieprawdopodobnyOdczyt.
     private int _ostatniaPozycja = -1;
     private DateTime _kiedyPozycja = DateTime.MinValue;
@@ -363,6 +368,11 @@ public sealed class Mostek : IDisposable
                 _kiedyPozycja = DateTime.MinValue;
                 _odrzuconeZRzedu = 0;
 
+                // Licznik zgubionych odpowiedzi opisuje **to** polaczenie, nie caly dzien.
+                Interlocked.Exchange(ref _kiedyZapytanie, 0);
+                Volatile.Write(ref _brakow, 0);
+                Interlocked.Exchange(ref _ostatniZrzutBraku, 0);
+
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
                 _czytnikSpe = czytnik;
 
@@ -614,7 +624,10 @@ public sealed class Mostek : IDisposable
                     if (rozkazy != null)
                     {
                         foreach (var ramka in rozkazy)
+                        {
+                            ZanotujZapytanie(ramka);
                             await dokad.WriteAsync(ramka, 0, ramka.Length, ct);
+                        }
                         await dokad.FlushAsync(ct);
                     }
                 }
@@ -636,8 +649,11 @@ public sealed class Mostek : IDisposable
                     var gotowe = _skladacz.Dopisz(bufor, n);
                     if (gotowe != null)
                         foreach (var ramka in gotowe)
+                        {
+                            ZanotujOdpowiedz(ramka);
                             if (!OdrzucicNieprawdopodobnyOdczyt(ramka))
                                 Oddaj(dokad, ramka, ct);
+                        }
                 }
             }
         }
@@ -659,6 +675,68 @@ public sealed class Mostek : IDisposable
 
         if (Slad.Wlaczony)
             Zapisz("  do kolejki portu " + dane.Length + " B, w kolejce " + _kolejkaPortu.Count);
+    }
+
+    /// <summary>
+    /// Ile razy sterownik nie odpowiedzial na zapytanie o pozycje od zestawienia lacza.
+    /// </summary>
+    public int BrakiOdpowiedzi => Volatile.Read(ref _brakow);
+
+    /// <summary>
+    /// Zapytanie o pozycje wyszlo do sterownika.
+    ///
+    /// **Brak odpowiedzi jest wskaznikiem wyprzedzajacym.** W dzienniku z 14 wrzesnia widac,
+    /// ze sekunde przed odczytem 208 jedno zapytanie zostalo bez odpowiedzi, a nastepna
+    /// odpowiedz przyszla 5 ms po kolejnym zapytaniu - czyli strumien przesunal sie o jedno.
+    /// Samo 208 wylapuje filtr pozycji, ale tylko wtedy, gdy jest wlaczony i gdy liczba jest
+    /// dostatecznie nieprawdopodobna. Dziura w wymianie widac zawsze i wczesniej.
+    ///
+    /// Nie mierzymy tu zadnego wlasnego limitu czasu, tylko korzystamy z rytmu klienta:
+    /// jesli idzie **nastepne** zapytanie, a poprzednie wciaz czeka, to odpowiedz przepadla.
+    /// Prog 500 ms odsiewa klienta, ktory wysyla dwa zapytania pod rzad - normalny obrot
+    /// zapytanie-odpowiedz trwa na tym torze 250-350 ms.
+    /// </summary>
+    private void ZanotujZapytanie(byte[] ramka)
+    {
+        if (!(Punkt is Rotor) || ramka.Length != 13 || ramka[0] != 0x57 ||
+            ramka[12] != 0x20 || ramka[11] != 0x1F) return;
+
+        long teraz = DateTime.UtcNow.Ticks;
+        long poprzednie = Interlocked.Exchange(ref _kiedyZapytanie, teraz);
+
+        if (poprzednie != 0)
+        {
+            double czekalo = TimeSpan.FromTicks(teraz - poprzednie).TotalMilliseconds;
+            if (czekalo >= 500)
+            {
+                Interlocked.Increment(ref _brakow);
+                ZglosBrakOdpowiedzi(czekalo);
+            }
+        }
+    }
+
+    /// <summary>Odpowiedz przyszla - przestajemy na nia czekac.</summary>
+    private void ZanotujOdpowiedz(byte[] ramka)
+    {
+        if (ramka.Length == 5 && ramka[0] == 0x57 && ramka[4] == 0x20)
+            Interlocked.Exchange(ref _kiedyZapytanie, 0);
+    }
+
+    /// <summary>
+    /// Wpis o zgubionej odpowiedzi. Ma **wlasny** dlawik, osobny od filtru pozycji: dziura
+    /// i wywolany przez nia zly odczyt dziela sie zwykle sekunda i wspolny limit piecio
+    /// sekundowy zjadlby ten drugi wpis - czyli dokladnie ten, po ktory sie tu przychodzi.
+    /// </summary>
+    private void ZglosBrakOdpowiedzi(double czekalo)
+    {
+        long ostatni = Interlocked.Read(ref _ostatniZrzutBraku);
+        if (ostatni != 0 && DateTime.UtcNow - new DateTime(ostatni) <= TimeSpan.FromSeconds(5)) return;
+
+        Interlocked.Exchange(ref _ostatniZrzutBraku, DateTime.UtcNow.Ticks);
+        Pulapka.Zapisz(Podpis,
+            "BRAK ODPOWIEDZI na zapytanie o pozycje: czekalo " + czekalo.ToString("0") +
+            " ms, poszlo nastepne. Brakow od zestawienia lacza: " + BrakiOdpowiedzi,
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 
     /// <summary>
