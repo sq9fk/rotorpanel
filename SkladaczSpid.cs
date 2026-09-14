@@ -28,6 +28,25 @@ public sealed class SkladaczSpid
     private int _ramek;
 
     /// <summary>
+    /// Czy urwany poczatek odpowiedzi ma byc **skasowany** zamiast oddany dalej.
+    ///
+    /// Wlaczane tylko dla kierunku od sterownika. Piec bajtow `57 H1 H2 H3 20` niesie jedna
+    /// liczbe i **polowa tej liczby nie jest liczba** - program sterujacy, ktory dostanie
+    /// `57 03 06`, doczyta reszte z wlasnego pustego bufora i pokaze 208 stopni. Lepiej,
+    /// zeby nie dostal nic: zapyta znowu za sekunde.
+    ///
+    /// W druga strone (rozkazy do sterownika) **nie wolno tego wlaczac** - zgubiony rozkaz
+    /// to nie jest brak odczytu, tylko niewykonana nastawa.
+    ///
+    /// Kazde takie skasowanie idzie do <see cref="Odrzucono"/>, bo dane o polozeniu anteny
+    /// nie moga znikac po cichu.
+    /// </summary>
+    public bool KasujUrwaneOdpowiedzi { get; set; }
+
+    /// <summary>Wolane z kawalkiem, ktory zostal skasowany zamiast oddany.</summary>
+    public Action<byte[]> Odrzucono { get; set; }
+
+    /// <summary>
     /// Czy skladacz wylaczyl sie sam, bo dane nie wygladaja na SPID.
     ///
     /// Skladanie ramek jest **swiadome protokolu**, a mostek ma byc przezroczysty. Gdyby ktos
@@ -45,8 +64,21 @@ public sealed class SkladaczSpid
     /// Po tym czasie oddajemy to, co mamy, nawet jesli nie jest cala ramka. Bez tego
     /// urwana ramka czekalaby do nastepnej odpowiedzi i doklejalaby sie do niej - czyli
     /// lek gorszy od choroby.
+    ///
+    /// **Osiemset milisekund, nie sto dwadziescia - bo tor idzie przez LTE.** Pierwotna
+    /// wartosc dobralem do sieci lokalnej, gdzie odstep miedzy bajtami odpowiedzi wynosi
+    /// 16-26 ms (zmierzone zrzutem pakietow). Tunel WireGuard po LTE potrafi jednak stanac
+    /// na pol sekundy i wypuscic wszystko naraz - w dzienniku z 14 wrzesnia dwa mostki
+    /// zglosily rowno **615 ms** w tej samej milisekundzie. Gdyby taki zastoj trafil
+    /// w **srodek** ramki, zawor przy 120 ms wypchnalby jej poczatek jako osobna porcje
+    /// i program sterujacy zobaczylby znowu 208 stopni - czyli dokladnie to, co ten
+    /// skladacz mial wyeliminowac.
+    ///
+    /// Gorna granica bierze sie z rytmu odpytywania: PstRotator pyta co sekunde, wiec ogon
+    /// oddany po 800 ms i tak wychodzi **przed** nastepna odpowiedzia i nie ma sie z czym
+    /// skleic. Osiemset milisekund to najwiecej, ile mozna czekac, nie tracac tej gwarancji.
     /// </summary>
-    private static readonly TimeSpan Cierpliwosc = TimeSpan.FromMilliseconds(120);
+    public TimeSpan Cierpliwosc { get; set; } = TimeSpan.FromMilliseconds(800);
 
     /// <summary>Dokłada bajty i zwraca porcje gotowe do wyslania na port.</summary>
     public List<byte[]> Dopisz(byte[] dane, int ile)
@@ -78,10 +110,19 @@ public sealed class SkladaczSpid
             if (_bufor.Count == 0) return null;
             if (DateTime.UtcNow - _odkad < Cierpliwosc) return null;
 
-            var reszta = new List<byte[]> { _bufor.ToArray() };
+            var ogon = _bufor.ToArray();
             _bufor.Clear();
             _ogonow++;
-            return reszta;
+
+            // Urwany poczatek odpowiedzi to nie sa dane - to polowa liczby. Patrz
+            // KasujUrwaneOdpowiedzi.
+            if (KasujUrwaneOdpowiedzi && ogon.Length < 5 && ogon[0] == 0x57)
+            {
+                Odrzucono?.Invoke(ogon);
+                return null;
+            }
+
+            return new List<byte[]> { ogon };
         }
     }
 

@@ -189,6 +189,33 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Tor idzie przez WireGuard po LTE - i to jest odpowiedz na wszystko powyzej** (1.11.17).
+Potwierdzone przez uzytkownika, zgodne z pomiarem: ping 38-56 ms przy rozrzucie 18 ms
+i **TTL 62**, czyli dwa przeskoki routowane - to nigdy nie byla siec lokalna.
+
+Trzy polaczenia TCP do trzech sterownikow ida **jednym tunelem, jednym nosnikiem radiowym**.
+Gdy LTE przeplanuje transmisje, wszystko w tunelu staje razem i rusza razem - stad zatory
+identyczne co do milisekundy na dwoch mostkach naraz. **Tego nie da sie naprawic programem,
+mozna tylko byc na to odpornym**, i wlasnie po to sa skladacz ramek, filtr pozycji i pulapka.
+
+Dwie nastawy dobrane pierwotnie pod siec lokalna wymagaly korekty:
+
+* **`SkladaczSpid.Cierpliwosc` ze 120 ms na 800 ms.** Odstep miedzy bajtami odpowiedzi to
+  16-26 ms, ale tunel potrafi stanac na 615 ms. Zastoj w **srodku** ramki wypchnalby jej
+  poczatek osobna porcja i program sterujacy zobaczylby znowu 208 - czyli dokladnie to, czemu
+  ten skladacz mial zapobiec. Gorna granica bierze sie z rytmu odpytywania: PstRotator pyta co
+  sekunde, wiec ogon oddany po 800 ms wychodzi **przed** nastepna odpowiedzia i nie ma sie
+  z czym skleic.
+* **Urwany poczatek odpowiedzi jest teraz kasowany, nie oddawany**
+  (`SkladaczSpid.KasujUrwaneOdpowiedzi`). Piec bajtow `57 H1 H2 H3 20` niesie jedna liczbe,
+  a **polowa liczby nie jest liczba**: program sterujacy, ktory dostanie `57 03 06`, doczyta
+  reszte z wlasnego pustego bufora i pokaze 208 stopni. Lepiej, zeby nie dostal nic - zapyta
+  znowu za sekunde. Kazde takie skasowanie idzie do `podejrzane.txt`, bo dane o polozeniu
+  anteny nie moga znikac po cichu.
+
+**W druga strone tego nie wlaczamy.** Zgubiony rozkaz to nie jest brak odczytu, tylko
+niewykonana nastawa - urwany rozkaz idzie do sterownika taki, jaki jest.
+
 **Zatory zdarzaja sie kilku mostkom w tej samej milisekundzie - wiec nie robia ich sterowniki**
 (1.11.16). Dwie godziny spokojnego odpytywania, bez nastaw i bez STOP-u, 7100 wymian na kazdym
 z trzech rotorow:

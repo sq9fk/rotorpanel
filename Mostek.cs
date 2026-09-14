@@ -292,6 +292,17 @@ public sealed class Mostek : IDisposable
     {
         _cfg = cfg;
         Punkt = punkt;
+
+        // Tylko kierunek od sterownika. Urwana odpowiedz to polowa liczby i lepiej jej
+        // nie oddawac wcale; urwany rozkaz to niewykonana nastawa i tego gubic nie wolno.
+        _skladacz.KasujUrwaneOdpowiedzi = punkt is Rotor;
+        _skladacz.Odrzucono = ogon => Pulapka.Zapisz(Podpis,
+            "SKASOWANY URWANY POCZATEK ODPOWIEDZI: " + Slad.Podglad(ogon, ogon.Length) +
+            " - nie doczekal sie reszty. " +
+            "Polowa ramki pozycji czytana przez program sterujacy daje 208 stopni, " +
+            "wiec lepiej, zeby nie dostal nic. Od zestawienia lacza: " + BilansWymian +
+            Environment.NewLine + "    " + CzujnikZastoju.Opis,
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 
     public void Start()
