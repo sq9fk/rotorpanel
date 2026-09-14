@@ -365,7 +365,8 @@ public partial class MainForm
                                  .FirstOrDefault(m => m.BrakiOdpowiedzi > 0);
             if (gubiacy != null)
                 ostatniBlad = gubiacy.Punkt.Etykieta + ": sterownik nie odpowiedział " +
-                              gubiacy.BrakiOdpowiedzi + "× (szczegóły w podejrzane.txt)";
+                              gubiacy.BrakiOdpowiedzi + "× (z tego " + gubiacy.SpoznioneOdpowiedzi +
+                              " spóźnionych), czasy " + gubiacy.OpisWymiany;
         }
 
         _stopka.Text = ostatniBlad;

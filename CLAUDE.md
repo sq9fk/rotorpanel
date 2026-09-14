@@ -189,14 +189,50 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Sterownik odpowiada jak metronom - zmierzone.** Sonda wpieta **wprost w `/dev/antA3S`
+na Pi**, z pominieciem ser2neta, sieci i calej strony windowsowej, dala przy 3479 wymianach:
+
+```
+min 243 ms   srednio 245 ms   max 247 ms      zero brakow, zero zlych ramek
+```
+
+Rozrzut **czterech milisekund na trzy i pol tysiaca wymian**. Z tego wynikaja dwie rzeczy,
+obie mocne:
+
+* **245 ms to wlasny czas obrotu sterownika**, a nie narzut ser2neta. Nie ma sensu szukac
+  winnego opieszalosci lacza gdzie indziej - tyle po prostu trwa odpowiedz Rot1Proga.
+* **Sterownik nie gubi odpowiedzi i nie ma zatorow.** Wszystko, co mostek widzi ponad te
+  245 ms - a widzi pierwszy bajt po 246 ms i **cala ramke dopiero po 339 ms** - powstaje
+  **nad portem szeregowym** Pi. Przy 1200 bodach piec bajtow idzie 42 ms, wiec te 93 ms ciszy
+  w srodku ramki nie ma prawa pochodzic od sterownika.
+
+Pierwszy podejrzany o te 93 ms to **Nagle po stronie ser2neta w parze z opoznionym ACK
+Windowsa**: ser2net oddaje pierwszy bajt od razu, kolejne cztery czekaja na potwierdzenie,
+a to przychodzi dopiero z zegara opoznionego ACK. Objaw pasuje idealnie, bo jest
+**powtarzalny co do ramki**, a nie losowy. Rozstrzyga to `tcpdump` na Pi: jesli odpowiedz
+wychodzi jako dwa segmenty (1 B, potem 4 B) rozdzielone ACK-iem z PC, to jest to.
+
+Nie potwierdzone, dopoki nie bedzie zrzutu - ale to jest nastepne miejsce do sprawdzenia,
+a nie maszt.
+
 Stad `Mostek.ZanotujZapytanie`/`ZanotujOdpowiedz`: gdy wychodzi **nastepne** zapytanie o pozycje,
 a poprzednie wciaz czeka dluzej niz 500 ms, liczymy zgubiona odpowiedz i piszemy do
 `podejrzane.txt`. Nie mierzymy zadnego wlasnego limitu czasu, tylko korzystamy z rytmu klienta -
 to jedyny prog, ktorego nie trzeba zgadywac. Wpis ma **wlasny dlawik** (`_ostatniZrzutBraku`),
 osobny od filtru pozycji: dziura i wywolany przez nia zly odczyt dziela sie zwykle sekunda,
 a wspolny limit pieciosekundowy zjadlby ten drugi wpis - czyli ten, po ktory sie tu przychodzi.
-Licznik `BrakiOdpowiedzi` zeruje sie przy kazdym zestawieniu lacza i pokazuje sie w stopce
-okna glownego, zeby nie trzeba bylo zagladac do pliku.
+**Zgubione i spoznione to nie to samo i nie wolno ich mylic** (1.11.11). Zgloszone zapytanie
+**zostaje w kolejce**; gdy odpowiedz przyjdzie pozniej, piszemy `ODPOWIEDZ SPOZNIONA: przyszla
+po X ms - nic sie nie zgubilo, to byl zator`. Odpowiedzi dopasowujemy do **najstarszego**
+czekajacego zapytania, bo przy zatorze odpowiedz potrafi przyjsc juz po wyslaniu nastepnego
+i liczenie od tego nowego dawaloby absurdalne "5 ms" zamiast prawdziwej sekundy. Te dwie
+diagnozy prowadza w zupelnie inne miejsca: zguba do warstwy, ktora gubi dane, zator do tej,
+ktora je przetrzymuje.
+
+Liczniki `BrakiOdpowiedzi`, `SpoznioneOdpowiedzi` i `OpisWymiany` (min/srednia/max) zeruja sie
+przy kazdym zestawieniu lacza, ida do kazdego wpisu w `podejrzane.txt` i pokazuja sie w stopce
+okna glownego - zeby dalo sie porownac wlasny tor z tymi 243/245/247 ms ze sondy i od razu
+zobaczyc, ile dokladamy sami.
 
 **[NIEAKTUALNE, zostawione jako przestroga] Sterownik odpowiada na STOP ramka w formacie pozycji.** Zmierzone: po rozkazie `0x0F` Rot1Prog odsyla `57 02 00 08 20`,
 czyli **208** czytane jak azymut, niezaleznie od tego, gdzie antena stoi. W sladzie widac to

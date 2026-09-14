@@ -89,9 +89,11 @@ public sealed class Mostek : IDisposable
     private readonly object _kolejnosc = new();
 
     // Ostatnia wiarygodna pozycja, czas jej przyjecia i licznik odrzucen z rzedu.
-    // Patrz ZglosBrakOdpowiedzi.
-    private long _kiedyZapytanie;
-    private int _brakow;
+    // Patrz ZanotujZapytanie. Zapytania wyslane, na ktore nie ma jeszcze odpowiedzi.
+    private sealed class Wymiana { public long Tik; public bool Zgloszona; }
+    private readonly Queue<Wymiana> _wymiany = new();
+    private int _brakow, _spoznionych, _ileWymian;
+    private double _sumaMs, _minMs = double.MaxValue, _maxMs;
     private long _ostatniZrzutBraku;
 
     // Patrz OdrzucicNieprawdopodobnyOdczyt.
@@ -368,9 +370,14 @@ public sealed class Mostek : IDisposable
                 _kiedyPozycja = DateTime.MinValue;
                 _odrzuconeZRzedu = 0;
 
-                // Licznik zgubionych odpowiedzi opisuje **to** polaczenie, nie caly dzien.
-                Interlocked.Exchange(ref _kiedyZapytanie, 0);
+                // Liczniki opisuja **to** polaczenie, nie caly dzien.
+                lock (_wymiany)
+                {
+                    _wymiany.Clear();
+                    _ileWymian = 0; _sumaMs = 0; _minMs = double.MaxValue; _maxMs = 0;
+                }
                 Volatile.Write(ref _brakow, 0);
+                Volatile.Write(ref _spoznionych, 0);
                 Interlocked.Exchange(ref _ostatniZrzutBraku, 0);
 
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
@@ -682,6 +689,29 @@ public sealed class Mostek : IDisposable
     /// </summary>
     public int BrakiOdpowiedzi => Volatile.Read(ref _brakow);
 
+    /// <summary>Ile z nich przyszlo jednak pozniej - czyli byl zator, a nie zguba.</summary>
+    public int SpoznioneOdpowiedzi => Volatile.Read(ref _spoznionych);
+
+    /// <summary>
+    /// Czasy obrotu zapytanie-odpowiedz, w milisekundach. Sam **rozrzut** jest tu informacja:
+    /// sonda wpieta wprost w port szeregowy Pi zmierzyla na sterowniku A3S 243/245/247 ms
+    /// przy 3479 wymianach - sterownik odpowiada jak metronom. Jesli ten sam tor mierzony
+    /// przez mostek daje wieksza srednia albo rozrzut, to roznica powstaje **nad** portem
+    /// szeregowym i tam trzeba jej szukac, a nie w maszcie.
+    /// </summary>
+    public string OpisWymiany
+    {
+        get
+        {
+            lock (_wymiany)
+            {
+                if (_ileWymian == 0) return "";
+                return _minMs.ToString("0") + "/" + (_sumaMs / _ileWymian).ToString("0") +
+                       "/" + _maxMs.ToString("0") + " ms z " + _ileWymian;
+            }
+        }
+    }
+
     /// <summary>
     /// Zapytanie o pozycje wyszlo do sterownika.
     ///
@@ -692,9 +722,14 @@ public sealed class Mostek : IDisposable
     /// dostatecznie nieprawdopodobna. Dziura w wymianie widac zawsze i wczesniej.
     ///
     /// Nie mierzymy tu zadnego wlasnego limitu czasu, tylko korzystamy z rytmu klienta:
-    /// jesli idzie **nastepne** zapytanie, a poprzednie wciaz czeka, to odpowiedz przepadla.
-    /// Prog 500 ms odsiewa klienta, ktory wysyla dwa zapytania pod rzad - normalny obrot
-    /// zapytanie-odpowiedz trwa na tym torze 250-350 ms.
+    /// jesli idzie **nastepne** zapytanie, a poprzednie wciaz czeka dluzej niz pol sekundy,
+    /// to cos sie stalo. Prog 500 ms odsiewa klienta wysylajacego dwa zapytania pod rzad -
+    /// normalny obrot trwa na tym torze 250-350 ms.
+    ///
+    /// **Zgloszone zapytanie zostaje w kolejce.** To jest sedno: dopoki odpowiedz nie przyjdzie,
+    /// nie wiadomo, czy przepadla, czy tylko stoi w zatorze. Gdy przyjdzie pozniej, mowimy to
+    /// wprost jako "ODPOWIEDZ SPOZNIONA" - i wtedy wiadomo, ze **nic sie nie zgubilo, tylko
+    /// czekalo**. Te dwie rzeczy prowadza w zupelnie inne miejsca, wiec nie wolno ich mylic.
     /// </summary>
     private void ZanotujZapytanie(byte[] ramka)
     {
@@ -702,40 +737,79 @@ public sealed class Mostek : IDisposable
             ramka[12] != 0x20 || ramka[11] != 0x1F) return;
 
         long teraz = DateTime.UtcNow.Ticks;
-        long poprzednie = Interlocked.Exchange(ref _kiedyZapytanie, teraz);
 
-        if (poprzednie != 0)
+        lock (_wymiany)
         {
-            double czekalo = TimeSpan.FromTicks(teraz - poprzednie).TotalMilliseconds;
-            if (czekalo >= 500)
+            foreach (var w in _wymiany)
             {
+                if (w.Zgloszona) continue;
+                double czeka = TimeSpan.FromTicks(teraz - w.Tik).TotalMilliseconds;
+                if (czeka < 500) continue;
+
+                w.Zgloszona = true;
                 Interlocked.Increment(ref _brakow);
-                ZglosBrakOdpowiedzi(czekalo);
+                ZglosWymiane("BRAK ODPOWIEDZI (na razie): zapytanie czeka juz " +
+                             czeka.ToString("0") + " ms, a poszlo nastepne");
             }
+
+            // Bez tego kolejka rosla by w nieskonczonosc przy zupelnie gluchym sterowniku.
+            while (_wymiany.Count >= 8) _wymiany.Dequeue();
+            _wymiany.Enqueue(new Wymiana { Tik = teraz });
         }
     }
 
-    /// <summary>Odpowiedz przyszla - przestajemy na nia czekac.</summary>
+    /// <summary>
+    /// Odpowiedz przyszla. Dopasowujemy ja do **najstarszego** czekajacego zapytania - przy
+    /// zatorze odpowiedz potrafi przyjsc juz po wyslaniu nastepnego zapytania i liczenie jej
+    /// od tego nowego dawaloby absurdalne "5 ms" zamiast prawdziwej sekundy.
+    /// </summary>
     private void ZanotujOdpowiedz(byte[] ramka)
     {
-        if (ramka.Length == 5 && ramka[0] == 0x57 && ramka[4] == 0x20)
-            Interlocked.Exchange(ref _kiedyZapytanie, 0);
+        if (ramka.Length != 5 || ramka[0] != 0x57 || ramka[4] != 0x20) return;
+
+        string doZgloszenia = null;
+
+        lock (_wymiany)
+        {
+            if (_wymiany.Count == 0) return;
+
+            var w = _wymiany.Dequeue();
+            double ms = TimeSpan.FromTicks(DateTime.UtcNow.Ticks - w.Tik).TotalMilliseconds;
+
+            _ileWymian++;
+            _sumaMs += ms;
+            if (ms < _minMs) _minMs = ms;
+            if (ms > _maxMs) _maxMs = ms;
+
+            if (w.Zgloszona)
+            {
+                Interlocked.Increment(ref _spoznionych);
+                doZgloszenia = "ODPOWIEDZ SPOZNIONA: przyszla po " + ms.ToString("0") +
+                               " ms - nic sie nie zgubilo, to byl zator";
+            }
+            else if (ms >= 600)
+            {
+                doZgloszenia = "ZATOR: odpowiedz po " + ms.ToString("0") + " ms";
+            }
+        }
+
+        if (doZgloszenia != null) ZglosWymiane(doZgloszenia);
     }
 
     /// <summary>
-    /// Wpis o zgubionej odpowiedzi. Ma **wlasny** dlawik, osobny od filtru pozycji: dziura
+    /// Wpis o chorej wymianie. Ma **wlasny** dlawik, osobny od filtru pozycji: dziura
     /// i wywolany przez nia zly odczyt dziela sie zwykle sekunda i wspolny limit piecio
     /// sekundowy zjadlby ten drugi wpis - czyli dokladnie ten, po ktory sie tu przychodzi.
     /// </summary>
-    private void ZglosBrakOdpowiedzi(double czekalo)
+    private void ZglosWymiane(string powod)
     {
         long ostatni = Interlocked.Read(ref _ostatniZrzutBraku);
         if (ostatni != 0 && DateTime.UtcNow - new DateTime(ostatni) <= TimeSpan.FromSeconds(5)) return;
 
         Interlocked.Exchange(ref _ostatniZrzutBraku, DateTime.UtcNow.Ticks);
         Pulapka.Zapisz(Podpis,
-            "BRAK ODPOWIEDZI na zapytanie o pozycje: czekalo " + czekalo.ToString("0") +
-            " ms, poszlo nastepne. Brakow od zestawienia lacza: " + BrakiOdpowiedzi,
+            powod + ". Od zestawienia lacza: brakow " + BrakiOdpowiedzi +
+            ", spoznionych " + SpoznioneOdpowiedzi + ", czasy " + OpisWymiany,
             _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 
