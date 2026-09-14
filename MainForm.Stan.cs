@@ -162,6 +162,14 @@ public partial class MainForm
                      "Przy połączonym mostku strona RC-1216H nie odświeża stanu" +
                      Environment.NewLine + "wzmacniacza — port szeregowy jest wtedy zajęty.";
 
+        // Bilans wymian takze przy urzadzeniu. Wzmacniacz idzie tym samym tunelem po LTE
+        // co rotory, wiec podlega tym samym zastojom - a do 1.11.18 nie bylo o tym zadnej
+        // informacji, bo liczyliśmy tylko rotory.
+        if (m != null && m.BilansWymian.Length > 0)
+            dymek += Environment.NewLine + Environment.NewLine +
+                     "Odpytywanie: " + m.BilansWymian +
+                     (m.OpisWymiany.Length > 0 ? ", czasy " + m.OpisWymiany : "");
+
         _dymek.SetToolTip(etykietaTrasy, dymek);
 
         var stan = EtykietaStanuKarty(karta, true);

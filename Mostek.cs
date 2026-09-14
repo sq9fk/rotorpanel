@@ -91,7 +91,7 @@ public sealed class Mostek : IDisposable
     // Ostatnia wiarygodna pozycja, czas jej przyjecia i licznik odrzucen z rzedu.
     // Patrz ZanotujZapytanie. Zapytania wyslane, na ktore nie ma jeszcze odpowiedzi.
     private readonly Queue<long> _wymiany = new();
-    private int _brakow, _spoznionych, _ileWymian, _zapytan, _odpowiedzi;
+    private int _brakow, _spoznionych, _ileWymian, _zapytan, _odpowiedzi, _statusowPoprzednio;
     private double _sumaMs, _minMs = double.MaxValue, _maxMs;
     private long _ostatniZrzutBraku;
 
@@ -372,7 +372,7 @@ public sealed class Mostek : IDisposable
                 _blad = "";
                 Volatile.Write(ref _stan, (int)StanMostka.Polaczony);
 
-                if (!OdpytywacSpe) Pulapka.Uzbrojono(Podpis);
+                Pulapka.Uzbrojono(Podpis);
 
                 // Po przerwie antena mogla zostac przekrecona recznie - pierwszy odczyt
                 // po polaczeniu nie ma sie do czego porownac i nie wolno go odrzucic.
@@ -385,7 +385,7 @@ public sealed class Mostek : IDisposable
                 {
                     _wymiany.Clear();
                     _ileWymian = 0; _sumaMs = 0; _minMs = double.MaxValue; _maxMs = 0;
-                    _zapytan = 0; _odpowiedzi = 0;
+                    _zapytan = 0; _odpowiedzi = 0; _statusowPoprzednio = 0;
                 }
                 Volatile.Write(ref _brakow, 0);
                 Volatile.Write(ref _spoznionych, 0);
@@ -605,6 +605,13 @@ public sealed class Mostek : IDisposable
                 // program po drugiej stronie pary o nie nie prosil. Liczniki pokazuja
                 // ruch klienta, wiec nasze wlasne odpytywanie do nich nie wchodzi.
                 var dalej = czytnik.Przepusc(bufor, n);
+
+                // Kazda rozebrana ramka statusu to jedna odpowiedz - czyja, nie ma znaczenia:
+                // interesuje nas, czy wzmacniacz odpowiada w ogole i jak szybko. Wzmacniacz
+                // idzie tym samym tunelem po LTE co rotory, wiec podlega tym samym zastojom.
+                for (int i = _statusowPoprzednio; i < czytnik.IleStatusow; i++) ZanotujOdbior();
+                _statusowPoprzednio = czytnik.IleStatusow;
+
                 _status = czytnik.Status ?? _status;
                 Interlocked.Add(ref _rx, dalej.Length);
 
@@ -776,6 +783,15 @@ public sealed class Mostek : IDisposable
         if (!(Punkt is Rotor) || ramka.Length != 13 || ramka[0] != 0x57 ||
             ramka[12] != 0x20 || ramka[11] != 0x1F) return;
 
+        ZanotujWyslanie();
+    }
+
+    /// <summary>
+    /// Zapytanie poszlo. Wydzielone z <see cref="ZanotujZapytanie"/>, bo **wzmacniacz tez
+    /// odpytujemy** i tez idzie przez ten tunel - rozny jest tylko sposob rozpoznania ramki.
+    /// </summary>
+    private void ZanotujWyslanie()
+    {
         long teraz = DateTime.UtcNow.Ticks;
         Interlocked.Increment(ref _zapytan);
 
@@ -796,6 +812,13 @@ public sealed class Mostek : IDisposable
     /// **ponad 700 ms jest martwe**. Po jego usunieciu nastepna odpowiedz znowu tworzy pare
     /// bez watpliwosci i pomiar sam wraca do zdrowia.
     /// </summary>
+    /// <summary>
+    /// Po ilu milisekundach uznajemy zapytanie za stracone. **Musi byc krotszy od odstepu
+    /// odpytywania** - patrz PorzucPrzeterminowane. Rotor jest pytany co sekunde, wzmacniacz
+    /// rzadziej i odpowiada wolniej, wiec dostaje wiecej luzu.
+    /// </summary>
+    private double ProgPorzucenia => OdpytywacSpe ? 2000 : 700;
+
     private void PorzucPrzeterminowane(long teraz)
     {
         int porzucone = 0;
@@ -806,7 +829,7 @@ public sealed class Mostek : IDisposable
             while (_wymiany.Count > 0)
             {
                 double czeka = TimeSpan.FromTicks(teraz - _wymiany.Peek()).TotalMilliseconds;
-                if (czeka < 700) break;
+                if (czeka < ProgPorzucenia) break;
 
                 _wymiany.Dequeue();
                 porzucone++;
@@ -831,7 +854,12 @@ public sealed class Mostek : IDisposable
     private void ZanotujOdpowiedz(byte[] ramka)
     {
         if (ramka.Length != 5 || ramka[0] != 0x57 || ramka[4] != 0x20) return;
+        ZanotujOdbior();
+    }
 
+    /// <summary>Odpowiedz przyszla - wspolne dla rotora i wzmacniacza.</summary>
+    private void ZanotujOdbior()
+    {
         Interlocked.Increment(ref _odpowiedzi);
 
         // Najpierw sprzataczka, potem dopasowanie - inaczej ta odpowiedz zostalaby przypisana
@@ -1076,7 +1104,7 @@ public sealed class Mostek : IDisposable
     {
         var czytnik = _czytnikSpe;
         bool poszlo = await WyslijKlawisz(StatusSpe.Zapytanie, ct);
-        if (poszlo) czytnik?.ZglosWlasneZapytanie();
+        if (poszlo) { czytnik?.ZglosWlasneZapytanie(); ZanotujWyslanie(); }
         return poszlo;
     }
 
@@ -1163,6 +1191,7 @@ public sealed class Mostek : IDisposable
                 await siec.WriteAsync(zapytanie, 0, zapytanie.Length, ct);
                 await siec.FlushAsync(ct);
                 czytnik.ZglosWlasneZapytanie();
+                ZanotujWyslanie();
                 Interlocked.Exchange(ref _ostatnieZapytanieOStan, DateTime.UtcNow.Ticks);
             }
             finally { _bramka.Release(); }

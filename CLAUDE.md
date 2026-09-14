@@ -189,6 +189,30 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Co z tej diagnostyki przenosi sie na wzmacniacz SPE, a co nie** (1.11.18). Wzmacniacz idzie
+**tym samym tunelem** (192.168.6.7, ta sama podsiec co Pi), wiec podlega tym samym zastojom.
+Przeglad, pozycja po pozycji:
+
+* **Skladanie ramek - juz tam jest i jest lepsze niz przy rotorze.** `CzytnikSpe.Przepusc`
+  akumuluje w `_reszta` miedzy odczytami, czeka na cala ramke (`czekam`) i radzi sobie
+  z naglowkiem przecietym miedzy porcjami. Co wiecej, ma **resynchronizacje po bajcie `0xAA`**
+  (`NastepnySync`), czyli rozwiazanie lepsze od zaworu czasowego: urwana ramka nie czeka na
+  zegar, tylko od razu ustepuje nastepnej. Nic tu nie trzeba dokladac.
+* **Odczyt 208 sie nie przenosi.** To byla arytmetyka PstRotatora na wlasnym pustym buforze
+  przy protokole bez sumy kontrolnej i z surowymi cyframi binarnymi. Ramka SPE ma naglowek
+  synchronizacji, typ i dlugosc, a `StatusSpe.Rozbierz` zwraca `null` na smieciach. Ten
+  protokol jest z budowy odporny na to, na co SPID nie byl.
+* **Filtr pozycji ma tam milczec i milczy** - `Punkt is Rotor`. Pieciobajtowy ciag zaczynajacy
+  sie od `0x57` w strumieniu wzmacniacza to przypadek, nie azymut.
+* **Czego brakowalo: pomiaru.** Liczniki wymian byly liczone **tylko dla rotorow**, wiec
+  o wzmacniaczu nie wiedzielismy nic - ani ile wlasnych zapytan o status zostaje bez
+  odpowiedzi, ani jak dlugo trwa wymiana. Teraz `CzytnikSpe.IleStatusow` liczy rozebrane ramki,
+  a mostek zestawia to z liczba wlasnych zapytan, dokladnie tak jak przy rotorze. Prog
+  porzucenia jest inny - **2000 ms zamiast 700 ms** - bo wzmacniacz odpytujemy rzadziej
+  i odpowiada wolniej, a prog musi zostac **krotszy od odstepu odpytywania**.
+* **Pulapka uzbraja sie teraz takze przy wzmacniaczu.** Wczesniej `if (!OdpytywacSpe)`
+  wylaczalo ja calkowicie, wiec `podejrzane.txt` nie mial o tym torze ani jednej linii.
+
 **Tor idzie przez WireGuard po LTE - i to jest odpowiedz na wszystko powyzej** (1.11.17).
 Potwierdzone przez uzytkownika, zgodne z pomiarem: ping 38-56 ms przy rozrzucie 18 ms
 i **TTL 62**, czyli dwa przeskoki routowane - to nigdy nie byla siec lokalna.

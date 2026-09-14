@@ -28,6 +28,16 @@ public sealed class CzytnikSpe
 
     public StatusSpe Status { get; private set; }
 
+    private int _ileStatusow;
+
+    /// <summary>
+    /// Ile ramek statusu udalo sie rozebrac od poczatku. Mostek porownuje to z liczba
+    /// **wlasnych zapytan**, zeby wiedziec, ile z nich zostalo bez odpowiedzi - tak samo,
+    /// jak robi to przy rotorach. Wzmacniacz idzie tym samym tunelem po LTE, wiec podlega
+    /// tym samym zastojom, a bez licznika nie bylo o tym **zadnej** informacji.
+    /// </summary>
+    public int IleStatusow => Volatile.Read(ref _ileStatusow);
+
     /// <summary>Ile wlasnych zapytan czeka na odpowiedz - do sladu diagnostycznego.</summary>
     public int WlasneOczekujace => Volatile.Read(ref _wlasneOczekujace);
 
@@ -145,6 +155,7 @@ public sealed class CzytnikSpe
         if (status is null) return false;
 
         Status = status;
+        Interlocked.Increment(ref _ileStatusow);
 
         // Odpowiedz na wlasne zapytanie zdejmujemy, cudza idzie do klienta - rozbior
         // dla siebie zrobilismy juz wyzej, wiec nic na tym nie tracimy.
