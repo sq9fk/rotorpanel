@@ -69,6 +69,17 @@ public partial class MainForm
             if (mostek is { ObcePrzejecia: > 0 })
                 skad += "; port przejmowany przez inny program (" + mostek.ObcePrzejecia + "×)";
 
+            // Czasy wymiany przy KAZDYM rotorze osobno. Sonda wpieta wprost w port szeregowy
+            // Pi zmierzyla na sterowniku 243/245/247 ms, wiec wszystko ponad to dokladamy
+            // my albo ser2net - a zeby to zobaczyc, trzeba miec te trzy tory obok siebie.
+            if (mostek != null && mostek.OpisWymiany.Length > 0)
+            {
+                skad += "; wymiana " + mostek.OpisWymiany;
+                if (mostek.BrakiOdpowiedzi > 0)
+                    skad += ", bez odpowiedzi " + mostek.BrakiOdpowiedzi +
+                            " (spóźnionych " + mostek.SpoznioneOdpowiedzi + ")";
+            }
+
             opisy.Add(rotor.Etykieta + " " + adres + " — " + skad);
         }
 
