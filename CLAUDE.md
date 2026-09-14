@@ -181,7 +181,14 @@ pieciu bajtow, oprozniany po 120 ms ciszy), `_kolejkaPortu` (do 256 porcji, przy
 odpadaja **najstarsze**, bo najswiezsza pozycja jest najcenniejsza) i bufory com0coma, czyszczone
 przy kazdym zestawieniu lacza.
 
-**Rozkazy do sterownika ida tak, jak przyszly z pary - bez skladania.** W dzienniku widac, ze
+**Rozkazy do sterownika tez wychodza calymi ramkami** (od 1.11.6). Ten sam `SkladaczSpid`
+pracuje w obie strony, ale po stronie gniazda wyjmowanie ramek i zapis ida pod semaforem
+`_bramka` - bo do gniazda pisze jeszcze zegar dopychajacy zalegly ogon, a gdyby chroniony byl
+tylko zapis, obaj mogliby sie wyprzedzic. Sprawdzone: rozkaz podzielony na 4+9 bajtow wychodzi
+**jednym zapisem**, a zapytanie o pozycje (same zera w polach cyfr) nie zostaje wziete za ramke
+pieciobajtowa, bo jego piaty bajt to `0x00`, nie `0x20`.
+
+**[historyczne] Rozkazy do sterownika szly tak, jak przyszly z pary - bez skladania.** W dzienniku widac, ze
 PstRotator wpisuje cale trzynascie bajtow jednym zapisem, wiec w praktyce idzie cala ramka - ale
 to wlasciwosc klienta, nie gwarancja mostka. Po drugiej stronie jest UART, gdzie bajty i tak
 docieraja pojedynczo, wiec podzial sam w sobie nie szkodzi; gdyby kiedys okazalo sie, ze firmware

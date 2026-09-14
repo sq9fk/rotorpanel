@@ -75,6 +75,10 @@ public sealed class Mostek : IDisposable
     // Odpowiedzi sterownika skladamy w cale ramki, zanim trafia na port - patrz SkladaczSpid.
     private readonly SkladaczSpid _skladacz = new();
 
+    // Ten sam skladacz w druga strone: rozkazy do sterownika tez maja wychodzic
+    // calymi ramkami. Patrz SkladaczRozkazow w Pompa.
+    private readonly SkladaczSpid _skladaczRozkazow = new();
+
     /// <summary>
     /// Pilnuje **kolejnosci** wkladania do kolejki portu. Do skladacza sa dwa wejscia: pompa
     /// z sieci i zegar dopychajacy zalegly ogon. Samo skladanie jest zamkniete, ale odcinek
@@ -380,7 +384,7 @@ public sealed class Mostek : IDisposable
                 // Odczyt z sieci potrafi stanac na sekunde, wiec zalegly ogon ramki
                 // musi miec kto wypchnac.
                 var dopychacz = OdpytywacSpe ? Task.Delay(Timeout.Infinite, ct)
-                                             : DopychajRamki(port, ct);
+                                             : DopychajRamki(port, siec, ct);
 
                 await Task.WhenAny(wGore, wDol, pytania, pisarz, dopychacz);
             }
@@ -587,13 +591,32 @@ public sealed class Mostek : IDisposable
                 continue;
             }
 
-            if (zPortu)
+            if (zPortu && OdpytywacSpe)
             {
                 await _bramka.WaitAsync(ct);
                 try
                 {
                     await dokad.WriteAsync(bufor, 0, n, ct);
                     await dokad.FlushAsync(ct);
+                }
+                finally { _bramka.Release(); }
+            }
+            else if (zPortu)
+            {
+                // Rotor: rozkaz wychodzi cala ramka albo wcale. Wyjmowanie ramek i zapis
+                // ida pod tym samym semaforem, bo do gniazda pisze jeszcze zegar dopychajacy
+                // zalegly ogon - gdyby tylko zapis byl chroniony, mogliby sie wyprzedzic
+                // i sterownik dostalby bajty w zlej kolejnosci.
+                await _bramka.WaitAsync(ct);
+                try
+                {
+                    var rozkazy = _skladaczRozkazow.Dopisz(bufor, n);
+                    if (rozkazy != null)
+                    {
+                        foreach (var ramka in rozkazy)
+                            await dokad.WriteAsync(ramka, 0, ramka.Length, ct);
+                        await dokad.FlushAsync(ct);
+                    }
                 }
                 finally { _bramka.Release(); }
             }
@@ -706,7 +729,7 @@ public sealed class Mostek : IDisposable
     /// Wypycha na port ogon ramki, ktory nie doczekal sie dokonczenia. Patrz
     /// <see cref="SkladaczSpid.Dopchnij"/> - bez tego czekalby do nastepnej odpowiedzi.
     /// </summary>
-    private async Task DopychajRamki(Stream port, CancellationToken ct)
+    private async Task DopychajRamki(Stream port, Stream siec, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
@@ -715,15 +738,33 @@ public sealed class Mostek : IDisposable
             lock (_kolejnosc)
             {
                 var zalegle = _skladacz.Dopchnij();
-                if (zalegle == null) continue;
+                if (zalegle != null)
+                    foreach (var ramka in zalegle)
+                    {
+                        if (Slad.Wlaczony)
+                            ZapiszRamke("siec->port OGON po ciszy", ramka, ramka.Length);
+                        Oddaj(port, ramka, ct);
+                    }
+            }
 
-                foreach (var ramka in zalegle)
+            // Ogon rozkazu idzie do gniazda pod tym samym semaforem co pompa.
+            await _bramka.WaitAsync(ct);
+            try
+            {
+                var zalegleRozkazy = _skladaczRozkazow.Dopchnij();
+                if (zalegleRozkazy == null) continue;
+
+                foreach (var ramka in zalegleRozkazy)
                 {
                     if (Slad.Wlaczony)
-                        ZapiszRamke("siec->port OGON po ciszy", ramka, ramka.Length);
-                    Oddaj(port, ramka, ct);
+                        ZapiszRamke("port->siec OGON po ciszy", ramka, ramka.Length);
+                    await siec.WriteAsync(ramka, 0, ramka.Length, ct);
                 }
+                await siec.FlushAsync(ct);
             }
+            catch (OperationCanceledException) { return; }
+            catch (ObjectDisposedException) { return; }
+            finally { _bramka.Release(); }
         }
     }
 
