@@ -1,4 +1,4 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Sklada bajty ze strony sieci w cale ramki SPID, zanim trafia na port com0com.
@@ -22,6 +22,25 @@ public sealed class SkladaczSpid
     private readonly List<byte> _bufor = new();
     private DateTime _odkad = DateTime.MinValue;
 
+    // Ile razy oddalismy ogon po czasie, nie doczekawszy sie ramki, i ile ramek
+    // rozpoznalismy w ogole. Patrz Przezroczysty.
+    private int _ogonow;
+    private int _ramek;
+
+    /// <summary>
+    /// Czy skladacz wylaczyl sie sam, bo dane nie wygladaja na SPID.
+    ///
+    /// Skladanie ramek jest **swiadome protokolu**, a mostek ma byc przezroczysty. Gdyby ktos
+    /// podpial pod te sama konfiguracje inny sterownik, kazda wymiana czekalaby na zawor czasowy
+    /// (120 ms), bo ramka nigdy by sie nie domknela. Dlatego po dwudziestu takich ogonach **bez
+    /// ani jednej rozpoznanej ramki** przestajemy sie wtracac i puszczamy wszystko wprost.
+    ///
+    /// Prog jest asymetryczny celowo: jedna poprawna ramka wystarczy, by uznac protokol za
+    /// znany, a do wycofania sie trzeba dwudziestu nieudanych prob. Lepiej raz za duzo poczekac
+    /// niz zepsuc dzialajacy tor.
+    /// </summary>
+    public bool Przezroczysty => _ramek == 0 && _ogonow >= 20;
+
     /// <summary>
     /// Po tym czasie oddajemy to, co mamy, nawet jesli nie jest cala ramka. Bez tego
     /// urwana ramka czekalaby do nastepnej odpowiedzi i doklejalaby sie do niej - czyli
@@ -36,6 +55,14 @@ public sealed class SkladaczSpid
         {
             if (_bufor.Count == 0 && ile > 0) _odkad = DateTime.UtcNow;
             for (int i = 0; i < ile; i++) _bufor.Add(dane[i]);
+
+            if (Przezroczysty)
+            {
+                var wprost = new List<byte[]> { _bufor.ToArray() };
+                _bufor.Clear();
+                return wprost;
+            }
+
             return Wyjmij();
         }
     }
@@ -53,6 +80,7 @@ public sealed class SkladaczSpid
 
             var reszta = new List<byte[]> { _bufor.ToArray() };
             _bufor.Clear();
+            _ogonow++;
             return reszta;
         }
     }
@@ -73,8 +101,8 @@ public sealed class SkladaczSpid
                 continue;
             }
 
-            if (_bufor.Count >= 5 && _bufor[4] == 0x20) { Dodaj(ref gotowe, 5); continue; }
-            if (_bufor.Count >= 13 && _bufor[12] == 0x20) { Dodaj(ref gotowe, 13); continue; }
+            if (_bufor.Count >= 5 && _bufor[4] == 0x20) { _ramek++; Dodaj(ref gotowe, 5); continue; }
+            if (_bufor.Count >= 13 && _bufor[12] == 0x20) { _ramek++; Dodaj(ref gotowe, 13); continue; }
 
             // Trzynascie bajtow bez zamkniecia to nie jest zadna znana ramka - oddajemy
             // pierwszy bajt i szukamy poczatku dalej, zeby sie nie zapetlic.

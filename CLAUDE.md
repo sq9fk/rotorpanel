@@ -188,6 +188,31 @@ tylko zapis, obaj mogliby sie wyprzedzic. Sprawdzone: rozkaz podzielony na 4+9 b
 **jednym zapisem**, a zapytanie o pozycje (same zera w polach cyfr) nie zostaje wziete za ramke
 pieciobajtowa, bo jego piaty bajt to `0x00`, nie `0x20`.
 
+**Mostek NIE jest juz w pelni przezroczysty - i sam o tym wie.** Skladanie ramek oraz filtr
+pozycji **znaja protokol SPID**. Gdyby ktos wpial pod te sama pare com0com sterownik mowiacy
+czyms innym (Yaesu GS-232, Hy-Gain DCU-1, rotctld), skladacz nie rozpoznalby ani jednej ramki
+i kazda wymiana czekalaby na zawor czasowy - **120 ms opoznienia na kazda wiadomosc**, a piec
+bajtow zaczynajacych sie od `0x57` i konczacych `0x20` moglby trafic pod filtr pozycji i zostac
+skasowany. To nie jest teoretyczne: GS-232 ustawia azymut rozkazem zaczynajacym sie wlasnie
+od `W` = `0x57`.
+
+Dlatego od 1.11.7 skladacz **wycofuje sie sam**. `SkladaczSpid.Przezroczysty` jest prawdziwe,
+gdy oddal **dwadziescia ogonow po czasie, nie rozpoznawszy ani jednej ramki** - wtedy `Dopisz`
+puszcza wszystko wprost, a `OdrzucicNieprawdopodobnyOdczyt` od razu zwraca `false`. Prog jest
+asymetryczny **celowo**: jedna poprawna ramka wystarczy, zeby uznac protokol za znany, a do
+wycofania sie trzeba dwudziestu nieudanych prob. Lepiej raz za duzo poczekac niz zepsuc
+dzialajacy tor.
+
+Czego to **nie** zalatwia: pierwsze ~2,5 sekundy obcego protokolu (dwadziescia ogonow po
+120 ms) i tak ida z opoznieniem, a dane, ktore przypadkiem wygladaja jak ramka SPID, nadal beda
+skladane. Jesli kiedys naprawde zmienisz protokol, **wylacz skladanie jawnie** przy tworzeniu
+mostka zamiast liczyc na samowycofanie - to jest siatka bezpieczenstwa, nie funkcja.
+
+Sprawdzone w `TestSkladacza`: ciag `57 58 31 32 33 0D` (zaczyna sie od `0x57`, ale nie ma `0x20`
+na piatym bajcie) po dwudziestu probach przelacza skladacz w tryb przezroczysty i od tej chwili
+wychodzi natychmiast; jedna poprawna odpowiedz SPID na poczatku sprawia, ze **nie przelacza sie
+nigdy**, nawet po dwudziestu pieciu smieciach.
+
 **[historyczne] Rozkazy do sterownika szly tak, jak przyszly z pary - bez skladania.** W dzienniku widac, ze
 PstRotator wpisuje cale trzynascie bajtow jednym zapisem, wiec w praktyce idzie cala ramka - ale
 to wlasciwosc klienta, nie gwarancja mostka. Po drugiej stronie jest UART, gdzie bajty i tak

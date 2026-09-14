@@ -687,6 +687,12 @@ public sealed class Mostek : IDisposable
     /// </summary>
     private bool OdrzucicNieprawdopodobnyOdczyt(byte[] ramka)
     {
+        // Filtr zna protokol SPID, wiec musi milczec tam, gdzie skladacz juz sie wycofal.
+        // Inaczej w obcym protokole piec bajtow zaczynajacych sie od 0x57 i konczacych 0x20
+        // byloby czytane jak pozycja rotora i mogloby zostac **skasowane** - a mostek
+        // nie ma prawa gubic danych, ktorych nie rozumie.
+        if (_skladacz.Przezroczysty) return false;
+
         if (ramka.Length != 5 || ramka[0] != 0x57 || ramka[4] != 0x20) return false;
 
         int pozycja = ramka[1] * 100 + ramka[2] * 10 + ramka[3];
