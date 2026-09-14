@@ -189,6 +189,33 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Sterownik w trybie recznym nie odpowiada na port - i to tlumaczy cisze w dzienniku.**
+Zgloszone przez uzytkownika: *"nie bede w stanie krecic i odczytywac azymutu w tym samym czasie
+z PstRotatora, bo sterownik jest w trybie recznym"*. W dzienniku wyglada to na powazna awarie -
+o 19:25:52 mostek A3S przestal dostawac cokolwiek, zapytania szly dalej co sekunde (2176, 2181,
+2186), a licznik odpowiedzi stal na 2173. Przyczyna byla taka, ze uzytkownik krecil rotorem
+recznie z panelu.
+
+**Wniosek na przyszlosc: zanim uznasz cisze sterownika za usterke, sprawdz, w jakim trybie stoi
+panel.** To dotyczy takze planowania testow - proba "krec recznie i czytaj sonda" jest
+niewykonalna z zalozenia, a ja ja zaproponowalem, nie wiedzac o tym ograniczeniu. Test na
+gubienie impulsow przez A3S musi isc **z trybu automatycznego, nastawa z PstRotatora**.
+
+**Dlawienie gestych zapytan usuniete** (1.11.15). Wprowadzone w 1.11.13 na podstawie **dwoch**
+przypadkow ze zrzutu pakietow. Pieciogodzinny przebieg go nie potwierdzil: na rotorze 10m
+dlawienie zadzialalo trzy razy, a brakow odpowiedzi bylo i tak piec; na 15m brakow bylo szesc
+przy zerowym dlawieniu. Skoro nie poprawilo bilansu, poszlo won - zgodnie z tym, co bylo
+zapisane przy jego wprowadzaniu.
+
+**Prog porzucania zapytania musi byc krotszy od odstepu odpytywania.** Inaczej pomiar czasow
+**zamiera po pierwszej zgubie**: przy progu 1500 ms i odpytywaniu co sekunde osierocone
+zapytanie nigdy sie nie przeterminowuje, bo gdy przychodzi nastepne, ma dopiero 1000 ms.
+Kolejna odpowiedz przypisuje sie wiec do osieroconego, zostawiajac osierocone nastepne - i tak
+w kolko, a zadna para nie jest juz jednoznaczna. Widac to bylo wprost: czasy zamrozone na
+"z 106" przez pol godziny przy dwoch tysiacach wymian. Teraz prog to 700 ms - powyzej
+zmierzonego maksimum odpowiedzi (442 ms), ponizej odstepu odpytywania - i sprzatanie idzie
+takze **przed** dopasowaniem odpowiedzi, wiec pomiar sam wraca do zdrowia.
+
 **Zrzut pakietow na Pi zamknal sprawe lacza** (1.11.13). Dziesiec minut ruchu na porcie 4101,
 `tcpdump` na Pi, przy pracujacych wszystkich trzech rotorach:
 
