@@ -160,6 +160,34 @@ Prawdziwa pozycja tuz po zatrzymaniu rozni sie o kilka stopni i przechodzi bez z
 odrzucenie ida do `podejrzane.txt` - **nic nie znika po cichu**, bo filtr na danych o polozeniu
 anteny musi byc rozliczalny.
 
+**Dwa wejscia do jednej kolejki wymagaja zamka na calym odcinku, nie tylko na skladaniu.**
+Do `_kolejkaPortu` wkladaja dwa watki: pompa z sieci i zegar dopychajacy zalegly ogon ramki.
+Sam `SkladaczSpid` jest zamkniety, ale odcinek **"wyjmij ramki" - "wloz do kolejki"** juz nie
+byl: dopychacz mogl wejsc w te szczeline i wrzucic ogon **przed** ramka, ktora pompa dopiero
+wkladala. Do klienta poszlyby bajty w zlej kolejnosci - czyli dokladnie to, przed czym ma
+chronic skladanie ramek. Stad `_kolejnosc`: obejmuje **pobranie i wlozenie razem**.
+
+Zasada ogolna: jesli dwa watki produkuja do wspolnej kolejki, samo zamkniecie producenta nie
+wystarcza - zamek musi obejmowac takze wlozenie, inaczej kolejnosc jest przypadkiem.
+
+**Audyt komunikacji - kto pisze i gdzie sa bufory.** Do **gniazda** pisze pompa z portu, pod
+semaforem `_bramka`; drugi pisarz (`WyslijKlawisz`, `OdpytujSpe`) istnieje tylko dla SPE i uzywa
+tego samego semafora - przy rotorze pisarz jest jeden, wiec kolizja jest niemozliwa. Do **portu**
+pisze wylacznie `PisarzPortu`, zdejmujac z jednej kolejki.
+
+Bufory w torze, od sprzetu: UART sterownika, przejsciowka USB na Pi, bufory gniazda TCP po obu
+stronach, odczyt mostka (1024 B, bez akumulacji), `SkladaczSpid` (skladana ramka, zwykle ponizej
+pieciu bajtow, oprozniany po 120 ms ciszy), `_kolejkaPortu` (do 256 porcji, przy przepelnieniu
+odpadaja **najstarsze**, bo najswiezsza pozycja jest najcenniejsza) i bufory com0coma, czyszczone
+przy kazdym zestawieniu lacza.
+
+**Rozkazy do sterownika ida tak, jak przyszly z pary - bez skladania.** W dzienniku widac, ze
+PstRotator wpisuje cale trzynascie bajtow jednym zapisem, wiec w praktyce idzie cala ramka - ale
+to wlasciwosc klienta, nie gwarancja mostka. Po drugiej stronie jest UART, gdzie bajty i tak
+docieraja pojedynczo, wiec podzial sam w sobie nie szkodzi; gdyby kiedys okazalo sie, ze firmware
+resynchronizuje sie po przerwie w srodku ramki, ten sam `SkladaczSpid` mozna wpiac takze w te
+strone.
+
 **Nie dziel ramki tylko dlatego, ze tak przyszla z sieci.** To byla przyczyna odczytu
 208 stopni - i szukalem jej daleko, bo pytanie brzmialo "kto wysyla taka nastawe", a wlasciwe
 brzmialo "kto czyta taka pozycje".

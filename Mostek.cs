@@ -75,6 +75,15 @@ public sealed class Mostek : IDisposable
     // Odpowiedzi sterownika skladamy w cale ramki, zanim trafia na port - patrz SkladaczSpid.
     private readonly SkladaczSpid _skladacz = new();
 
+    /// <summary>
+    /// Pilnuje **kolejnosci** wkladania do kolejki portu. Do skladacza sa dwa wejscia: pompa
+    /// z sieci i zegar dopychajacy zalegly ogon. Samo skladanie jest zamkniete, ale odcinek
+    /// "wyjmij ramki" - "wloz do kolejki" juz nie byl: dopychacz mogl wejsc w te szczeline
+    /// i wrzucic ogon **przed** ramka, ktora pompa dopiero wkladala. Bajty dotarlyby wtedy
+    /// do klienta w zlej kolejnosci - czyli dokladnie to, przed czym ma chronic skladanie ramek.
+    /// </summary>
+    private readonly object _kolejnosc = new();
+
     // Ostatnia wiarygodna pozycja, czas jej przyjecia i licznik odrzucen z rzedu.
     // Patrz OdrzucicNieprawdopodobnyOdczyt.
     private int _ostatniaPozycja = -1;
@@ -599,11 +608,14 @@ public sealed class Mostek : IDisposable
                 // Rotor: oddajemy cale ramki albo nic. Kawalek ramki wpisany na port
                 // konczy sie tym, ze program sterujacy czyta pusty bufor i pokazuje
                 // 208 stopni - patrz SkladaczSpid.
-                var gotowe = _skladacz.Dopisz(bufor, n);
-                if (gotowe != null)
-                    foreach (var ramka in gotowe)
-                        if (!OdrzucicNieprawdopodobnyOdczyt(ramka))
-                            Oddaj(dokad, ramka, ct);
+                lock (_kolejnosc)
+                {
+                    var gotowe = _skladacz.Dopisz(bufor, n);
+                    if (gotowe != null)
+                        foreach (var ramka in gotowe)
+                            if (!OdrzucicNieprawdopodobnyOdczyt(ramka))
+                                Oddaj(dokad, ramka, ct);
+                }
             }
         }
     }
@@ -700,14 +712,17 @@ public sealed class Mostek : IDisposable
         {
             await Task.Delay(50, ct);
 
-            var zalegle = _skladacz.Dopchnij();
-            if (zalegle == null) continue;
-
-            foreach (var ramka in zalegle)
+            lock (_kolejnosc)
             {
-                if (Slad.Wlaczony)
-                    ZapiszRamke("siec->port OGON po ciszy", ramka, ramka.Length);
-                Oddaj(port, ramka, ct);
+                var zalegle = _skladacz.Dopchnij();
+                if (zalegle == null) continue;
+
+                foreach (var ramka in zalegle)
+                {
+                    if (Slad.Wlaczony)
+                        ZapiszRamke("siec->port OGON po ciszy", ramka, ramka.Length);
+                    Oddaj(port, ramka, ct);
+                }
             }
         }
     }
