@@ -137,18 +137,28 @@ byc prawda. Ramki nie zapamietujemy, zeby nastepny prawdziwy odczyt porownal sie
 zostac przekrecona recznie. **To jest proteza, nie naprawa** - i dlatego kazde odrzucenie idzie
 do `podejrzane.txt` razem z dziennikiem.
 
-**I dlatego tez da sie ja wylaczyc** (1.11.8). W Ustawieniach jest pole *Odrzucaj niemozliwe
-odczyty pozycji (SPID)*, w pliku `filtrPozycji`, domyslnie wlaczone. Dwie rzeczy sa tu wazne:
+**I dlatego tez da sie ja wylaczyc** - **osobno dla kazdego rotora** (1.11.9). W Ustawieniach
+jest kolumna *Filtr* w tabeli rotorow, w pliku `rotory[].filtrPozycji`, domyslnie wlaczona.
+Ustawienie siedzi przy rotorze, a nie przy programie, bo usterka, dla ktorej filtr powstal,
+siedzi w **jednym** sterowniku (A3S) - wylaczanie go wszedzie naraz zdejmowaloby oslone takze
+z masztow, na ktorych nic sie nie dzieje. W 1.11.8 byl jeden przelacznik globalny; stara
+wartosc z korzenia pliku jest przy wczytaniu **domyslna dla kazdego rotora**, wiec
+aktualizacja niczego nie zmienia pod reka.
+
+Trzy rzeczy sa tu wazne:
 
 * **wylacznik zdejmuje kasowanie danych, nie diagnostyke** - przy wylaczonym filtrze
   nieprawdopodobny odczyt idzie do klienta, ale nadal trafia do `podejrzane.txt` jako
   `PRZEPUSZCZONY (filtr wylaczony w Ustawieniach)`. Inaczej uzytkownik, ktory wylacza filtr
   **wlasnie po to, zeby zobaczyc surowa prawde**, straciłby jedyny slad usterki;
 * **wylaczony filtr nadal zapamietuje pozycje** (`Zapamietaj`), inaczej po ponownym wlaczeniu
-  porownanie szloby od pozycji sprzed godziny.
+  porownanie szloby od pozycji sprzed godziny;
+* **przy urzadzeniu innym niz rotor filtr milczy z zasady** (`Punkt is Rotor`). Wczesniej
+  dzialal na kazdym mostku - przy zwyklym urzadzeniu szeregowym piec bajtow zaczynajacych sie
+  od `0x57` to przypadek, a nie azymut.
 
-`Config` jest wspoldzielony przez referencje, wiec zmiana dziala **od razu**, bez restartu
-mostkow - `OdrzucicNieprawdopodobnyOdczyt` czyta `_cfg.FiltrPozycji` przy kazdej ramce.
+Zapis ustawien i tak przebudowuje liste i mostki, wiec zmiana dziala od zaraz;
+`OdrzucicNieprawdopodobnyOdczyt` czyta `rotor.FiltrPozycji` przy kazdej ramce.
 
 **[NIEAKTUALNE, zostawione jako przestroga] Sterownik odpowiada na STOP ramka w formacie pozycji.** Zmierzone: po rozkazie `0x0F` Rot1Prog odsyla `57 02 00 08 20`,
 czyli **208** czytane jak azymut, niezaleznie od tego, gdzie antena stoi. W sladzie widac to
@@ -824,6 +834,21 @@ miesci linijke mocy nadawania i trzeci przycisk. `BudujUrzadzenia` przesuwa sie 
 zalezna od `u.Spe` - jesli dolozysz cos do tej karty, popraw obie liczby naraz, inaczej karty
 zaczna na siebie nachodzic. Ukladu tej karty **nie da sie sprawdzic zrzutem** (`MainForm` sama
 sie ukrywa), wiec pozycje licz na piechote: przyciski stoja na y=8, 40 i 72, kazdy po 30 px.
+
+**Kolumny licza sie wzdluz grup, a nie tylko wzdluz wysokosci.** `MainForm.Rozloz` probuje
+najpierw dac kazdej grupie wlasna kolumne (anteny osobno, urzadzenia osobno) i dopiero gdy
+najwyzsza kolumna nie miesci sie w ekranie, wraca do rownego podzialu na wysokosc. Rowny
+podzial daje slupki podobnej dlugosci, ale rozrywa to, co dla patrzacego jest calosci: przy
+szesciu antenach i jednym wzmacniaczu wychodzilo *cztery anteny | dwie anteny + Urzadzenia +
+wzmacniacz*, czyli naglowek grupy siedzial w polowie drugiej kolumny. Zmierzone: przy 150% na
+ekranie 1920x1080 uklad to teraz *szesc anten | Urzadzenia + wzmacniacz*.
+
+Podzial wzdluz grup stosujemy **tylko wtedy, gdy grup jest dokladnie tyle, ile kolumn**, i gdy
+najwyzsza kolumna miesci sie w tym, co zostaje po naglowku i przyciskach. Na ekranie GPD
+(1920x768 przy 150%) szesc anten w jednej kolumnie to 472 jednostki ukladu, a zostaje ich
+okolo 314 - tam wiec nadal obowiazuje podzial rowny, bo **paski przewijania sa gorsze niz
+nierowne slupki**. Trzeciej kolumny nie ma z czego zrobic: `580 + 2 * 556` nie miesci sie
+w `1920/1.5`.
 
 **Okna musza sie miescic na ekranie, na ktorym stoja.** Polozenia kontrolek sa wpisane na
 sztywno, wiec Ustawienia maja 1000 na 852 punkty - na laptopie z ekranem 1366 na 768 dolny

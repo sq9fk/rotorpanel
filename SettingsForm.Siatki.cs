@@ -83,7 +83,7 @@ public partial class SettingsForm
         _kolPara = new DataGridViewComboBoxColumn
         {
             HeaderText = "Para portów   (PstRotator - mostek)",
-            Width = 370,
+            Width = 330,
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
             SortMode = DataGridViewColumnSortMode.NotSortable
@@ -92,7 +92,7 @@ public partial class SettingsForm
 
         _siatkaRotorow.Columns.Add(new DataGridViewTextBoxColumn
         {
-            HeaderText = "Adres ser2net", Width = 255,
+            HeaderText = "Adres ser2net", Width = 225,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
 
@@ -101,6 +101,21 @@ public partial class SettingsForm
             HeaderText = "Port TCP", Width = 100,
             SortMode = DataGridViewColumnSortMode.NotSortable
         });
+
+        // Filtr jest przy rotorze, bo usterka, dla ktorej powstal, siedzi w jednym
+        // sterowniku - wylaczanie go dla wszystkich naraz zdejmowaloby oslone tam,
+        // gdzie nic sie nie dzieje.
+        var kolFiltr = new DataGridViewCheckBoxColumn
+        {
+            HeaderText = "Filtr", Width = 70,
+            ToolTipText =
+                "Odrzucaj odczyty pozycji, których ten rotor nie zdążyłby wykonać " +
+                "(obraca się około 2,5° na sekundę).\n" +
+                "Wyłącz, żeby widzieć surowe odczyty ze sterownika, na przykład przy szukaniu " +
+                "usterki — podejrzane odczyty trafiają do pliku podejrzane.txt tak czy owak.",
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        };
+        _siatkaRotorow.Columns.Add(kolFiltr);
 
         _siatkaRotorow.CurrentCellDirtyStateChanged += (_, _) =>
         {
@@ -148,7 +163,7 @@ public partial class SettingsForm
             }
 
             _siatkaRotorow.Rows.Add(r.Nr, r.Etykieta, opis, r.Ip,
-                                    r.Port > 0 ? r.Port.ToString() : "");
+                                    r.Port > 0 ? r.Port.ToString() : "", r.FiltrPozycji);
         }
     }
 
@@ -161,7 +176,7 @@ public partial class SettingsForm
         int nr = 1;
         while (uzyte.Contains(nr)) nr++;
 
-        _siatkaRotorow.Rows.Add(nr, WolnaNazwa(nr), Brak, "", "");
+        _siatkaRotorow.Rows.Add(nr, WolnaNazwa(nr), Brak, "", "", true);
         OdswiezListyPar();
         OdswiezListeRotorow();
     }
@@ -332,7 +347,8 @@ public partial class SettingsForm
             Com = para?.A ?? "",
             Dev = para?.B ?? "",
             Ip = Kom(w, RIp),
-            Port = port
+            Port = port,
+            FiltrPozycji = !(w.Cells[RFiltr].Value is bool z) || z
         };
     }
 

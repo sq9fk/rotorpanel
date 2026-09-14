@@ -99,7 +99,6 @@ JSON-em bez podwajania znaków.
 | `sterownikAnten` | adres sterownika anten w postaci `host` albo `host:port`, np. `192.168.1.101` |
 | `autoPolacz` | czy zestawiać mostki od razu po uruchomieniu |
 | `sprawdzajAktualizacje` | czy sprawdzać przy starcie, czy jest nowsze wydanie |
-| `filtrPozycji` | czy odrzucać niemożliwe odczyty pozycji rotorów SPID (domyślnie tak) |
 | `rotory[].nr` | numer rotora, do którego odwołują się anteny |
 | `rotory[].nazwa` | nazwa własna, np. „maszt A” |
 | `rotory[].com` | port widoczny dla PstRotatora |
@@ -107,6 +106,7 @@ JSON-em bez podwajania znaków.
 | `rotory[].ip` | adres `ser2net` dla tego rotora; puste znaczy `piIp` |
 | `rotory[].port` | port TCP wystawiony przez `ser2net` |
 | `rotory[].protokol` | `surowy` albo `rfc2217` |
+| `rotory[].filtrPozycji` | czy odrzucać odczyty pozycji, których ten rotor nie zdążyłby wykonać (domyślnie tak) |
 | `urzadzenia[]` | urządzenia inne niż rotory; te same pola co przy rotorze |
 | `anteny[].nr` | numer wyjścia w przełącznicy antenowej |
 | `anteny[].nazwa` | nazwa anteny, pobierana ze sterownika |

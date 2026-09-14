@@ -36,8 +36,7 @@ public partial class Config
             Setupc         = Json.Tekst(korzen, "setupc"),
             SterownikAnten = NormalizujHost(Json.Tekst(korzen, "sterownikAnten")),
             AutoPolacz     = Json.Flaga(korzen, "autoPolacz", false),
-            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true),
-            FiltrPozycji   = Json.Flaga(korzen, "filtrPozycji", true)
+            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true)
         };
 
         CzytajRotory(cfg, korzen);
@@ -51,6 +50,10 @@ public partial class Config
     private static void CzytajRotory(Config cfg, Dictionary<string, object> korzen)
     {
         if (!korzen.TryGetValue("rotory", out object lista) || !(lista is List<object> tablica)) return;
+
+        // Do 1.11.8 filtr byl jeden dla calego programu. Stara wartosc z korzenia staje sie
+        // domyslna dla kazdego rotora, zeby aktualizacja niczego nie zmienila pod reka.
+        bool domyslnyFiltr = Json.Flaga(korzen, "filtrPozycji", true);
 
         foreach (var element in tablica)
         {
@@ -68,7 +71,8 @@ public partial class Config
                 Predkosc   = Json.Liczba(o, "predkosc"),
                 BityDanych = Json.Liczba(o, "bityDanych", 8),
                 Parzystosc = ParzystoscZTekstu(Json.Tekst(o, "parzystosc")),
-                BityStopu  = BityStopuZTekstu(Json.Tekst(o, "bityStopu"))
+                BityStopu  = BityStopuZTekstu(Json.Tekst(o, "bityStopu")),
+                FiltrPozycji = Json.Flaga(o, "filtrPozycji", domyslnyFiltr)
             });
         }
     }
@@ -227,6 +231,7 @@ public partial class Config
             wpis.Dodaj("bityDanych", r.BityDanych);
             wpis.Dodaj("parzystosc", NazwyParzystosci[(int)r.Parzystosc]);
             wpis.Dodaj("bityStopu", NazwyBitowStopu[(int)r.BityStopu]);
+            wpis.Dodaj("filtrPozycji", r.FiltrPozycji);
             rotory.Add(wpis);
         }
 
@@ -265,7 +270,6 @@ public partial class Config
         korzen.Dodaj("sterownikAnten", SterownikAnten);
         korzen.Dodaj("autoPolacz", AutoPolacz);
         korzen.Dodaj("sprawdzajAktualizacje", SprawdzajAktualizacje);
-        korzen.Dodaj("filtrPozycji", FiltrPozycji);
         korzen.Dodaj("rotory", rotory);
         korzen.Dodaj("urzadzenia", urzadzenia);
         korzen.Dodaj("anteny", anteny);

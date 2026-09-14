@@ -75,6 +75,23 @@ public abstract class Polaczenie
 public class Rotor : Polaczenie
 {
     protected override string DomyslnaNazwa => "Rotor " + Nr;
+
+    /// <summary>
+    /// Czy odrzucac odczyty pozycji, ktorych ten rotor nie zdazylby wykonac. Patrz
+    /// <c>Mostek.OdrzucicNieprawdopodobnyOdczyt</c>.
+    ///
+    /// Filtr jest **proteza na czas szukania usterki sprzetowej**, a nie czescia protokolu,
+    /// wiec musi dac sie wylaczyc: kasuje dane o polozeniu anteny, a przy diagnostyce sprzetu
+    /// lepiej widziec surowa prawde. Wylaczony nadal **zapisuje** nieprawdopodobne odczyty
+    /// do `podejrzane.txt` - tylko ich nie zatrzymuje.
+    ///
+    /// **Ustawienie jest przy rotorze, nie przy programie.** Usterka, dla ktorej filtr
+    /// powstal, siedzi w jednym konkretnym sterowniku; wylaczanie go wszedzie naraz znaczyloby,
+    /// ze przy diagnostyce jednego masztu traci sie oslone na pozostalych.
+    ///
+    /// Domyslnie wlaczony - tak dziala od 1.11.3 i tak ma sie zachowac stara konfiguracja.
+    /// </summary>
+    public bool FiltrPozycji { get; set; } = true;
 }
 
 /// <summary>
@@ -121,20 +138,6 @@ public partial class Config
     public string SterownikAnten { get; set; } = "";
     public bool   AutoPolacz     { get; set; }
     public bool   SprawdzajAktualizacje { get; set; } = true;
-
-    /// <summary>
-    /// Czy odrzucac odczyty pozycji, ktorych rotor nie zdazylby wykonac. Patrz
-    /// <c>Mostek.OdrzucicNieprawdopodobnyOdczyt</c>.
-    ///
-    /// Filtr jest **proteza na czas szukania usterki sprzetowej**, a nie czescia protokolu,
-    /// wiec musi dac sie wylaczyc: kasuje dane o polozeniu anteny, a przy diagnostyce sprzetu
-    /// lepiej widziec surowa prawde. Wylaczony nadal **zapisuje** nieprawdopodobne odczyty
-    /// do `podejrzane.txt` - tylko ich nie zatrzymuje.
-    ///
-    /// Domyslnie wlaczony, bo tak dziala od 1.11.3 i tak ma sie zachowac stara konfiguracja
-    /// bez tego pola.
-    /// </summary>
-    public bool   FiltrPozycji { get; set; } = true;
 
     public List<Rotor>      Rotory     { get; set; } = new List<Rotor>();
     public List<Urzadzenie> Urzadzenia { get; set; } = new List<Urzadzenie>();

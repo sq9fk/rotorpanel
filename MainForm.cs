@@ -54,6 +54,12 @@ public partial class MainForm : Form
 
     /// <summary>Karty listy w kolejnosci, we wspolrzednych ukladu (100%).</summary>
     private readonly List<Control> _karty = new();
+
+    /// <summary>
+    /// Do ktorej grupy nalezy karta o tym samym numerze: 0 to anteny, 1 to urzadzenia.
+    /// Uklad stara sie **nie rozrywac grup miedzy kolumny** - patrz <see cref="PodzialWgGrup"/>.
+    /// </summary>
+    private readonly List<int> _grupy = new();
     private int _kolumn = 1;
 
     /// <summary>Obszar roboczy uzyty do wyboru liczby kolumn - patrz <see cref="IleKolumn"/>.</summary>
@@ -212,10 +218,14 @@ public partial class MainForm : Form
         var pozycje = new List<Control>();
         int y = 0;
         y = BudujAnteny(y, pozycje);
+        int anten = pozycje.Count;
         y = BudujUrzadzenia(y, pozycje);
 
         _karty.Clear();
         _karty.AddRange(pozycje);
+
+        _grupy.Clear();
+        for (int i = 0; i < pozycje.Count; i++) _grupy.Add(i < anten ? 0 : 1);
 
         float skala = Ui.Skala(this);
         foreach (var karta in pozycje)
@@ -229,7 +239,8 @@ public partial class MainForm : Form
                                          .GroupBy(x => _cfg.RotorAnteny(x).KluczPary))
             _opisMostka[grupa.Key] = string.Join(", ", grupa.Select(x => x.Etykieta));
 
-        UlozListe(IleKolumn(MiejsceNaEkranie()));
+        var miejsce = MiejsceNaEkranie();
+        UlozListe(IleKolumn(miejsce), Limit(miejsce));
 
         // Lista rosnie z liczba rotorow i urzadzen, wiec przy kilku pozycjach okno
         // potrafi byc wyzsze niz ekran. Wtedy dostaje paski przewijania zamiast chowac
@@ -257,10 +268,10 @@ public partial class MainForm : Form
     /// Uklada karty w kolumnach i przesuwa wszystko, co pod nimi. Wywolywane przy
     /// budowaniu listy i przy zmianie rozmiaru okna.
     /// </summary>
-    private void UlozListe(int kolumn)
+    private void UlozListe(int kolumn, int limit)
     {
         _kolumn = kolumn;
-        int wysokoscListy = RozlozWKolumnach(_karty, kolumn, Ui.Skala(this));
+        int wysokoscListy = RozlozWKolumnach(_karty, _grupy, kolumn, limit, Ui.Skala(this));
 
         _lista.Size = new Size(Ui.Px(this, (kolumn - 1) * OdstepKolumn + SzerokoscListy),
                                wysokoscListy);
@@ -304,7 +315,7 @@ public partial class MainForm : Form
         if (kolumn == _kolumn) return;
 
         _ukladamListe = true;
-        try { UlozListe(kolumn); }
+        try { UlozListe(kolumn, Limit(miejsce)); }
         finally { _ukladamListe = false; }
     }
 
@@ -318,23 +329,29 @@ public partial class MainForm : Form
     /// </summary>
     private int IleKolumn(Size miejsce)
     {
+        int limit = Limit(miejsce);
         int kolumn = 1;
         while (kolumn < 4)
         {
-            if (GoraListy + WysokoscUkladu(kolumn) + PodLista <= miejsce.Height) break;
+            if (WysokoscUkladu(kolumn, limit) <= limit) break;
             if (SzerokoscOkna + kolumn * OdstepKolumn > miejsce.Width) break;
             kolumn++;
         }
         return kolumn;
     }
 
+    /// <summary>Ile wysokosci zostaje dla samej listy, w jednostkach ukladu.</summary>
+    private static int Limit(Size miejsce) => miejsce.Height - GoraListy - PodLista;
+
     /// <summary>Wysokosc listy w jednostkach ukladu, gdyby ulozyc ja w tylu kolumnach.</summary>
-    private int WysokoscUkladu(int kolumn)
-        => Rozloz(Wysokosci(), kolumn, null, 1f);
+    private int WysokoscUkladu(int kolumn, int limit)
+        => Rozloz(Wysokosci(), _grupy, kolumn, limit, null, 1f);
 
     /// <summary>Ustawia karty w kolumnach i zwraca wysokosc najwyzszej, w pikselach.</summary>
-    private static int RozlozWKolumnach(List<Control> karty, int kolumn, float skala)
-        => Rozloz(karty.Select(k => (int)Math.Round(k.Height / skala)).ToList(), kolumn, karty, skala);
+    private static int RozlozWKolumnach(List<Control> karty, List<int> grupy, int kolumn,
+                                        int limit, float skala)
+        => Rozloz(karty.Select(k => (int)Math.Round(k.Height / skala)).ToList(),
+                  grupy, kolumn, limit, karty, skala);
 
     /// <summary>Wysokosci kart w jednostkach ukladu - same kontrolki sa juz przeskalowane.</summary>
     private List<int> Wysokosci()
@@ -345,15 +362,85 @@ public partial class MainForm : Form
 
     /// <summary>
     /// Wspolna arytmetyka dla pytania "ile to zajmie" i dla samego ukladania. Kolejnosc
-    /// pozycji zostaje zachowana: kolumna zbiera karty po kolei, dopoki nie przekroczy
-    /// swojego przydzialu wysokosci.
+    /// pozycji zostaje zachowana.
+    ///
+    /// **Najpierw probujemy ulozyc kolumny wzdluz grup** - anteny osobno, urzadzenia osobno.
+    /// Rowny podzial na wysokosc daje slupki podobnej dlugosci, ale rozrywa to, co dla
+    /// patrzacego jest calosci: przy szesciu antenach i jednym wzmacniaczu wychodzilo
+    /// "cztery anteny | dwie anteny + Urzadzenia + wzmacniacz", czyli naglowek grupy siedzial
+    /// w polowie drugiej kolumny. Rownosc slupkow jest mniej warta niz to, ze **rzeczy tego
+    /// samego rodzaju stoja razem**.
+    ///
+    /// Podzial wzdluz grup bierzemy tylko wtedy, gdy najwyzsza kolumna nadal **miesci sie
+    /// w <paramref name="limit"/>** - inaczej okno dostaloby paski przewijania, a to jest
+    /// gorsze od nierownego podzialu. Na niskim ekranie (GPD, 768 px przy 150%) szesc anten
+    /// w jednej kolumnie sie nie miesci i wtedy wracamy do rownego podzialu.
     /// </summary>
-    private static int Rozloz(List<int> wysokosci, int kolumn, List<Control> pozycje, float skala)
+    private static int Rozloz(List<int> wysokosci, List<int> grupy, int kolumn, int limit,
+                              List<Control> pozycje, float skala)
+    {
+        var przydzial = PodzialWgGrup(wysokosci, grupy, kolumn);
+        if (przydzial == null || Najwyzsza(wysokosci, przydzial, kolumn) > limit)
+            przydzial = PodzialRowny(wysokosci, kolumn);
+
+        if (pozycje != null)
+        {
+            var y = new int[Math.Max(kolumn, 1)];
+            for (int i = 0; i < wysokosci.Count; i++)
+            {
+                int k = przydzial[i];
+                pozycje[i].Location = new Point((int)Math.Round(k * OdstepKolumn * skala),
+                                                (int)Math.Round(y[k] * skala));
+                y[k] += wysokosci[i] + Odstep;
+            }
+        }
+
+        return (int)Math.Round(Najwyzsza(wysokosci, przydzial, kolumn) * skala);
+    }
+
+    /// <summary>Wysokosc najwyzszej kolumny, w jednostkach ukladu.</summary>
+    private static int Najwyzsza(List<int> wysokosci, List<int> przydzial, int kolumn)
+    {
+        var y = new int[Math.Max(kolumn, 1)];
+        for (int i = 0; i < wysokosci.Count; i++) y[przydzial[i]] += wysokosci[i] + Odstep;
+        return Math.Max(0, y.Max() - Odstep);
+    }
+
+    /// <summary>
+    /// Kolumna na grupe. Stosujemy tylko wtedy, gdy grup jest **dokladnie tyle, ile kolumn** -
+    /// przy mniejszej liczbie grup ktoras kolumna zostalaby pusta, a przy wiekszej i tak
+    /// trzeba by ktoras grupe rozerwac i nie ma po co udawac, ze sie tego uniknelo.
+    /// </summary>
+    private static List<int> PodzialWgGrup(List<int> wysokosci, List<int> grupy, int kolumn)
+    {
+        if (kolumn < 2 || grupy == null || grupy.Count != wysokosci.Count) return null;
+
+        int ile = 0;
+        for (int i = 0; i < grupy.Count; i++)
+            if (i == 0 || grupy[i] != grupy[i - 1]) ile++;
+        if (ile != kolumn) return null;
+
+        var wynik = new List<int>(grupy.Count);
+        int kolumna = -1;
+        for (int i = 0; i < grupy.Count; i++)
+        {
+            if (i == 0 || grupy[i] != grupy[i - 1]) kolumna++;
+            wynik.Add(kolumna);
+        }
+        return wynik;
+    }
+
+    /// <summary>
+    /// Rowny podzial na wysokosc: kolumna zbiera karty po kolei, dopoki nie przekroczy
+    /// swojego przydzialu. Uklad zapasowy, gdy podzial wzdluz grup sie nie miesci.
+    /// </summary>
+    private static List<int> PodzialRowny(List<int> wysokosci, int kolumn)
     {
         int lacznie = wysokosci.Sum() + Math.Max(0, wysokosci.Count - 1) * Odstep;
         int przydzial = kolumn > 1 ? lacznie / kolumn : int.MaxValue;
 
-        int kolumna = 0, y = 0, najwyzsza = 0;
+        var wynik = new List<int>(wysokosci.Count);
+        int kolumna = 0, y = 0;
         for (int i = 0; i < wysokosci.Count; i++)
         {
             // Nowa kolumna dopiero wtedy, gdy biezaca ma juz swoj przydzial - i tylko
@@ -364,13 +451,10 @@ public partial class MainForm : Form
                 y = 0;
             }
 
-            if (pozycje != null)
-                pozycje[i].Location = new Point((int)Math.Round(kolumna * OdstepKolumn * skala),
-                                                (int)Math.Round(y * skala));
+            wynik.Add(kolumna);
             y += wysokosci[i] + Odstep;
-            najwyzsza = Math.Max(najwyzsza, y - Odstep);
         }
-        return (int)Math.Round(Math.Max(najwyzsza, 0) * skala);
+        return wynik;
     }
 
     private int BudujAnteny(int y, List<Control> pozycje)

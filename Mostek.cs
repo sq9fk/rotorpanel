@@ -701,6 +701,10 @@ public sealed class Mostek : IDisposable
         // nie ma prawa gubic danych, ktorych nie rozumie.
         if (_skladacz.Przezroczysty) return false;
 
+        // Pozycje maja tylko rotory. Przy zwyklym urzadzeniu szeregowym piec bajtow
+        // zaczynajacych sie od 0x57 to przypadek, a nie azymut.
+        if (!(Punkt is Rotor rotor)) return false;
+
         if (ramka.Length != 5 || ramka[0] != 0x57 || ramka[4] != 0x20) return false;
 
         int pozycja = ramka[1] * 100 + ramka[2] * 10 + ramka[3];
@@ -725,9 +729,9 @@ public sealed class Mostek : IDisposable
         // Filtr wylaczony w Ustawieniach: odczyt idzie dalej, ale **nadal go opisujemy**.
         // Wylacznik ma zdejmowac kasowanie danych, a nie diagnostyke - bez zapisu uzytkownik
         // stracilby jedyny slad usterki, ktorej wlasnie szuka.
-        if (!_cfg.FiltrPozycji)
+        if (!rotor.FiltrPozycji)
         {
-            ZglosNieprawdopodobny("PRZEPUSZCZONY (filtr wylaczony w Ustawieniach)",
+            ZglosNieprawdopodobny("PRZEPUSZCZONY (filtr wylaczony dla tego rotora)",
                                   poprzednia, pozycja, ramka, sekundy, dopuszczalny);
             Zapamietaj(pozycja);
             return false;

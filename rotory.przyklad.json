@@ -6,10 +6,9 @@
   "sterownikAnten": "192.168.1.101",
   "autoPolacz": false,
   "sprawdzajAktualizacje": true,
-  "filtrPozycji": true,
 
   "rotory": [
-    { "nr": 1, "nazwa": "Rotor 1", "com": "COM10", "dev": "CNCB10", "ip": "", "port": 4001, "protokol": "surowy" },
+    { "nr": 1, "nazwa": "Rotor 1", "com": "COM10", "dev": "CNCB10", "ip": "", "port": 4001, "protokol": "surowy", "filtrPozycji": true },
     { "nr": 2, "nazwa": "Rotor 2", "com": "COM11", "dev": "CNCB11", "ip": "", "port": 4002, "protokol": "surowy" },
     { "nr": 3, "nazwa": "Rotor 3", "com": "COM12", "dev": "CNCB12", "ip": "", "port": 4003, "protokol": "surowy" }
   ],
