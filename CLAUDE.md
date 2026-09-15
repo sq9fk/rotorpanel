@@ -195,7 +195,29 @@ while the PC-program is in use, only the On/Off buttons is enabled"*. Stan **nas
 ma osobny wskaznik: **System info -> RFC2217: connected** (str. 59). Uzytkownik patrzyl na ten
 pierwszy, my mierzylismy drugi - stad poltora dnia gonienia wlasnego ogona.
 
-**Puls trzymajacy tryb zdalny** (1.11.28). Na zyczenie uzytkownika: skoro mostek jest polaczony,
+**To zapytanie o status wytraca RC-1216H z trybu "Remoted"** (1.11.29). Rozstrzygniete
+eksperymentem kontrolnym, ktory nie wymagal ani jednej linii kodu:
+
+```
+samo okno sterowania          -> "Remoted" stabilne
++ dolozone okno stanu         -> zaczyna przelaczac
+```
+
+Okno stanu wznawia zapytania `0x90`, **nie ruszajac pulsowania**. Czyli winna jest **tresc tego
+jednego zapytania**, a nie tempo (obalone w 1.11.25) i nie tryb RCU (obalone w 1.11.26).
+
+Wzmacniacz nie wysyla stanu sam z siebie, wiec **nie ma trzeciej drogi: albo stan, albo stabilne
+"Remoted"**. Rozstrzygamy to tak, zeby uzytkownik dostawal to, na co akurat patrzy: gdy okno
+stanu albo sterowania jest otwarte, albo gdy panel glowny jest na ekranie - pytamy o stan; gdy
+panel siedzi w zasobniku i nie ma otwartego okna - pulsujemy i trzymamy tryb zdalny.
+`Mostek.PanelWidoczny` ustawia `MainForm` przy chowaniu i pokazywaniu okna.
+
+Warto zobaczyc, ile kosztowalo dojscie tutaj: **trzy chybione mechanizmy** (tempo, tryb,
+puls przy jednoczesnym odpytywaniu) i jeden eksperyment za darmo, ktory rozstrzygnal wszystko
+w dwie minuty. **Gdy przypadek dzialajacy rozni sie od niedzialajacego na kilka sposobow naraz,
+najtaniej jest znalezc sposob na dolozenie roznic po jednej - zamiast zmieniac kod.**
+
+**[uzupelnione w 1.11.29] Puls trzymajacy tryb zdalny (1.11.28).** Na zyczenie uzytkownika: skoro mostek jest polaczony,
 to znaczy, ze bedzie sterowal wzmacniaczem, wiec "Remoted" ma stac. Mechanizm musial byc trzeci
 z rzedu, bo dwa poprzednie sa obalone pomiarem:
 
