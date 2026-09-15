@@ -40,6 +40,9 @@ public sealed class CzytnikSpe
 
     private int _ileWlasnych;
 
+    // Bufor rozbioru na kopii - patrz Przezroczysty i Podgladaj.
+    private readonly List<byte> _podglad = new();
+
     /// <summary>
     /// Ile ramek statusu bylo odpowiedzia na **nasze** zapytanie.
     ///
@@ -101,11 +104,43 @@ public sealed class CzytnikSpe
     public bool PrzechwytujEkran { get; set; }
 
     /// <summary>
+    /// Tryb przezroczysty: **kazdy bajt idzie do klienta natychmiast i bez zmian**, a rozbior
+    /// robimy na kopii. Wlaczamy go wtedy, gdy port trzyma program kliencki.
+    ///
+    /// Zwykla droga - ta ponizej - musi ramki **skladac**, a skladanie oznacza trzy rzeczy,
+    /// ktorych nie wolno robic cudzemu strumieniowi:
+    ///
+    /// 1. **trzyma** niedokonczona ramke do nastepnego kawalka (a ser2net potrafi przysylac
+    ///    po jednym bajcie na segment, co zmierzylismy po stronie rotorow),
+    /// 2. **kasuje** ramke urwana w polowie - `ZdejmijStatus` przy napotkaniu wczesniejszej
+    ///    synchronizacji wyrzuca poczatek bez sladu, a wzmacniacz urywa ramki regularnie,
+    /// 3. **przeramowuje** strumien - trzy bajty `AA` wewnatrz klatki wyswietlacza wygladaja
+    ///    jak naglowek i dalszy rozbior idzie od zlego miejsca.
+    ///
+    /// Kazda z tych trzech rzeczy widac u klienta jako migniecie obrazu. Dlatego przy kliencie
+    /// na porcie nie skladamy **nic**: rozbior na kopii moze sie mylic, bo nikomu nie szkodzi.
+    /// </summary>
+    public bool Przezroczysty { get; set; }
+
+    /// <summary>
     /// Przyjmuje surowy kawalek strumienia, zwraca to, co ma isc do klienta.
     /// Niedokonczona ramka zostaje w srodku do nastepnego wywolania.
     /// </summary>
     public byte[] Przepusc(byte[] bufor, int ile)
     {
+        if (Przezroczysty)
+        {
+            // Zaleglosci z trybu skladania oddajemy razem z nowym kawalkiem - zmiana trybu
+            // nie moze zjesc bajtow, ktore juz do nas przyszly.
+            var kopia = new byte[_reszta.Count + ile];
+            _reszta.CopyTo(kopia, 0);
+            Array.Copy(bufor, 0, kopia, _reszta.Count, ile);
+            _reszta.Clear();
+
+            Podgladaj(kopia);
+            return kopia;
+        }
+
         for (int i = 0; i < ile; i++) _reszta.Add(bufor[i]);
 
         var wyjscie = new List<byte>(_reszta.Count);
@@ -155,6 +190,62 @@ public sealed class CzytnikSpe
         }
 
         return wyjscie.ToArray();
+    }
+
+    /// <summary>
+    /// Rozbior ramek statusu **na kopii**, do wlasnego uzytku: karta i okno stanu pokazuja
+    /// wtedy to, o co poprosil klient, nie wysylajac ani jednego bajtu. Ze strumienia nie
+    /// znika nic - gdybysmy tu trafili w zly bajt, klient i tak dostal juz swoje.
+    /// </summary>
+    private void Podgladaj(byte[] dane)
+    {
+        _podglad.AddRange(dane);
+
+        // Bufor podgladu nie moze rosnac bez konca: gdy klient nie pyta o status, plyna przez
+        // nas same klatki wyswietlacza i nie ma czego z nich zdjac.
+        if (_podglad.Count > 8192) _podglad.RemoveRange(0, _podglad.Count - 1024);
+
+        while (true)
+        {
+            int i = Szukaj(_podglad, StatusSpe.DlugoscRamki);
+            if (i < 0) return;
+
+            var znaki = new char[StatusSpe.DlugoscDanych];
+            for (int z = 0; z < znaki.Length; z++)
+                znaki[z] = (char)_podglad[i + StatusSpe.DlugoscNaglowka + z];
+
+            var status = StatusSpe.Rozbierz(new string(znaki));
+
+            if (status is null)
+            {
+                // Falszywy trop wewnatrz innej ramki - idziemy o bajt dalej.
+                _podglad.RemoveRange(0, i + 1);
+                continue;
+            }
+
+            Status = status;
+            OstatniObcyStatus = DateTime.UtcNow;
+            Interlocked.Increment(ref _ileStatusow);
+            _podglad.RemoveRange(0, i + StatusSpe.DlugoscRamki);
+        }
+    }
+
+    /// <summary>
+    /// Pozycja pelnej ramki statusu w buforze podgladu albo -1.
+    ///
+    /// Tu sprawdzamy **wiecej niz w drodze skladania**: naglowek, dlugosc i zakonczenie `CR LF`.
+    /// Powod jest asymetryczny - skladacz zdejmuje ramke ze strumienia, wiec falszywy trop
+    /// jest tam widoczny od razu, a podglad tylko czyta cudzy ruch i nikt by sie nie dowiedzial,
+    /// ze karta pokazuje liczby zlozone z dwoch roznych ramek. Wolimy nie pokazac nic.
+    /// </summary>
+    private static int Szukaj(List<byte> gdzie, int dlugosc)
+    {
+        for (int i = 0; i + dlugosc <= gdzie.Count; i++)
+            if (gdzie[i] == Sync && gdzie[i + 1] == Sync && gdzie[i + 2] == Sync &&
+                gdzie[i + 3] == StatusSpe.DlugoscDanych &&
+                gdzie[i + dlugosc - 2] == 0x0D && gdzie[i + dlugosc - 1] == 0x0A)
+                return i;
+        return -1;
     }
 
     /// <summary>

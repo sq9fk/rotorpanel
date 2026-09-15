@@ -1294,12 +1294,25 @@ public sealed class Mostek : IDisposable
                 // przy otwartym wlasnym podgladzie zabieralismy mu klatki, o ktore sam poprosil.
                 czytnik.PrzechwytujEkran = false;
 
+                // **I nie skladamy mu ramek.** Skladanie trzyma niedokonczona ramke do
+                // nastepnego kawalka, kasuje ramke urwana w polowie i potrafi przeramowac
+                // strumien na trzech bajtach `AA` wewnatrz klatki - kazda z tych rzeczy widac
+                // u klienta jako migniecie obrazu. Rozbior dla siebie robimy wtedy na kopii.
+                czytnik.Przezroczysty = true;
+
                 // Kasujemy pamiec o wlasnych zapytaniach czekajacych na odpowiedz. Bez tego
                 // pierwsza ramka statusu **jego** zapytania trafialaby na nasz licznik, zostala
                 // uznana za nasza i zdjeta ze strumienia - a on zobaczylby dziure w odczycie.
                 czytnik.ZapomnijWlasne();
                 await Task.Delay(500, ct);
                 continue;
+            }
+
+            // Klienta nie ma - wracamy do skladania ramek dla siebie.
+            if (czytnik.Przezroczysty)
+            {
+                czytnik.Przezroczysty = false;
+                czytnik.PrzechwytujEkran = _trybEkranu;
             }
 
             // **Zapytanie o status wytraca RC-1216H z trybu "Remoted".**

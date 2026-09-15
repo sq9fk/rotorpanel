@@ -240,6 +240,32 @@ klient trzyma port. Sama cisza w petli odpytywania nie wystarczala, bo ta droga 
 puls okna sterowania, wlaczenie trybu zdalnego i **wylaczenie go przy zamykaniu okna**, czyli
 ostatnie wtracenie tuz po tym, jak obiecalismy milczec.
 
+**...i cisza to za malo: przy kliencie na porcie nie wolno tez ramek skladac** (1.11.37).
+Po 1.11.36 migotanie w SPE Term **zeslablo, ale nie zniklo** - a to znaczy, ze zostal drugi
+mechanizm. Trop uzytkownika: *"nie jest to problem pocietych ramek?"*. Jest.
+
+Zwykla droga przez `CzytnikSpe.Przepusc` **sklada** ramki, a skladanie robi cudzemu strumieniowi
+trzy rzeczy naraz:
+
+1. **trzyma** niedokonczona ramke do nastepnego kawalka - a ser2net potrafi przysylac
+   **po jednym bajcie na segment** (zmierzone tcpdumpem po stronie rotorow), wiec klient dostaje
+   76 bajtow jednym skokiem zamiast plynnie,
+2. **kasuje** ramke urwana w polowie - `ZdejmijStatus` przy napotkaniu wczesniejszej
+   synchronizacji wyrzuca poczatek **bez sladu**, a wzmacniacz urywa ramki regularnie
+   (to nie hipoteza, tylko powod, dla ktorego ta galaz w ogole powstala),
+3. **przeramowuje** strumien - trzy bajty `AA` wewnatrz klatki wyswietlacza wygladaja jak
+   naglowek i dalszy rozbior idzie od zlego miejsca.
+
+Stad `CzytnikSpe.Przezroczysty`: przy kliencie na porcie **kazdy bajt idzie do niego natychmiast
+i bez zmian**, a rozbior dla siebie robimy **na kopii** (`Podgladaj`). Podglad sprawdza wiecej niz
+skladacz - naglowek, dlugosc **i zakonczenie `CR LF`** - bo skladacz zdejmuje ramke ze strumienia
+i falszywy trop widac od razu, a podglad tylko czyta cudzy ruch i nikt by sie nie dowiedzial,
+ze karta pokazuje liczby zlozone z dwoch roznych ramek. Wolimy nie pokazac nic.
+
+**Zasada ogolna, warta zapamietania poza SPE:** mostek, ktory sklada ramki dla siebie, przestaje
+byc przezroczysty. Dopoki jest jedynym uczestnikiem, to nie szkodzi; w chwili, gdy po drugiej
+stronie pojawia sie ktos wlasny, **skladanie trzeba wylaczyc**, a nie tylko przestac nadawac.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
