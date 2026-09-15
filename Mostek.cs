@@ -322,6 +322,19 @@ public sealed class Mostek : IDisposable
 
     public void Stop()
     {
+        // Wzmacniacz oddajemy do trybu lokalnego, zanim zerwiemy lacze - inaczej zostalby
+        // "Remoted" bez nikogo po drugiej stronie i jego wlasna strona nie odzyskalaby portu.
+        //
+        // Wysylka idzie **z puli watkow**, z limitem czasu. Blokujace czekanie wprost na
+        // watku interfejsu zawieszalo kiedys caly program: zapis czeka na semafor mostka,
+        // a jego kontynuacja wraca na ten sam watek, ktory wlasnie stoi na czekaniu.
+        // Wewnatrz Task.Run nie ma kontekstu synchronizacji, wiec kontynuacje ida na pule.
+        if (OdpytywacSpe && Stan == StanMostka.Polaczony)
+        {
+            try { Task.Run(() => WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None)).Wait(1000); }
+            catch { /* zatrzymania nie wolno blokowac */ }
+        }
+
         try { _cts?.Cancel(); } catch { /* nic */ }
 
         // Zamkniecie uchwytow przerywa zawieszone odczyty - bez tego kazde
@@ -416,6 +429,24 @@ public sealed class Mostek : IDisposable
 
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
                 _czytnikSpe = czytnik;
+
+                // **Tryb zdalny trzymamy przez cale polaczenie.** Wzmacniacz pokazuje "Remoted"
+                // nie dlatego, ze ktos jest podlaczony, tylko dlatego, ze dostal komende RCU -
+                // sprawdzone w kodzie okna sterowania, ktore wysyla ja przy otwarciu i dlatego
+                // jako jedyne dawalo stabilny stan. Samo odpytywanie o status trybu nie zmienia,
+                // wiec wyswietlacz wracal do trybu lokalnego miedzy naszymi zapytaniami.
+                //
+                // Probowalem wczesniej wygrac to gestszym odpytywaniem (1.11.25) - nie pomoglo
+                // i **nie moglo**, bo przy otwartym oknie sterowania ruch bywa rzadszy, a stan
+                // i tak stoi. Przyczyna byla w trybie, nie w tempie.
+                //
+                // Ekranu tu **nie** przechwytujemy: bez pulsu wzmacniacz nie przysyla klatek,
+                // wiec nie ma czego zjadac klientowi na drugiej stronie pary.
+                if (OdpytywacSpe)
+                {
+                    try { await WyslijKlawisz(EkranSpe.RcuWlacz, ct); }
+                    catch (Exception ex) { Zapisz("nie udalo sie wlaczyc trybu RCU: " + ex.Message); }
+                }
 
                 // Bufor portu zbieral dane przez caly czas laczenia - patrz
                 // StrumienPortu.Wyczysc. Musi poleciec, zanim ruszy pompa.
@@ -1268,37 +1299,8 @@ public sealed class Mostek : IDisposable
             }
             finally { _bramka.Release(); }
 
-            await OdczekajPoZapytaniu(czytnik, ct);
+            await Task.Delay(1000, ct);
         }
-    }
-
-    /// <summary>
-    /// Odstep przed nastepnym zapytaniem o stan. **Samotaktujacy: czekamy na odpowiedz, nie na
-    /// zegar.**
-    ///
-    /// Wczesniej bylo sztywne 1000 ms. Uzytkownik poprosil o gestsze odpytywanie, zeby microBIT
-    /// trzymal port i pokazywal "Remoted" bez przerwy zamiast przeskakiwac w rytmie naszych
-    /// zapytan. Sztywne skrocenie zegara byloby jednak zlym sposobem: **zmierzone wczesniej,
-    /// ze nadmiar ruchu gubi wzmacniaczowi odpowiedzi**, a zapytania wysylane szybciej, niz on
-    /// odpowiada, i tak wpadlyby na limit dwoch oczekujacych i przestaly byc nasze.
-    ///
-    /// Dlatego czekamy, az poprzednia odpowiedz wroci (albo minie zawor czasowy), i dopiero
-    /// wtedy odliczamy krotka przerwe. W praktyce daje to cykl okolo 450 ms zamiast 1000 ms -
-    /// ponad dwa razy gesciej - ale **nigdy nie kolejkuje zapytan**: w locie jest zawsze jedno.
-    /// Gdy wzmacniacz milknie, tempo samo spada do zaworu i nie zasypujemy go prosbami.
-    ///
-    /// Jesli okaze sie, ze to jednak za gesto, zobaczymy to wprost w bilansie wymian: zacznie
-    /// rosnac "brak". To jest sprawdzalne kryterium, a nie kwestia gustu.
-    /// </summary>
-    private static async Task OdczekajPoZapytaniu(CzytnikSpe czytnik, CancellationToken ct)
-    {
-        var zegar = System.Diagnostics.Stopwatch.StartNew();
-        while (!ct.IsCancellationRequested &&
-               czytnik.WlasneOczekujace > 0 &&
-               zegar.ElapsedMilliseconds < 1500)
-            await Task.Delay(50, ct);
-
-        await Task.Delay(200, ct);
     }
 
     public void Dispose()

@@ -189,7 +189,32 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
-**Odpytywanie wzmacniacza jest samotaktujace, nie zegarowe** (1.11.25). Uzytkownik poprosil
+**Trybem zdalnym wzmacniacza zarzadza mostek, nie okno** (1.11.26). Wzmacniacz pokazuje
+"Remoted" **nie dlatego, ze ktos jest podlaczony, tylko dlatego, ze dostal komende RCU**.
+Widac to wprost w kodzie okna sterowania: przy otwarciu wysyla `EkranSpe.RcuWlacz`, przy
+zamknieciu `RcuWylacz` - i dlatego jako jedyne dawalo stabilny stan. Samo odpytywanie o status
+(`0x90`) trybu nie zmienia, wiec wyswietlacz wracal do trybu lokalnego miedzy naszymi
+zapytaniami.
+
+Teraz `RcuWlacz` idzie przy **zestawieniu lacza**, a `RcuWylacz` przy **zatrzymaniu mostka** -
+wzmacniacz wraca wtedy do trybu lokalnego i jego wlasna strona odzyskuje port. Okno sterowania
+przestalo gasic RCU przy zamknieciu; gasi tylko przechwytywanie ekranu. Ekranu przy samym
+trzymaniu trybu **nie** przechwytujemy: bez pulsu klatki nie przychodza, wiec nie ma czego
+zjadac klientowi na drugiej stronie pary.
+
+Wysylka `RcuWylacz` w `Stop` idzie **z puli watkow, z limitem czasu**. Blokujace czekanie wprost
+na watku interfejsu zawieszalo kiedys caly program: zapis czeka na semafor mostka, a jego
+kontynuacja wraca na ten sam watek, ktory stoi na czekaniu. Wewnatrz `Task.Run` nie ma kontekstu
+synchronizacji, wiec kontynuacje ida na pule i zakleszczenia nie ma.
+
+**[cofniete] Odpytywanie samotaktujace zamiast zegarowego (1.11.25).** Proba wygrania stabilnego
+"Remoted" **gestszym odpytywaniem**. Nie zadzialala i **nie mogla**: przy otwartym oknie
+sterowania ruch bywa **rzadszy** niz nasze odpytywanie - puls chodzi oszczednie, klatki przychodza
+co 1,25-11 s - a stan i tak stoi. Przyczyna byla w trybie, nie w tempie. Wrocilismy do 1000 ms.
+Warto zapamietac ten wzorzec: **zanim zaczniesz kręcic parametrem, sprawdz, czy przypadek,
+ktory dziala, nie ma tego parametru gorszego.**
+
+**[cofniete] Odpytywanie wzmacniacza jest samotaktujace, nie zegarowe** (1.11.25). Uzytkownik poprosil
 o gestsze odpytywanie, zeby microBIT trzymal port i pokazywal "Remoted" bez przerwy zamiast
 przeskakiwac w rytmie naszych zapytan.
 
