@@ -27,7 +27,9 @@ public sealed class Mostek : IDisposable
     private readonly SemaphoreSlim _bramka = new SemaphoreSlim(1, 1);
     private volatile StatusSpe _status;
     private volatile CzytnikSpe _czytnikSpe;
-    private System.Collections.Concurrent.ConcurrentQueue<byte[]> _kolejkaPortu;
+    // Kawalek danych dla klienta razem z chwila, w ktorej do nas przyszedl - patrz
+    // PisarzPortu i wpis "TRZYMALISMY DANE KLIENTA".
+    private System.Collections.Concurrent.ConcurrentQueue<(byte[] dane, long kiedy)> _kolejkaPortu;
     private SemaphoreSlim _budzikPortu;
     private bool _trybEkranu;
 
@@ -99,7 +101,7 @@ public sealed class Mostek : IDisposable
     // Kiedy ostatnio cokolwiek przyszlo od wzmacniacza i kiedy ostatnio zglosilismy przerwe.
     // Kiedy ostatnio cokolwiek przyszlo od urzadzenia po drugiej stronie - sterownika
     // rotora albo wzmacniacza. Patrz MilczyOd.
-    private long _ostatniRuchZUrzadzenia, _zgloszonyBrak;
+    private long _ostatniRuchZUrzadzenia, _zgloszonyBrak, _ostatniaZgloszonaZwloka;
 
     // Patrz OdrzucicNieprawdopodobnyOdczyt.
     private int _ostatniaPozycja = -1;
@@ -233,9 +235,17 @@ public sealed class Mostek : IDisposable
                 }
                 else if (odRuchu > TimeSpan.FromSeconds(3))
                 {
+                    // **Gdy klient jest juz rozpoznany, badamy rzadko.** Badanie to
+                    // synchroniczne `CreateFile` na porcie szeregowym - potrafi zajac watek
+                    // puli, a pompa i pisarz z tej samej puli korzystaja. Dopoki klienta
+                    // szukamy, warto placic co piec sekund; gdy juz go mamy, badanie sluzy
+                    // tylko do wykrycia, ze odszedl, a to moze poczekac pol minuty.
+                    var odstep = _klientWykryty ? TimeSpan.FromSeconds(30)
+                                                : TimeSpan.FromSeconds(5);
+
                     long poprzednie = Interlocked.Read(ref _kiedyBadanyPort);
                     if (poprzednie == 0 ||
-                        DateTime.UtcNow - new DateTime(poprzednie) > TimeSpan.FromSeconds(5))
+                        DateTime.UtcNow - new DateTime(poprzednie) > odstep)
                     {
                         Interlocked.Exchange(ref _kiedyBadanyPort, DateTime.UtcNow.Ticks);
                         wynik = PortIo.Zajety(Punkt.Com);
@@ -508,7 +518,7 @@ public sealed class Mostek : IDisposable
                 if (zalegalo > 0)
                     Zapisz("odrzucono " + zalegalo + " B zaleglych z czasu laczenia");
 
-                _kolejkaPortu = new System.Collections.Concurrent.ConcurrentQueue<byte[]>();
+                _kolejkaPortu = new System.Collections.Concurrent.ConcurrentQueue<(byte[], long)>();
                 _budzikPortu = new SemaphoreSlim(0);
                 var pisarz = PisarzPortu(port, ct);
 
@@ -674,13 +684,29 @@ public sealed class Mostek : IDisposable
     {
         if (czytnik is null || czytnik.Przezroczysty) return;
 
+        int zalegle = czytnik.WlasneOczekujace;
+
         czytnik.Przezroczysty = true;
         czytnik.PrzechwytujEkran = false;
 
         // Zaleglosc po naszych zapytaniach nie moze zjesc pierwszej ramki, o ktora poprosil on.
         czytnik.ZapomnijWlasne();
 
+        // ...ale odpowiedzi na te zalegle zapytania sa juz w drodze i to **nasze** ramki.
+        // Przepuszczone do klienta dawaly dokladnie tyle mrugniec, ile zapytan bylo w locie.
+        if (zalegle > 0) czytnik.PolknijZalegle(zalegle, TimeSpan.FromSeconds(2));
+
         Zapisz("klient odezwal sie na porcie - oddaje mu strumien bez skladania");
+
+        // **Zdarzenie warte zapisu.** Przekazanie portu to jedyna chwila, w ktorej nasz ruch
+        // i ruch klienta sa na kablu naraz - a objaw ("mrugnal dwa razy") siedzi wlasnie tutaj.
+        // Wpis jest jeden na podlaczenie klienta, wiec pliku nie zaleje.
+        Pulapka.Zapisz(Podpis,
+            "PRZEKAZANIE PORTU KLIENTOWI. Naszych zapytan w locie: " + zalegle +
+            " (ich odpowiedzi polykamy), podglad wyswietlacza byl " +
+            (_trybEkranu ? "wlaczony" : "wylaczony") + ", okno stanu " +
+            (_trybStanu ? "otwarte" : "zamkniete"),
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 
     private async Task Pompa(Stream skad, Stream dokad, bool zPortu, CzytnikSpe czytnik,
@@ -876,7 +902,7 @@ public sealed class Mostek : IDisposable
     {
         if (_kolejkaPortu is null) return;
         if (_kolejkaPortu.Count > 256) _kolejkaPortu.TryDequeue(out _);
-        _kolejkaPortu.Enqueue(dane);
+        _kolejkaPortu.Enqueue((dane, DateTime.UtcNow.Ticks));
         _budzikPortu.Release();
 
         if (Slad.Wlaczony)
@@ -1340,12 +1366,56 @@ public sealed class Mostek : IDisposable
         }
     }
 
+    /// <summary>
+    /// Ile czasu **dane klienta przeczekaly u nas**, miedzy odebraniem z sieci a zapisem
+    /// na port. Zglaszamy powyzej 150 ms.
+    ///
+    /// **Przyrzad do jednego konkretnego pytania**, zadanego przez uzytkownika w formie
+    /// obserwacji: *"stabilnie gdy zamkne okno, tak to przynajmniej wyglada"*. Jesli otwarte
+    /// okno glowne rzeczywiscie robi roznice, to jedyna droga, ktora moze to zrobic, jest
+    /// **zastoj procesu** - pompa i pisarz siedza na puli watkow, a interfejs przemalowuje
+    /// karty kilka razy na sekunde. Zmierzone wczesniej zastoje siegaly 380 ms i bylo ich
+    /// okolo osmiu na minute; 380 ms wstrzymanych danych to u klienta widoczne szarpniecie.
+    ///
+    /// Dlatego do wpisu idzie **opis czujnika zastoju** - jesli zwloka i zastoj pokrywaja sie
+    /// w czasie, mamy odpowiedz; jesli nie, trzeba szukac gdzie indziej. Dlawione do jednego
+    /// wpisu na 30 s, bo to ma byc dowod, nie dziennik.
+    /// </summary>
+    private void ZmierzWlasnaZwloke(long kiedy)
+    {
+        if (!OdpytywacSpe || kiedy == 0) return;
+
+        var zwloka = DateTime.UtcNow - new DateTime(kiedy);
+        if (zwloka < ProgWlasnejZwloki) return;
+
+        long ostatnie = Interlocked.Read(ref _ostatniaZgloszonaZwloka);
+        if (ostatnie != 0 &&
+            DateTime.UtcNow - new DateTime(ostatnie) <= TimeSpan.FromSeconds(30)) return;
+        Interlocked.Exchange(ref _ostatniaZgloszonaZwloka, DateTime.UtcNow.Ticks);
+
+        Pulapka.Zapisz(Podpis,
+            "TRZYMALISMY DANE KLIENTA " + zwloka.TotalMilliseconds.ToString("0") + " ms " +
+            "miedzy odebraniem z sieci a zapisem na port. W kolejce " + _kolejkaPortu.Count +
+            " kawalkow" + Environment.NewLine + "    " + CzujnikZastoju.Opis,
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
+    }
+
+    /// <summary>
+    /// Od ilu wlasnej zwloki uznajemy, ze to juz widac u klienta. Zmierzone tempo wzmacniacza:
+    /// odpowiedz w 89 ms, cala klatka ekranu w 400-500 ms w szesciu kawalkach - wiec 150 ms
+    /// przetrzymania jednego kawalka to juz wyrwa w rysowaniu obrazu.
+    /// </summary>
+    private static readonly TimeSpan ProgWlasnejZwloki = TimeSpan.FromMilliseconds(150);
+
     private async Task PisarzPortu(Stream port, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
             await _budzikPortu.WaitAsync(ct);
-            if (!_kolejkaPortu.TryDequeue(out var dane)) continue;
+            if (!_kolejkaPortu.TryDequeue(out var pozycja)) continue;
+
+            var (dane, kiedy) = pozycja;
+            ZmierzWlasnaZwloke(kiedy);
 
             try
             {

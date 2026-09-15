@@ -43,6 +43,10 @@ public sealed class CzytnikSpe
     // Bufor rozbioru na kopii - patrz Przezroczysty i Podgladaj.
     private readonly List<byte> _podglad = new();
 
+    // Ile odpowiedzi na nasze zalegle zapytania mamy jeszcze polknac i do kiedy.
+    private int _doPolkniecia;
+    private DateTime _polykajDo = DateTime.MinValue;
+
     /// <summary>
     /// Ile ramek statusu bylo odpowiedzia na **nasze** zapytanie.
     ///
@@ -123,6 +127,28 @@ public sealed class CzytnikSpe
     public bool Przezroczysty { get; set; }
 
     /// <summary>
+    /// W chwili oddania portu klientowi **nasze ostatnie zapytania sa juz w drodze** i ich
+    /// odpowiedzi przyjda za chwile. Do 1.11.41 przepuszczalismy je do klienta - "lepsza
+    /// nadmiarowa ramka niz dziura". Zgloszenie po 1.11.41: *"mrugnal 2 razy"*. Limit naszych
+    /// zapytan w locie to **dwa** (`MaksWlasnych`). Zgodnosc jest dokladna.
+    ///
+    /// Wolno je polknac, bo **wiemy, ze sa nasze**: w dzienniku z 15 wrzesnia SPE Term wyslal
+    /// na port 126 rozkazow i **wszystkie** byly `55 55 55 01 80 80` (RCU), ani jeden nie byl
+    /// zapytaniem o status `0x90`. Kazda ramka statusu na kablu jest wiec odpowiedzia na nasze
+    /// zapytanie. To nie jest zalozenie - to pomiar.
+    ///
+    /// Dwa bezpieczniki, zeby to nie zamienilo sie w zjadanie cudzych ramek:
+    /// **okno czasowe** (po nim licznik przepada) i **tylko cala, sprawdzona ramka** - z CR LF
+    /// na swoim miejscu i w calosci w biezacym kawalku. Nic nie jest trzymane w oczekiwaniu
+    /// na reszte, bo trzymanie to wlasnie to, przed czym broni tryb przezroczysty.
+    /// </summary>
+    public void PolknijZalegle(int ile, TimeSpan okno)
+    {
+        _doPolkniecia = ile;
+        _polykajDo = DateTime.UtcNow + okno;
+    }
+
+    /// <summary>
     /// Przyjmuje surowy kawalek strumienia, zwraca to, co ma isc do klienta.
     /// Niedokonczona ramka zostaje w srodku do nastepnego wywolania.
     /// </summary>
@@ -138,7 +164,7 @@ public sealed class CzytnikSpe
             _reszta.Clear();
 
             Podgladaj(kopia);
-            return kopia;
+            return _doPolkniecia > 0 ? BezZaleglych(kopia) : kopia;
         }
 
         for (int i = 0; i < ile; i++) _reszta.Add(bufor[i]);
@@ -191,6 +217,44 @@ public sealed class CzytnikSpe
 
         return wyjscie.ToArray();
     }
+
+    /// <summary>
+    /// Usuwa z kawalka cale ramki statusu, ktore sa odpowiedziami na nasze zalegle zapytania.
+    /// Patrz <see cref="PolknijZalegle"/>.
+    /// </summary>
+    private byte[] BezZaleglych(byte[] dane)
+    {
+        // Porownanie **nierownosciowe z rownoscia**: zegar Windows tyka co kilkanascie
+        // milisekund, wiec przy krotkim oknie `UtcNow` potrafi byc dokladnie rowne granicy
+        // i ostre `>` przepuszczaloby polykanie poza okno. Zlapal to test.
+        if (DateTime.UtcNow >= _polykajDo) { _doPolkniecia = 0; return dane; }
+
+        var wyjscie = new List<byte>(dane.Length);
+        int i = 0;
+
+        while (i < dane.Length)
+        {
+            if (_doPolkniecia > 0 && CalaRamkaStatusu(dane, i))
+            {
+                i += StatusSpe.DlugoscRamki;
+                _doPolkniecia--;
+                continue;
+            }
+
+            wyjscie.Add(dane[i]);
+            i++;
+        }
+
+        return wyjscie.ToArray();
+    }
+
+    /// <summary>Czy od tego miejsca stoi cala ramka statusu - z naglowkiem i z CR LF na koncu.</summary>
+    private static bool CalaRamkaStatusu(byte[] dane, int od) =>
+        od + StatusSpe.DlugoscRamki <= dane.Length &&
+        dane[od] == Sync && dane[od + 1] == Sync && dane[od + 2] == Sync &&
+        dane[od + 3] == StatusSpe.DlugoscDanych &&
+        dane[od + StatusSpe.DlugoscRamki - 2] == 0x0D &&
+        dane[od + StatusSpe.DlugoscRamki - 1] == 0x0A;
 
     /// <summary>
     /// Rozbior ramek statusu **na kopii**, do wlasnego uzytku: karta i okno stanu pokazuja

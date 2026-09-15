@@ -340,6 +340,34 @@ po `KlientPytaSam` albo po zajetej drugiej stronie pary.
 **Wzor do zapamietania:** gdy decyzja ma byc natychmiastowa, nie moze mieszkac w petli, ktora
 ma wlasny takt. Petla jest dobra do **utrzymywania** stanu, nie do jego **ustanawiania**.
 
+**Piata warstwa: dwa mrugniecia to nasze dwa zapytania w locie** (1.11.42). Po 1.11.41 zostalo
+*"mrugnal 2 razy"*. Limit naszych zapytan oczekujacych na odpowiedz to **dwa** (`MaksWlasnych`).
+Zgodnosc jest dokladna i nie jest przypadkiem: w chwili przekazania portu odpowiedzi na te
+zapytania sa juz w drodze, a my je do 1.11.41 **przepuszczalismy klientowi** - z uzasadnieniem
+"lepsza nadmiarowa ramka niz dziura".
+
+Wolno je polknac, bo **wiemy, ze sa nasze** - i to jest pomiar, nie zalozenie: w dzienniku
+z 15 wrzesnia SPE Term wyslal na port **126 rozkazow i wszystkie byly `55 55 55 01 80 80`**
+(RCU), ani jeden nie byl zapytaniem o status `0x90`. Kazda ramka statusu na tym kablu jest wiec
+odpowiedzia na nasze zapytanie.
+
+Dwa bezpieczniki, zeby to nie zamienilo sie w zjadanie cudzych ramek: **okno dwoch sekund**
+(potem licznik przepada) i **tylko cala, sprawdzona ramka** - naglowek, dlugosc, `CR LF`
+na swoim miejscu, w calosci w biezacym kawalku. Ramka przecieta miedzy kawalkami **idzie do
+klienta w calosci**, bo trzymanie jest dokladnie tym, przed czym broni tryb przezroczysty.
+
+**Przyrzad na to, co zostanie:** wpis `TRZYMALISMY DANE KLIENTA X ms` - czas miedzy odebraniem
+kawalka z sieci a zapisem go na port, prog 150 ms, razem z opisem czujnika zastoju. Powstal
+z obserwacji *"stabilnie gdy zamkne okno"*, ktora przy nastepnej probie sie nie potwierdzila -
+ale pytanie zostaje wazne: jesli to my przetrzymujemy dane, to widac to tutaj, a jesli zwloka
+pokrywa sie z zastojem procesu, znamy tez powod. Do tego `PRZEKAZANIE PORTU KLIENTOWI` - jeden
+wpis na podlaczenie klienta, z liczba naszych zapytan w locie.
+
+Przy okazji: **badanie drugiej strony pary co piec sekund zeszlo do trzydziestu**, gdy klient
+jest juz rozpoznany. To synchroniczne `CreateFile` na porcie szeregowym, czyli watek z tej
+samej puli, z ktorej zyja pompa i pisarz. Dopoki klienta szukamy, warto placic co piec sekund;
+gdy juz go mamy, badanie sluzy tylko do wykrycia, ze odszedl - a to moze poczekac.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
