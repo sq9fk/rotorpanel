@@ -1263,25 +1263,21 @@ public sealed class Mostek : IDisposable
             // **albo stan, albo stabilne "Remoted"**. Rozstrzygamy to tak, zeby uzytkownik
             // dostawal to, na co akurat patrzy - gdy oglada stan, pytamy; gdy panel siedzi
             // w zasobniku i zadne okno nie jest otwarte, pulsujemy i trzymamy tryb zdalny.
-            // **Pytamy tylko wtedy, gdy otwarte jest okno stanu.**
+            // **Pytamy przez caly czas polaczenia - i to jest stan docelowy.**
             //
-            // Decyzja uzytkownika po calej serii prob: na karcie w oknie glownym stan nie jest
-            // pokazywany i nie jest odpytywany; pelny odczyt bierze sie dopiero po otwarciu
-            // okna stanu. Karta radzi sobie z tym sama - po pieciu sekundach bez swiezego
-            // statusu czysci linijke mocy i wraca do opisu trasy.
+            // RC-1216H podsluchuje port i pokazuje to, co w danej chwili wie: po rozkazach RCU
+            // "Remoted" (program przejal panel), po ramce statusu **prawdziwy stan wzmacniacza**
+            // ("Standby" albo "Operate"), a bez ruchu - "Off/Unknown", bo jego obraz sie starzeje
+            // i nie ma jak go odswiezyc, skoro port trzymamy my.
             //
-            // **Cena jest znana i zmierzona:** dopoki trzymamy sesje RFC 2217, RC-1216H nie
-            // odpytuje wzmacniacza sam, wiec przy naszej ciszy jego wlasna strona przechodzi
-            // na **Off/Unknown**. Zglaszane wczesniej przy 1.11.30. To swiadomy wybor: zysk
-            // to stabilne "Remoted" i brak ruchu, ktorego nikt nie oglada.
-            if (!_trybStanu)
-            {
-                czytnik.PrzechwytujEkran = _trybEkranu;
-                await Task.Delay(500, ct);
-                continue;
-            }
-
-            // Historyczne uzasadnienie odpytywania bez przerwy - patrz wyzej, zastapione.
+            // Wynika z tego cos, co przez pol dnia bralem za usterke: **przeskakiwanie
+            // "Remoted / Standby" to naprzemienne pokazywanie dwoch prawdziwych informacji**,
+            // a nie migotanie polaczenia. To jest najbogatszy z trzech stanow - stabilne
+            // "Remoted" znaczy, ze RC-1216H nie wie, co robi wzmacniacz, a "Off/Unknown",
+            // ze nie wie nic.
+            //
+            // Dlatego odpytujemy bez przerwy: karta ma swiezy stan, a strona RC-1216H
+            // dostaje dane, ktorych sama nie moze sobie wziac.
             //
             // W 1.11.29 przestawalismy pytac, gdy panel schowal sie do zasobnika: skoro nikt
             // nie oglada stanu, zapytanie wydawalo sie zmarnowane. Skutek zgloszony przez

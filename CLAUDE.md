@@ -195,7 +195,34 @@ while the PC-program is in use, only the On/Off buttons is enabled"*. Stan **nas
 ma osobny wskaznik: **System info -> RFC2217: connected** (str. 59). Uzytkownik patrzyl na ten
 pierwszy, my mierzylismy drugi - stad poltora dnia gonienia wlasnego ogona.
 
-**Stan wzmacniacza odpytujemy tylko przy otwartym oknie stanu** (1.11.34). Decyzja uzytkownika
+**Co naprawde pokazuje RC-1216H - model konczacy caly watek** (1.11.35). Urzadzenie
+**podsluchuje port i wyswietla to, co w danej chwili wie**:
+
+| co widzi na porcie | co wyswietla | dlaczego |
+|---|---|---|
+| rozkazy RCU (`0x80`/`0x81`) | **Remoted** | panel przejal program PC; sam wzmacniacza nie pyta, bo port jest zajety |
+| ramka statusu (odpowiedz na `0x90`) | **Standby** / **Operate** | rozebral ramke i **zna prawdziwy stan wzmacniacza** |
+| nic | **Off / Unknown** | jego obraz sie zestarzal, a odswiezyc go nie moze |
+
+Ten jeden model tlumaczy wszystkie trzy obserwacje naraz - i **wywraca zalozenie, na ktorym
+stalo pol dnia szukania**: `Remoted / Standby` to nie migotanie polaczenia, tylko **naprzemienne
+pokazywanie dwoch prawdziwych informacji** - ze steruje program i ze wzmacniacz stoi w Standby.
+W trybie Operate przeskakuje `Remoted / Operate`.
+
+Paradoksalnie jest to **najbogatszy z trzech stanow**: stabilne "Remoted" znaczy, ze RC-1216H nie
+wie, co robi wzmacniacz, a "Off/Unknown" - ze nie wie nic.
+
+Stad stan docelowy: **odpytujemy bez przerwy przez cale polaczenie**. Karta ma swiezy stan,
+a strona RC-1216H dostaje dane, ktorych sama nie moze sobie wziac.
+
+**Lekcja z calej serii (1.11.25-1.11.35, siedem zmian i szesc cofniec):** objaw byl opisany
+slowem z cudzego interfejsu - "przeskakuje Standby/Remoted" - i przez to od poczatku czytalem go
+jako "polaczenie sie zrywa". Zadna z czterech prob naprawy nie mogla trafic, bo naprawialy cos,
+co nie bylo zepsute. **Zanim zaczniesz naprawiac objaw opisany cudzym slownictwem, ustal, co to
+slowo znaczy w tamtym systemie.** Instrukcja RC-1216H miala te odpowiedz na stronie 71 przez
+caly czas.
+
+**[cofniete] Stan wzmacniacza odpytujemy tylko przy otwartym oknie stanu (1.11.34).** Decyzja uzytkownika
 konczaca cala serie: na karcie w oknie glownym stan **nie jest pokazywany i nie jest odpytywany**;
 pelny odczyt bierze sie dopiero po otwarciu okna stanu. Karta radzi sobie z tym sama - po pieciu
 sekundach bez swiezego statusu `OdswiezSpe` czysci linijke mocy i wraca do opisu trasy, wiec nie
