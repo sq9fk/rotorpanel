@@ -307,12 +307,54 @@ internal sealed class StrumienPortu : Stream
         catch { return false; }
     }
 
+    /// <summary>Ile razy <c>WriteFile</c> zapisal mniej, niz mial - patrz Write.</summary>
+    public int NiepelneZapisy => _niepelne;
+    private int _niepelne;
+
+    /// <summary>Ile milisekund zajal ostatni zapis, razem z dopisywaniem reszty.</summary>
+    public long OstatniZapisMs { get; private set; }
+
+    /// <summary>
+    /// Zapis na port **do skutku**, a nie "ile sie uda".
+    ///
+    /// Port jest otwarty z <c>WriteTotalTimeoutConstant = 2000</c>, wiec gdy bufor pary
+    /// com0com sie zapelni - a zapelnia sie, kiedy program po drugiej stronie nie nadaza
+    /// czytac - <c>WriteFile</c> **konczy sie sukcesem po dwoch sekundach, zapisujac tylko
+    /// czesc bajtow**. Poprzednia wersja ignorowala licznik zapisanych bajtow (<c>out _</c>),
+    /// wiec reszta kawalka **przepadala po cichu**. Do klienta szla polowa klatki ekranu
+    /// i obraz mrugal.
+    ///
+    /// Zmierzone 15 wrzesnia przyrzadem "TRZYMALISMY DANE KLIENTA": 398, **1994** i 4543 ms
+    /// oczekiwania w kolejce przy pustej kolejce i bez towarzyszacego zastoju procesu.
+    /// **1994 ms to nie przypadkowa liczba - to dokladnie limit czasu zapisu**, czyli slad
+    /// zapisu, ktory sie o niego oparl.
+    ///
+    /// Po pieciu sekundach bez postepu rezygnujemy z kawalka i mowimy o tym glosno. Lepiej
+    /// stracic jeden kawalek ze sladem niz stac w nieskonczonosc na kliencie, ktory nie czyta.
+    /// </summary>
     public override void Write(byte[] bufor, int offset, int ile)
     {
-        var tymczasowy = new byte[ile];
-        Buffer.BlockCopy(bufor, offset, tymczasowy, 0, ile);
-        if (!PortIo.WriteFile(_h, tymczasowy, (uint)ile, out _, IntPtr.Zero))
-            throw new IOException("WriteFile: blad " + Marshal.GetLastWin32Error());
+        var zegar = System.Diagnostics.Stopwatch.StartNew();
+        int poszlo = 0;
+
+        while (poszlo < ile)
+        {
+            var kawalek = new byte[ile - poszlo];
+            Buffer.BlockCopy(bufor, offset + poszlo, kawalek, 0, kawalek.Length);
+
+            if (!PortIo.WriteFile(_h, kawalek, (uint)kawalek.Length, out uint teraz, IntPtr.Zero))
+                throw new IOException("WriteFile: blad " + Marshal.GetLastWin32Error());
+
+            if (teraz < kawalek.Length) _niepelne++;
+            poszlo += (int)teraz;
+
+            if (poszlo < ile && zegar.Elapsed > TimeSpan.FromSeconds(5))
+                throw new IOException("zapis na port utknal: " + poszlo + " z " + ile +
+                                      " B w " + zegar.ElapsedMilliseconds + " ms " +
+                                      "(druga strona pary nie odbiera)");
+        }
+
+        OstatniZapisMs = zegar.ElapsedMilliseconds;
     }
 
     // Domyslne ReadAsync i WriteAsync klasy Stream przepuszczaja obie operacje przez

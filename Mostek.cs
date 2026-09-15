@@ -1393,10 +1393,14 @@ public sealed class Mostek : IDisposable
             DateTime.UtcNow - new DateTime(ostatnie) <= TimeSpan.FromSeconds(30)) return;
         Interlocked.Exchange(ref _ostatniaZgloszonaZwloka, DateTime.UtcNow.Ticks);
 
+        var pary = _portPary;
+
         Pulapka.Zapisz(Podpis,
             "TRZYMALISMY DANE KLIENTA " + zwloka.TotalMilliseconds.ToString("0") + " ms " +
             "miedzy odebraniem z sieci a zapisem na port. W kolejce " + _kolejkaPortu.Count +
-            " kawalkow" + Environment.NewLine + "    " + CzujnikZastoju.Opis,
+            " kawalkow, zapisow niepelnych " + (pary?.NiepelneZapisy ?? -1) +
+            ", ostatni zapis " + (pary?.OstatniZapisMs ?? -1) + " ms" +
+            Environment.NewLine + "    " + CzujnikZastoju.Opis,
             _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 

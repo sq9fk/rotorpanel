@@ -368,6 +368,30 @@ jest juz rozpoznany. To synchroniczne `CreateFile` na porcie szeregowym, czyli w
 samej puli, z ktorej zyja pompa i pisarz. Dopoki klienta szukamy, warto placic co piec sekund;
 gdy juz go mamy, badanie sluzy tylko do wykrycia, ze odszedl - a to moze poczekac.
 
+**Szosta warstwa - i tym razem przyrzad wskazal wprost na nas** (1.11.43). Wpisy
+`TRZYMALISMY DANE KLIENTA` z pierwszego przebiegu: **398, 1994 i 4543 ms** miedzy odebraniem
+kawalka z sieci a zapisaniem go na port. Przy **pustej kolejce** i **bez towarzyszacego zastoju
+procesu** (ostatni zastoj 165 ms, prawie trzy sekundy wczesniej). Czyli nie przeciazenie
+i nie interfejs - cos stalo w samym zapisie.
+
+**1994 ms to nie jest przypadkowa liczba.** Port otwieramy z `WriteTotalTimeoutConstant = 2000`.
+To slad zapisu, ktory oparl sie o wlasny limit czasu - a `WriteFile` po przekroczeniu limitu
+**konczy sie sukcesem, zapisujac tylko czesc bajtow**. `StrumienPortu.Write` ignorowal licznik
+zapisanych bajtow (`out _`), wiec **reszta kawalka przepadala po cichu**. Do klienta szla
+polowa klatki ekranu - i obraz mrugal.
+
+To dotyczy **takze rotorow**: urwany zapis pieciobajtowej ramki pozycji zostawia programowi
+sterujacemu `57 03`, a on doczyta reszte z pustego bufora i pokaze **208**. Czyli kolejna droga
+do 208, tym razem w calosci wewnatrz naszego procesu, obok tych juz zamknietych (ogon
+z poprzedniego polaczenia, pol ramki przy zatrzymywaniu, urwana ramka od sterownika).
+
+Teraz `Write` dopisuje do skutku, liczy zapisy niepelne i po pieciu sekundach bez postepu
+rezygnuje **glosno**, z wyjatkiem w sladzie. Licznik niepelnych zapisow idzie do wpisu
+o zwloce, wiec nastepny plik powie wprost, czy to bylo to.
+
+**Zasada:** kazde API, ktore zwraca "ile sie udalo", trzeba pytac, ile sie udalo. `out _`
+przy `WriteFile` to nie jest skrot - to jest miejsce, w ktorym dane znikaja bez sladu.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
