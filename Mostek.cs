@@ -293,6 +293,8 @@ public sealed class Mostek : IDisposable
         _cfg = cfg;
         Punkt = punkt;
 
+        _dziennik.RozbierajSpid = punkt is Rotor;
+
         // Tylko kierunek od sterownika. Urwana odpowiedz to polowa liczby i lepiej jej
         // nie oddawac wcale; urwany rozkaz to niewykonana nastawa i tego gubic nie wolno.
         _skladacz.KasujUrwaneOdpowiedzi = punkt is Rotor;
@@ -595,12 +597,21 @@ public sealed class Mostek : IDisposable
             if (zPortu) Interlocked.Exchange(ref _ostatniRuchKlienta, DateTime.UtcNow.Ticks);
 
             // Pulapka dziala zawsze, takze przy wylaczonym sladzie - inaczej zlapanie
-            // rzadkiego objawu wymaga szczescia. Mostki SPE pomijamy, bo to inny protokol.
+            // rzadkiego objawu wymaga szczescia.
+            //
+            // **Kontekst zbieramy na kazdym mostku, takze SPE.** Do 1.11.22 stalo tu
+            // `if (!OdpytywacSpe)` z uzasadnieniem "to inny protokol" - i owszem, rozbior
+            // ramek SPID jest tam bez sensu, ale **surowe bajty i os czasu nie sa protokolem**.
+            // Skutek byl taki, ze kazdy wpis dotyczacy wzmacniacza mial puste bufory i pusty
+            // dziennik, czyli byl dowodem bez dowodu. Zgloszenie "microBIT przeskakuje
+            // Standby/Remoted" nie mialo sie o co oprzec.
+            (zPortu ? _doSterownika : _odSterownika).Dopisz(bufor, n);
+            _dziennik.Dopisz(zPortu ? "PC ->" : "   <- sterownik", bufor, n);
+
+            // Rozbior nastaw zostaje przy rotorach - tam `2F` znaczy nastawe, a przy
+            // wzmacniaczu ten sam bajt nie znaczy nic.
             if (!OdpytywacSpe)
             {
-                (zPortu ? _doSterownika : _odSterownika).Dopisz(bufor, n);
-                _dziennik.Dopisz(zPortu ? "PC ->" : "   <- sterownik", bufor, n);
-
                 // Zapisujemy **kazda** nastawe, nie tylko podejrzana. Jest ich kilka na
                 // godzine, a bez pelnej listy nie da sie powiedziec, czy 208 przyszlo
                 // z komputera, czy pojawilo sie gdzies dalej.

@@ -189,6 +189,31 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Przeskoki Standby/Remoted na microBIT to NIE jest zrywanie naszego polaczenia** (1.11.23).
+Wyciagnalem taki wniosek z 227 linii "pulapka uzbrojona" w jednym pliku i **byl bledny**.
+Dziewietnascie minut na 1.11.22, przy zglaszanych przez uzytkownika ciaglych przeskokach:
+
+```
+uzbrojen pulapki:            1 na kazdy mostek, takze SPE
+wpisow LACZE PADLO:          0
+mostek SPE, czas polaczenia: 1150 s bez przerwy
+```
+
+Nasza sesja TCP stala jak skala. Cokolwiek pokazuje microBIT, **nie jest to stan naszego
+polaczenia**. Tamte 227 zestawien bylo zdarzeniem przejsciowym z innego dnia i nie mialo
+zwiazku z tym objawem.
+
+**Kontekst pulapki nie byl zbierany na mostkach SPE** - i to jest powod, dla ktorego sledztwo
+stalo. Stalo tam `if (!OdpytywacSpe)` z uzasadnieniem "to inny protokol". Rozbior ramek SPID
+faktycznie nie ma tam sensu, ale **surowe bajty i os czasu nie sa protokolem**. Skutek: kazdy
+wpis dotyczacy wzmacniacza mial puste bufory i pusty dziennik - dowod bez dowodu. Teraz kontekst
+zbieramy na kazdym mostku, a `Dziennik.RozbierajSpid` pilnuje tylko tego, zeby nie opisywac
+bajtow SPE jak ramek SPID.
+
+Powtarza sie wzorzec z tego calego sledztwa: **wylaczenie diagnostyki "bo tam jej nie potrzeba"
+konczy sie tym, ze przy nastepnym objawie nie ma sie czego chwycic.** Tak samo bylo z pulapka
+nieuzbrajana przy SPE (1.11.18) i z filtrem liczacym cudze ramki (1.11.22).
+
 **Rotory sa czyste - zmierzone** (1.11.22). Siedemdziesiat minut na 1.11.21, po przeniesieniu
 katalogu poza OneDrive i po przeniesieniu zapisu pulapki do tla:
 

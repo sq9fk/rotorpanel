@@ -144,9 +144,15 @@ public static class Pulapka
         private readonly Queue<string> _wpisy = new();
         private const int Ile = 150;
 
+        /// <summary>
+        /// Czy rozbierac bajty jak ramki SPID. Przy wzmacniaczu **nie** - `SladSpid` opisywalby
+        /// wtedy kazdy bajt jako "poza ramka", zasmiecajac dziennik udawana wiedza.
+        /// </summary>
+        public bool RozbierajSpid { get; set; } = true;
+
         public void Dopisz(string kierunek, byte[] dane, int ile)
         {
-            string opis = SladSpid.Opis(dane, ile);
+            string opis = RozbierajSpid ? SladSpid.Opis(dane, ile) : "";
             string wpis = DateTime.Now.ToString("HH:mm:ss.fff") + "  " + kierunek + "  " +
                           Slad.Podglad(dane, ile) + (opis.Length > 0 ? "   " + opis : "");
 
