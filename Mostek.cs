@@ -97,7 +97,9 @@ public sealed class Mostek : IDisposable
     private long _ostatniZrzutBraku, _ostatnieZerwanie;
 
     // Kiedy ostatnio cokolwiek przyszlo od wzmacniacza i kiedy ostatnio zglosilismy przerwe.
-    private long _ostatniRuchWzmacniacza, _zgloszonyBrak;
+    // Kiedy ostatnio cokolwiek przyszlo od urzadzenia po drugiej stronie - sterownika
+    // rotora albo wzmacniacza. Patrz MilczyOd.
+    private long _ostatniRuchZUrzadzenia, _zgloszonyBrak;
 
     // Patrz OdrzucicNieprawdopodobnyOdczyt.
     private int _ostatniaPozycja = -1;
@@ -119,6 +121,28 @@ public sealed class Mostek : IDisposable
     /// </summary>
     public int ObcePrzejecia => Volatile.Read(ref _obcePrzejecia) >= 3
         ? Volatile.Read(ref _obcePrzejecia) : 0;
+
+    /// <summary>
+    /// Jak dlugo urzadzenie nie przyslalo **ani jednego bajtu**. Zero, gdy mostek nie jest
+    /// polaczony albo gdy jeszcze nic nie przyszlo.
+    ///
+    /// **Powstalo z konkretnego zdarzenia, 15 wrzesnia 18:34:58.** Sterownik A3S zamilkl
+    /// w trakcie obrotu i nie odezwal sie wiecej, a rotor **krecil sie dalej** - minal zadane
+    /// 300 stopni i zatrzymal sie dopiero na 85. Przez te cztery minuty RotorPanel pokazywal
+    /// **zielona diode i napis "polaczony"**, bo sesja TCP stala nienaruszona od 18:30:52.
+    /// I to byla prawda o laczu, ale nie o tym, co sie dzialo z antena.
+    ///
+    /// Zielone swiatlo znaczy teraz "przychodza odpowiedzi", a nie "gniazdo jest otwarte".
+    /// </summary>
+    public TimeSpan MilczyOd
+    {
+        get
+        {
+            if (Stan != StanMostka.Polaczony) return TimeSpan.Zero;
+            long ostatni = Interlocked.Read(ref _ostatniRuchZUrzadzenia);
+            return ostatni == 0 ? TimeSpan.Zero : DateTime.UtcNow - new DateTime(ostatni);
+        }
+    }
 
     /// <summary>Ostatni odczytany stan wzmacniacza SPE albo null.</summary>
     public StatusSpe Status => _status;
@@ -424,7 +448,7 @@ public sealed class Mostek : IDisposable
                 // o 17:21:31.881, nowe polaczenie dopiero o 17:21:38.36. Tyle wlasnie znaczy
                 // zgloszone "zniknie na wiecej niz kilka sekund" - i nie da sie tego zobaczyc
                 // ani we wpisie o zerwaniu, ani we wpisie o zestawieniu, bo lezy **miedzy nimi**.
-                long ostatniOdWzmacniacza = Interlocked.Read(ref _ostatniRuchWzmacniacza);
+                long ostatniOdWzmacniacza = Interlocked.Read(ref _ostatniRuchZUrzadzenia);
                 if (OdpytywacSpe && ostatniOdWzmacniacza != 0)
                 {
                     var bezDanych = DateTime.UtcNow - new DateTime(ostatniOdWzmacniacza);
@@ -682,7 +706,7 @@ public sealed class Mostek : IDisposable
             }
 
             if (zPortu) Interlocked.Exchange(ref _ostatniRuchKlienta, DateTime.UtcNow.Ticks);
-            else if (OdpytywacSpe) ZmierzPrzerwe();
+            else ZmierzPrzerwe();
 
             // Pulapka dziala zawsze, takze przy wylaczonym sladzie - inaczej zlapanie
             // rzadkiego objawu wymaga szczescia.
@@ -845,7 +869,7 @@ public sealed class Mostek : IDisposable
     /// </summary>
     private void ZmierzPrzerwe()
     {
-        Interlocked.Exchange(ref _ostatniRuchWzmacniacza, DateTime.UtcNow.Ticks);
+        Interlocked.Exchange(ref _ostatniRuchZUrzadzenia, DateTime.UtcNow.Ticks);
     }
 
     /// <summary>
@@ -865,7 +889,7 @@ public sealed class Mostek : IDisposable
     private void SprawdzBrakOdpowiedzi()
     {
         long rozkaz = Interlocked.Read(ref _ostatniRuchKlienta);
-        if (rozkaz == 0 || rozkaz <= Interlocked.Read(ref _ostatniRuchWzmacniacza)) return;
+        if (rozkaz == 0 || rozkaz <= Interlocked.Read(ref _ostatniRuchZUrzadzenia)) return;
 
         var czeka = DateTime.UtcNow - new DateTime(rozkaz);
         if (czeka < ProgBezOdpowiedzi) return;
@@ -1115,8 +1139,16 @@ public sealed class Mostek : IDisposable
     /// </summary>
     private void ZglosWymiane(string powod)
     {
+        // **Gdy urzadzenie milczy zupelnie, kolejne wpisy nie wnosza nic nowego** - a szkodza.
+        // 15 wrzesnia sterownik A3S zamilkl na cztery minuty i przy dlawieniu co piec sekund
+        // plik urosl z 3 kB do **1,66 MB**; jeszcze chwila i przekroczylby limit 2 MB, po ktorym
+        // pulapka przestaje pisac. Zapis o tym, ze nic nie przychodzi, zaslonilby zapis o tym,
+        // co sie stalo pozniej. Pierwszy wpis leci normalnie, kolejne raz na pol minuty.
+        var dlawik = MilczyOd > TimeSpan.FromSeconds(5)
+            ? TimeSpan.FromSeconds(30) : TimeSpan.FromSeconds(5);
+
         long ostatni = Interlocked.Read(ref _ostatniZrzutBraku);
-        if (ostatni != 0 && DateTime.UtcNow - new DateTime(ostatni) <= TimeSpan.FromSeconds(5)) return;
+        if (ostatni != 0 && DateTime.UtcNow - new DateTime(ostatni) <= dlawik) return;
 
         Interlocked.Exchange(ref _ostatniZrzutBraku, DateTime.UtcNow.Ticks);
         Pulapka.Zapisz(Podpis,

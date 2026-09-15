@@ -290,6 +290,17 @@ public partial class MainForm
         return (n / (1024.0 * 1024.0)).ToString("0.0") + " MB";
     }
 
+    /// <summary>
+    /// Po ilu sekundach ciszy urzadzenia mowimy, ze nie odpowiada.
+    ///
+    /// Rotor pytamy co sekunde, wiec piec sekund to juz cztery zgubione odpowiedzi z rzedu.
+    /// Przy wzmacniaczu z podpietym programem klienckim **to on nadaje rytm** - SPE Term robi
+    /// sobie przerwy do czterech sekund i nikt niczego nie gubi, wiec tam prog musi byc
+    /// dluzszy, inaczej napis migalby przy zdrowej pracy.
+    /// </summary>
+    private static TimeSpan ProgCiszyUrzadzenia(Mostek m) =>
+        TimeSpan.FromSeconds(m.KlientNaPorcie ? 15 : 5);
+
     private void Odswiez()
     {
         string ostatniBlad = "";
@@ -304,9 +315,20 @@ public partial class MainForm
             switch (m.Stan)
             {
                 case StanMostka.Polaczony:
-                    u.Dioda.Kolor = Theme.Zielony;
-                    u.Stan.Text = "połączony";
-                    u.Stan.ForeColor = Theme.Tekst;
+                    // **Zielone swiatlo znaczy "przychodza odpowiedzi", nie "gniazdo otwarte".**
+                    // 15 wrzesnia sterownik A3S zamilkl w trakcie obrotu, rotor minal zadane
+                    // 300 stopni i zatrzymal sie na 85 - a karta przez cztery minuty pokazywala
+                    // zielona diode i "polaczony", bo sesja TCP rzeczywiscie stala. Prawda
+                    // o laczu, ktora zaslaniala prawde o antenie.
+                    var cisza = m.MilczyOd;
+                    bool milczy = cisza > ProgCiszyUrzadzenia(m);
+
+                    u.Dioda.Kolor = milczy ? Theme.Pomarancz : Theme.Zielony;
+                    u.Stan.Text = milczy
+                        ? (m.Punkt is Rotor ? "sterownik" : "wzmacniacz") +
+                          " nie odpowiada " + cisza.TotalSeconds.ToString("0") + " s"
+                        : "połączony";
+                    u.Stan.ForeColor = milczy ? Theme.Pomarancz : Theme.Tekst;
                     UstawPrzycisk(u.Przelacz, "Rozłącz", glowny: false);
                     break;
 

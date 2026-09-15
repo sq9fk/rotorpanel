@@ -1702,7 +1702,36 @@ watkow (`ZaplanujBadanieStrony`, pola czytane atomowo), a przebudowa listy uzywa
 kazdej linii, w sciezce danych mostka. Teraz trzyma otwarty uchwyt, a po 10 MB przewija plik
 na `.old`.
 
-## Pułapki, na które już wpadliśmy
+## Zielone swiatlo ma znaczyc "przychodza odpowiedzi"
+
+**Zdarzenie z 15 wrzesnia, 18:34:58** - jedyne w calej serii, ktore bylo prawdziwa usterka
+sprzetu, a nie nasza. Sterownik A3S **przestal odpowiadac w trakcie obrotu** i nie odezwal sie
+wiecej: ostatnia ramka o 18:34:58.631, potem okolo czterystu zapytan bez jednej odpowiedzi.
+W tym samym czasie 15m mialo 1 brak na 373 wymiany, a 10m 5 na 384 - ten sam Pi, ten sam
+ser2net, ten sam tunel. Sesja TCP do portu 4101 **stala nienaruszona od 18:30:52**.
+
+Co robil RotorPanel przez te cztery minuty: pokazywal **zielona diode i napis "polaczony"**.
+I to byla prawda - o laczu. Nie o antenie.
+
+Stad `Mostek.MilczyOd` i pomaranczowe "sterownik nie odpowiada X s" na karcie. Progi: piec
+sekund tam, gdzie pytamy sami (rotor co sekunde, wiec to juz cztery zgubione odpowiedzi),
+pietnascie przy wzmacniaczu z podpietym programem klienckim - bo tam **rytm nadaje klient**,
+a SPE Term robi sobie przerwy do czterech sekund przy zdrowej pracy.
+
+**Drugi wniosek z tego samego zdarzenia: pulapka potrafi zaslepic sama siebie.** Dlawienie co
+piec sekund wystarcza przy pojedynczych brakach, ale przy calkowitej ciszy kazdy wpis mowi to
+samo, a plik urosl z 3 kB do **1,66 MB w dziewiec minut**. Limit to 2 MB i po jego przekroczeniu
+`Pulapka` przestaje pisac - czyli zapis o tym, ze nic nie przychodzi, zaslonilby zapis o tym,
+co sie stalo pozniej. Przy milczacym urzadzeniu dlawik idzie wiec na pol minuty.
+
+**Rozpoznanie sprzetu (do zapamietania, bo latwo wziac to za blad programu):** sterownik
+pokazywal potem **85 stopni, a antena fizycznie stala na 345** - czyli licznik uciekl o okolo
+250 stopni, podczas gdy antena nie ruszyla sie z miejsca, w ktorym zamilkl. Nie jest to
+**gubienie** impulsow, tylko ich **liczenie bez ruchu** - albo silnik krecil sie bez anteny
+(zerwane sprzeglo, gear), albo wejscie impulsow lapie zaklocenia. Filtr pozycji nie odrzucil
+niczego, bo do konca odczyty szly rowno po 2-3 stopnie na sekunde.
+
+## Pulapki, na ktore juz wpadlismy
 
 **`setupc` wymaga katalogu roboczego.** Szuka `com0com.inf` w katalogu bieżącym; wywołany
 skądinąd zwraca `SetupOpenInfFile ... ERROR: 2`. Generowany plik `.bat` zaczyna się od
