@@ -80,6 +80,27 @@ public sealed class SkladaczSpid
     /// </summary>
     public TimeSpan Cierpliwosc { get; set; } = TimeSpan.FromMilliseconds(800);
 
+    /// <summary>
+    /// Wyrzuca to, co zostalo w srodku, i zwraca to albo null.
+    ///
+    /// **Musi byc wolane przy kazdym zestawieniu lacza.** Skladacz zyje tak dlugo jak mostek,
+    /// a polaczenie moze paść w polowie ramki - wtedy w buforze zostaje np. `57 03 06`. Bez
+    /// czyszczenia ten ogon czekal na **nastepne** polaczenie i sklejal sie z jego pierwszymi
+    /// bajtami w ramke, ktorej nikt nie wyslal. Zgłoszone przez uzytkownika: odczyt skacze na
+    /// 208 przy zatrzymywaniu i wznawianiu mostka.
+    /// </summary>
+    public byte[] Wyczysc()
+    {
+        lock (_bufor)
+        {
+            if (_bufor.Count == 0) return null;
+            var reszta = _bufor.ToArray();
+            _bufor.Clear();
+            _odkad = DateTime.MinValue;
+            return reszta;
+        }
+    }
+
     /// <summary>Dokłada bajty i zwraca porcje gotowe do wyslania na port.</summary>
     public List<byte[]> Dopisz(byte[] dane, int ile)
     {

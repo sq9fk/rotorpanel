@@ -189,6 +189,26 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Zatrzymanie mostka przy pracujacym kliencie potrafilo dac 208 - dwa osobne bledy** (1.11.20).
+Zgloszone przez uzytkownika: *"jak pstrotator jest wlaczony a wylacze w RotorPanel polaczenie
+z ser2net, to przeskakuje mi czasem na 208 pomimo filtru"*.
+
+* **`PisarzPortu` zapisywal na port z zetonem anulowania.** Zapis na pare com0com potrafi stanac
+  na sekundy (zmierzone: 203 ms, 589 ms, 2,77 s), wiec anulowanie w jego trakcie zostawialo na
+  porcie **pol ramki**. Program sterujacy, ktory dostanie `57 03`, doczyta reszte z wlasnego
+  pustego bufora - i mamy 208. Teraz ramka dopisuje sie do konca (`CancellationToken.None`);
+  ma piec albo trzynascie bajtow, wiec nie ma zadnego pozytku z przerwania jej w polowie.
+* **Skladacze nigdy nie byly czyszczone miedzy polaczeniami.** Zyja tak dlugo jak mostek, a lacze
+  moze paść w srodku ramki - wtedy w buforze zostawal np. `57 03 06` i czekal na **nastepne**
+  polaczenie, gdzie sklejal sie z jego pierwszymi bajtami w ramke, ktorej nikt nie wyslal.
+  `SkladaczSpid.Wyczysc` jest teraz wolane przy kazdym zestawieniu lacza, a wyrzucony ogon idzie
+  do `podejrzane.txt`.
+
+**Czego to nadal nie zalatwia i nie zalatwi:** gdy mostek jest zatrzymany, a klient dalej pyta,
+**zadna ramka nie przechodzi przez mostek** - klient czyta wlasny pusty bufor i sam sobie robi
+208. Filtr pozycji nie ma tam czego filtrowac, bo nie ma danych. To jest poza programem i tak
+zostanie; jedyna obrona to nie zostawiac klienta odpytujacego martwa pare.
+
 **Pulapka wspolwytwarzala usterke, ktorej szukala** (1.11.19). Dziewiec godzin pracy, 33 255
 wymian na kazdym z trzech rotorow, braki 13 / 8 / 17 czyli **0,02-0,05 %** - i czujnik zastoju
 dal odpowiedz na pytanie, ktorego nie dalo sie rozstrzygnac z wnetrza mostka:

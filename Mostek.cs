@@ -374,6 +374,22 @@ public sealed class Mostek : IDisposable
 
                 Pulapka.Uzbrojono(Podpis);
 
+                // Ogon ramki z poprzedniego polaczenia skleilby sie z pierwszymi bajtami
+                // tego - i powstalaby ramka, ktorej nikt nie wyslal. Patrz SkladaczSpid.Wyczysc.
+                foreach (var (co, ogon) in new[]
+                         {
+                             ("od sterownika", _skladacz.Wyczysc()),
+                             ("do sterownika", _skladaczRozkazow.Wyczysc())
+                         })
+                {
+                    if (ogon is null) continue;
+                    Pulapka.Zapisz(Podpis,
+                        "OGON Z POPRZEDNIEGO POLACZENIA (" + co + "): " +
+                        Slad.Podglad(ogon, ogon.Length) +
+                        " - wyrzucony, zeby nie skleil sie z pierwsza ramka nowego polaczenia",
+                        null, null, TimeSpan.Zero);
+                }
+
                 // Po przerwie antena mogla zostac przekrecona recznie - pierwszy odczyt
                 // po polaczeniu nie ma sie do czego porownac i nie wolno go odrzucic.
                 _ostatniaPozycja = -1;
@@ -1078,9 +1094,18 @@ public sealed class Mostek : IDisposable
 
             try
             {
+                // **Bez zetonu anulowania.** Zapis na pare com0com potrafi stanac na sekundy,
+                // wiec anulowanie w jego trakcie zostawialo na porcie **pol ramki** - a program
+                // sterujacy, ktory dostanie `57 03`, doczyta reszte z wlasnego pustego bufora
+                // i pokaze 208 stopni. Dokladnie to zglosil uzytkownik: zatrzymanie mostka przy
+                // pracujacym PstRotatorze czasem konczylo sie skokiem na 208.
+                //
+                // Ramka ma piec albo trzynascie bajtow, wiec dopisanie jej do konca jest
+                // krotsze niz jakikolwiek pozytek z przerwania w polowie. Petla i tak wyjdzie
+                // przy nastepnym sprawdzeniu zetonu.
                 var zegar = System.Diagnostics.Stopwatch.StartNew();
-                await port.WriteAsync(dane, 0, dane.Length, ct);
-                await port.FlushAsync(ct);
+                await port.WriteAsync(dane, 0, dane.Length, CancellationToken.None);
+                await port.FlushAsync(CancellationToken.None);
                 if (Slad.Wlaczony)
                     Zapisz("  zapisano na port " + dane.Length + " B w " +
                            zegar.ElapsedMilliseconds + " ms");
