@@ -654,6 +654,35 @@ public sealed class Mostek : IDisposable
         await laczenie;   // przenosi ewentualny wyjatek polaczenia
     }
 
+    /// <summary>
+    /// Oddaje strumien klientowi **na jego pierwszym bajcie**, a nie przy najblizszym obrocie
+    /// petli odpytywania.
+    ///
+    /// **To jest reszta migotania po wlaczeniu SPE Term** - zgloszona jako "jeszcze zdarza sie,
+    /// ze zamruga kilka razy, potem dluzsza chwile stabilnie". Objaw skupiony na starcie ma
+    /// przyczyne na starcie: decyzje o oddaniu lacza podejmowala petla `OdpytujSpe`, ktora
+    /// po wyslaniu zapytania spi sekunde. Klient odzywal sie wiec na porcie i przez **do
+    /// poltorej sekundy** bylismy nadal w trybie skladania: trzymalismy mu ramki, moglismy
+    /// zjesc pierwsza odpowiedz statusu jako "nasza zalegla" i zdejmowac klatki wyswietlacza.
+    /// Potem petla sie budzila, wlaczala tryb przezroczysty i **wszystko sie uspokajalo** -
+    /// dokladnie tak, jak to wygladalo na ekranie.
+    ///
+    /// Tutaj jestesmy na tym samym watku, ktory za chwile zawola `Przepusc`, wiec **pierwszy
+    /// kawalek od wzmacniacza po odezwaniu sie klienta jest juz obslugiwany przezroczysto**.
+    /// </summary>
+    private void OddajLaczeKlientowi(CzytnikSpe czytnik)
+    {
+        if (czytnik is null || czytnik.Przezroczysty) return;
+
+        czytnik.Przezroczysty = true;
+        czytnik.PrzechwytujEkran = false;
+
+        // Zaleglosc po naszych zapytaniach nie moze zjesc pierwszej ramki, o ktora poprosil on.
+        czytnik.ZapomnijWlasne();
+
+        Zapisz("klient odezwal sie na porcie - oddaje mu strumien bez skladania");
+    }
+
     private async Task Pompa(Stream skad, Stream dokad, bool zPortu, CzytnikSpe czytnik,
                              CancellationToken ct)
     {
@@ -705,7 +734,11 @@ public sealed class Mostek : IDisposable
                 }
             }
 
-            if (zPortu) Interlocked.Exchange(ref _ostatniRuchKlienta, DateTime.UtcNow.Ticks);
+            if (zPortu)
+            {
+                Interlocked.Exchange(ref _ostatniRuchKlienta, DateTime.UtcNow.Ticks);
+                OddajLaczeKlientowi(czytnik);
+            }
             else ZmierzPrzerwe();
 
             // Pulapka dziala zawsze, takze przy wylaczonym sladzie - inaczej zlapanie
@@ -1424,21 +1457,12 @@ public sealed class Mostek : IDisposable
             // z jego ramek po drodze, a wzmacniacz nie dostaje podwojnego ruchu.
             if (KlientNaPorcie)
             {
-                // Klient jest panem lacza - oddajemy mu **wszystko**: i klatki wyswietlacza,
-                // i ramki statusu. Wczesniej bylo tu `PrzechwytujEkran = _trybEkranu`, wiec
-                // przy otwartym wlasnym podgladzie zabieralismy mu klatki, o ktore sam poprosil.
-                czytnik.PrzechwytujEkran = false;
-
-                // **I nie skladamy mu ramek.** Skladanie trzyma niedokonczona ramke do
-                // nastepnego kawalka, kasuje ramke urwana w polowie i potrafi przeramowac
-                // strumien na trzech bajtach `AA` wewnatrz klatki - kazda z tych rzeczy widac
-                // u klienta jako migniecie obrazu. Rozbior dla siebie robimy wtedy na kopii.
-                czytnik.Przezroczysty = true;
-
-                // Kasujemy pamiec o wlasnych zapytaniach czekajacych na odpowiedz. Bez tego
-                // pierwsza ramka statusu **jego** zapytania trafialaby na nasz licznik, zostala
-                // uznana za nasza i zdjeta ze strumienia - a on zobaczylby dziure w odczycie.
-                czytnik.ZapomnijWlasne();
+                // Klient jest panem lacza - dostaje **wszystko**: i klatki wyswietlacza,
+                // i ramki statusu, i to bez skladania. Robi to juz `OddajLaczeKlientowi`
+                // na jego pierwszym bajcie; tutaj tylko domykamy przypadek, w ktorym klienta
+                // rozpoznalismy inaczej niz po ruchu - po tym, ze sam pyta o status
+                // (`KlientPytaSam`) albo po zajetej drugiej stronie pary.
+                OddajLaczeKlientowi(czytnik);
                 await Task.Delay(500, ct);
                 continue;
             }

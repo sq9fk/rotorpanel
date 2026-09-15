@@ -320,6 +320,26 @@ ani we wpisie o zerwaniu, ani we wpisie o zestawieniu, bo lezy **miedzy nimi**, 
 nieudane proby polaczenia. Stad wpis `LACZE WROCILO - przerwa w dostawie do klienta X s`,
 liczony od ostatniego bajtu od wzmacniacza, a nie od poczatku ostatniej proby.
 
+**Czwarta warstwa i ostatnia z tej serii: oddanie lacza musi nastapic na pierwszym bajcie
+klienta** (1.11.41). Objaw po 1.11.40: *"po zalaczeniu SPE Term jeszcze zdarza sie, ze zamruga
+kilka razy, potem dluzsza chwile stabilnie"*. **Objaw skupiony na starcie ma przyczyne
+na starcie** - i to jest cala diagnoza w jednym zdaniu.
+
+Decyzje o oddaniu strumienia podejmowala petla `OdpytujSpe`, ktora po wyslaniu zapytania **spi
+sekunde**. Klient odzywal sie na porcie i przez **do poltorej sekundy** bylismy nadal w trybie
+skladania: trzymalismy mu ramki do nastepnego kawalka, moglismy zjesc pierwsza ramke statusu
+jako "nasza zalegla" i zdejmowalismy klatki wyswietlacza. Potem petla sie budzila, wlaczala
+tryb przezroczysty i wszystko sie uspokajalo - dokladnie tak, jak to wygladalo na ekranie.
+
+Teraz robi to `OddajLaczeKlientowi`, wolane z pompy **w tej samej linijce, w ktorej notujemy ruch
+od strony portu**. Jestesmy wtedy na tym samym watku, ktory za chwile zawola `Przepusc`, wiec
+pierwszy kawalek od wzmacniacza po odezwaniu sie klienta jest juz obslugiwany przezroczysto.
+Petla tylko domyka przypadki, w ktorych klienta rozpoznajemy inaczej niz po ruchu -
+po `KlientPytaSam` albo po zajetej drugiej stronie pary.
+
+**Wzor do zapamietania:** gdy decyzja ma byc natychmiastowa, nie moze mieszkac w petli, ktora
+ma wlasny takt. Petla jest dobra do **utrzymywania** stanu, nie do jego **ustanawiania**.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
