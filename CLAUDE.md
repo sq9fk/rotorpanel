@@ -195,6 +195,37 @@ while the PC-program is in use, only the On/Off buttons is enabled"*. Stan **nas
 ma osobny wskaznik: **System info -> RFC2217: connected** (str. 59). Uzytkownik patrzyl na ten
 pierwszy, my mierzylismy drugi - stad poltora dnia gonienia wlasnego ogona.
 
+**Stan wzmacniacza da sie czytac z jego wlasnego wyswietlacza** (1.11.33). Wyjscie z konfliktu
+"swiezy stan albo stabilne Remoted": zapytanie `0x90` wytraca RC-1216H z trybu zdalnego, ale
+**ekran w trybie RCU dostajemy za darmo przy kazdym pulsie**. A ekran to siatka **40 na 8
+znakow**, nie obrazek.
+
+Pozycje wziete ze zrzutu siatki (1.11.32), nie z obrazka - separatory w wierszu 5 wyznaczaja
+pola jednoznacznie:
+
+```
+        0123456789012345678901234567890123456789
+    5 |────┬──────┬───┬─────┬─────┬─────┬──────|
+    6 | IN │ BAND │ANT│ CAT │ OUT │ SWR │ TEMP |
+    7 |  1 │ 15 m │ 1 │NONE │ MID │--.--│ 30°C |
+         0-3   5-10 12-14 16-20 22-26 28-32 34-39
+```
+
+**Ten sam pasek stoi tak samo w Standby i w Operate** - sprawdzone na zrzutach z obu trybow.
+Roznia sie tylko gorne wiersze: w spoczynku slowo "Standby", w pracy linijki `PA OUT` i `I PA`
+wraz z liczbami w watach i amperach. Stad `StanZEkranu.Rozpoznaj` czyta tryb po tym, **co widac**,
+a nie po tym, czego brakuje.
+
+**Rozbior milczy przy kazdej watpliwosci.** Parsujemy dopiero wtedy, gdy **wszystkie siedem
+etykiet** stoi dokladnie na swoich pozycjach; po wejsciu w menu wzmacniacza pasek znika i wtedy
+jedyna uczciwa odpowiedz brzmi "nie wiem". Lepiej zostawic poprzedni odczyt z jego wlasnym
+znacznikiem czasu niz podstawic liczbe z innego ekranu.
+
+**Na razie tylko do podpowiedzi karty**, z godzina odczytu - zeby dalo sie porownac z tym, co
+widac na wzmacniaczu. Podstawienie tego pod karte bez takiego sprawdzenia byloby kolejnym ruchem
+na wyczucie, a w tej sprawie bylo ich juz cztery. Czego na ekranie **nie ma i nie bedzie**:
+napiec, pradow i kilku czujnikow temperatury z ramki `0x43` - okno Stan musi wiec dalej pytac.
+
 **Cisza na porcie nie jest darmowa - i to jest sedno calego watku SPE** (1.11.31). W 1.11.30
 przestawalismy pytac o stan, gdy panel schowal sie do zasobnika: skoro nikt nie oglada, zapytanie
 wydawalo sie zmarnowane, a dodatkowo nie blokowalismy wtedy web GUI. Zgloszenie uzytkownika:

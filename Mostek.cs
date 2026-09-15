@@ -146,6 +146,15 @@ public sealed class Mostek : IDisposable
         Pulapka.Zapisz(Podpis, opis.ToString(), null, null, TimeSpan.Zero);
     }
 
+    /// <summary>
+    /// Stan odczytany z **wyswietlacza** wzmacniacza, o ile ekran akurat pokazuje pasek.
+    ///
+    /// Na razie tylko do pokazania w podpowiedzi - zeby dalo sie **porownac z tym, co widac
+    /// na wzmacniaczu**, zanim karta zacznie sie z tego karmic. Podstawienie liczb pod karte
+    /// bez takiego sprawdzenia byloby czwartym z rzedu ruchem na wyczucie w tej sprawie.
+    /// </summary>
+    public StanZEkranu StanEkranu { get; private set; }
+
     /// <summary>Ostatni odczytany stan wzmacniacza SPE albo null.</summary>
     public StatusSpe Status => _status;
 
@@ -693,7 +702,11 @@ public sealed class Mostek : IDisposable
                 _statusowPoprzednio = czytnik.IleWlasnychOdpowiedzi;
 
                 _status = czytnik.Status ?? _status;
-                if (czytnik.Ekran is not null) ZrzucEkran(czytnik.Ekran);
+                if (czytnik.Ekran is not null)
+                {
+                    ZrzucEkran(czytnik.Ekran);
+                    StanEkranu = StanZEkranu.Czytaj(czytnik.Ekran) ?? StanEkranu;
+                }
                 Interlocked.Add(ref _rx, dalej.Length);
 
                 if (Slad.Wlaczony)
