@@ -37,9 +37,6 @@ public sealed class Mostek : IDisposable
     /// </summary>
     public volatile bool PanelWidoczny;
 
-    // Patrz PulsTla.
-    private DateTime _ostatniPulsTla = DateTime.MinValue;
-    private static readonly TimeSpan TaktPulsuTla = TimeSpan.FromMilliseconds(1500);
     private volatile bool _trybStanu;
     private long _ostatniPulsRcu;
     private long _ostatnieZapytanieOStan;
@@ -1241,38 +1238,6 @@ public sealed class Mostek : IDisposable
     /// Pyta wzmacniacz SPE o status raz na sekunde. Ramka: 55 55 55, jeden bajt
     /// dlugosci, kod polecenia i suma kontrolna rowna temu bajtowi.
     /// </summary>
-    /// <summary>
-    /// Puls trzymajacy wzmacniacz w trybie zdalnym, gdy nikt nie oglada stanu.
-    ///
-    /// RC-1216H pokazuje "Remoted", dopoki uznaje, ze program PC uzywa wzmacniacza, i wtedy
-    /// blokuje swoje web GUI (instrukcja, str. 71: *"The web GUI is blocked while the PC-program
-    /// is in use"*). Uznaje tak, gdy dostaje **rozkazy RCU** - nie wystarcza ani szybsze
-    /// odpytywanie o status, ani trzymanie wlaczonego trybu RCU; obie te drogi sprawdzone
-    /// i obalone.
-    ///
-    /// Puls to dokladnie to, co robi okno sterowania: `RcuWylacz`, 20 ms, `RcuWlacz` - co sciaga
-    /// ramke ekranu. Takt 1500 ms to `SpeForm.TaktSpoczynku`, czyli tempo **znane z tego, ze
-    /// daje stabilne "Remoted"**, a nie zgadniete.
-    ///
-    /// Klatki sciagamy do siebie, bo inaczej 367 bajtow co puls szloby na pare com0com do nikogo.
-    /// </summary>
-    private async Task PulsTla(CzytnikSpe czytnik, CancellationToken ct)
-    {
-        if (DateTime.UtcNow - _ostatniPulsTla < TaktPulsuTla) return;
-        _ostatniPulsTla = DateTime.UtcNow;
-
-        czytnik.PrzechwytujEkran = true;
-
-        try
-        {
-            await WyslijKlawisz(EkranSpe.RcuWylacz, ct);
-            await Task.Delay(20, ct);
-            await WyslijKlawisz(EkranSpe.RcuWlacz, ct);
-        }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception ex) { Zapisz("puls trybu zdalnego nie poszedl: " + ex.Message); }
-    }
-
     private async Task OdpytujSpe(Stream siec, CzytnikSpe czytnik, CancellationToken ct)
     {
         var zapytanie = new byte[]
@@ -1306,7 +1271,12 @@ public sealed class Mostek : IDisposable
             // w zasobniku i zadne okno nie jest otwarte, pulsujemy i trzymamy tryb zdalny.
             if (!_trybStanu && !PanelWidoczny && !_trybEkranu)
             {
-                await PulsTla(czytnik, ct);
+                // **Nie pytamy i nie pulsujemy.** Nikt nie oglada stanu, wiec zapytanie byloby
+                // zmarnowane, a puls trzymalby RC-1216H w trybie "Remoted" - czyli **blokowal
+                // jego web GUI** (instrukcja str. 71) wtedy, gdy nasz panel siedzi w zasobniku
+                // i najpewniej chcesz uzyc wlasnie tamtej strony. Cisza jest tu najlepsza
+                // z trzech mozliwosci.
+                czytnik.PrzechwytujEkran = _trybEkranu;
                 await Task.Delay(500, ct);
                 continue;
             }

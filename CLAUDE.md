@@ -195,7 +195,28 @@ while the PC-program is in use, only the On/Off buttons is enabled"*. Stan **nas
 ma osobny wskaznik: **System info -> RFC2217: connected** (str. 59). Uzytkownik patrzyl na ten
 pierwszy, my mierzylismy drugi - stad poltora dnia gonienia wlasnego ogona.
 
-**To zapytanie o status wytraca RC-1216H z trybu "Remoted"** (1.11.29). Rozstrzygniete
+**Koniec watku "Remoted": swiezy stan wygrywa, przeskoki zostaja** (1.11.30). Decyzja
+uzytkownika po przedstawieniu wyboru: *"odczyt musi byc swiezy, zeby wygladal na real time"*.
+Skoro tak, to przeskoki Standby/Remoted sa **cena swiezego stanu** i nie da sie ich uniknac -
+wzmacniacz nie wysyla stanu sam, wiec kazdy odczyt wymaga zapytania, a kazde zapytanie wytraca
+RC-1216H z trybu zdalnego.
+
+Puls w tle (1.11.28) zostal **usuniety**. Mial trzymac "Remoted", gdy nikt nie patrzy - ale to
+jest dokladnie ta chwila, w ktorej uzytkownik najpewniej chce uzyc **web GUI RC-1216H**,
+a "Remoted" je blokuje. Trzymanie trybu zdalnego przy schowanym panelu mialo wiec same wady.
+
+Zostaje reguła prosta i bez kosztow ukrytych:
+
+```
+ktos oglada stan (okno stanu, sterowania albo panel na ekranie)  -> pytamy co sekunde
+nikt nie oglada (panel w zasobniku, okna zamkniete)              -> cisza
+```
+
+Cisza przy schowanym panelu jest lepsza od obu skrajnosci: nie marnuje zapytan, nie obciaza
+wzmacniacza i **nie blokuje jego strony WWW**.
+
+**[nieaktualne] To zapytanie o status wytraca RC-1216H z trybu "Remoted" (1.11.29)** - samo
+ustalenie zostaje w mocy, zmienil sie tylko wniosek praktyczny. Rozstrzygniete
 eksperymentem kontrolnym, ktory nie wymagal ani jednej linii kodu:
 
 ```
