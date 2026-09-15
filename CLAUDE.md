@@ -189,7 +189,37 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
-**Przeskoki Standby/Remoted na microBIT: wyczerpalismy hipotezy** (1.11.27). Wykluczone
+**"Remoted" znaczy "program PC uzywa wzmacniacza", a nie "ktos jest polaczony"** - instrukcja
+RC-1216H, str. 71: *"the status on the top right has changed to Remoted. The web GUI is blocked
+while the PC-program is in use, only the On/Off buttons is enabled"*. Stan **naszego polaczenia**
+ma osobny wskaznik: **System info -> RFC2217: connected** (str. 59). Uzytkownik patrzyl na ten
+pierwszy, my mierzylismy drugi - stad poltora dnia gonienia wlasnego ogona.
+
+**Puls trzymajacy tryb zdalny** (1.11.28). Na zyczenie uzytkownika: skoro mostek jest polaczony,
+to znaczy, ze bedzie sterowal wzmacniaczem, wiec "Remoted" ma stac. Mechanizm musial byc trzeci
+z rzedu, bo dwa poprzednie sa obalone pomiarem:
+
+* **nie tempo** - ani 1000 ms, ani 450 ms odpytywania o status nie utrzymuje stanu (1.11.25),
+* **nie samo wlaczenie RCU** - puls okna sterowania to `RcuWylacz` + 20 ms + `RcuWlacz`, czyli
+  w **dzialajacym** przypadku tryb jest bez przerwy przelaczany, a trzymanie go wlaczonego
+  stanu nie utrzymuje (1.11.26),
+* **dziala powtarzany puls**, bo sciaga ramke ekranu - czyli ruch, ktory RC-1216H uznaje za
+  "program w uzyciu".
+
+Takt to 1500 ms, dokladnie `SpeForm.TaktSpoczynku` - tempo **znane z tego, ze daje stabilne
+"Remoted"**, a nie zgadniete. Pulsujemy tylko przy zamknietym oknie sterowania (ono pulsuje samo
+i lepiej, bo omija wlasne klawisze) i tylko gdy na parze nie ma klienta. Klatki sciagamy do
+siebie, inaczej 367 bajtow co puls szloby na pare com0com do nikogo.
+
+**Cena jest zmierzona i trzeba ja znac:** kazdy zbedny puls odbiera wzmacniaczowi uwage - przy
+takcie 1 s odpowiadal kolejno po 218, 1150, 1055 i 2170 ms. Drugi koszt jest z instrukcji:
+dopoki stoi "Remoted", **web GUI RC-1216H jest zablokowane** poza przyciskami On/Off. To jest
+swiadomy wybor uzytkownika, nie efekt uboczny.
+
+**Kryterium odwrotu:** rosnacy "brak" w bilansie wymian SPE albo gubione klawisze w oknie
+sterowania.
+
+**[czesciowo nieaktualne] Przeskoki Standby/Remoted na microBIT: wyczerpalismy hipotezy (1.11.27).** Wykluczone
 pomiarem, po kolei:
 
 * **nie sledzi naszej sesji TCP** - 72 minuty bez jednej przerwy, zero wpisow `LACZE PADLO`,

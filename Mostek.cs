@@ -30,6 +30,10 @@ public sealed class Mostek : IDisposable
     private System.Collections.Concurrent.ConcurrentQueue<byte[]> _kolejkaPortu;
     private SemaphoreSlim _budzikPortu;
     private bool _trybEkranu;
+
+    // Patrz puls trzymajacy tryb zdalny w OdpytujSpe.
+    private DateTime _ostatniPulsTla = DateTime.MinValue;
+    private static readonly TimeSpan TaktPulsuTla = TimeSpan.FromMilliseconds(1500);
     private volatile bool _trybStanu;
     private long _ostatniPulsRcu;
     private long _ostatnieZapytanieOStan;
@@ -1245,8 +1249,44 @@ public sealed class Mostek : IDisposable
             // z jego ramek po drodze, a wzmacniacz nie dostaje podwojnego ruchu.
             if (KlientNaPorcie)
             {
+                // Klient jest panem lacza - oddajemy mu klatki i przestajemy pulsowac.
+                czytnik.PrzechwytujEkran = _trybEkranu;
                 await Task.Delay(500, ct);
                 continue;
+            }
+
+            // **Puls trzymajacy tryb zdalny.** RC-1216H pokazuje "Remoted", dopoki uznaje, ze
+            // program PC uzywa wzmacniacza - i wtedy blokuje swoje web GUI (instrukcja, str. 71:
+            // *"The web GUI is blocked while the PC-program is in use"*). Samo odpytywanie
+            // o status mu nie wystarcza: sprawdzone, ze ani przy takcie 1000 ms, ani przy 450 ms
+            // (1.11.25) stan sie nie utrzymywal. Nie wystarcza tez samo wlaczenie trybu RCU
+            // i trzymanie go (1.11.26) - bo puls okna sterowania to `RcuWylacz` + `RcuWlacz`,
+            // czyli w dzialajacym przypadku tryb jest bez przerwy przelaczany.
+            //
+            // Dziala to, co robi okno sterowania: powtarzany puls, ktory sciaga ramke ekranu.
+            // Takt 1500 ms to dokladnie `SpeForm.TaktSpoczynku`, czyli tempo **znane z tego, ze
+            // daje stabilne "Remoted"** - nie zgadniete.
+            //
+            // Cena jest zmierzona i trzeba ja znac: **kazdy zbedny puls odbiera wzmacniaczowi
+            // uwage**. Przy takcie 1 s odpowiadal kolejno po 218, 1150, 1055 i 2170 ms.
+            // Dlatego pulsujemy tylko wtedy, gdy nikogo nie ma na parze i gdy okno sterowania
+            // jest zamkniete - ono pulsuje samo i lepiej, bo omija wlasne klawisze.
+            if (!_trybEkranu && DateTime.UtcNow - _ostatniPulsTla >= TaktPulsuTla)
+            {
+                _ostatniPulsTla = DateTime.UtcNow;
+
+                // Klatki sciagamy do siebie - bez tego 367 bajtow co puls szloby na pare
+                // com0com do nikogo i zapychalo kolejke zapisu.
+                czytnik.PrzechwytujEkran = true;
+
+                try
+                {
+                    await WyslijKlawisz(EkranSpe.RcuWylacz, ct);
+                    await Task.Delay(20, ct);
+                    await WyslijKlawisz(EkranSpe.RcuWlacz, ct);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) { Zapisz("puls trybu zdalnego nie poszedl: " + ex.Message); }
             }
 
             // Przy wlaczonym podgladzie pytamy tylko wtedy, gdy ktos patrzy na okno
