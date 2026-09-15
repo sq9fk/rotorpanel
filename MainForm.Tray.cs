@@ -232,7 +232,6 @@ public partial class MainForm
     {
         if (IsDisposed) return;
 
-        MeldujWidocznosc(true);
         Show();
         WindowState = FormWindowState.Normal;
         ShowInTaskbar = true;
@@ -242,19 +241,9 @@ public partial class MainForm
 
     private void UkryjDoZasobnika()
     {
-        MeldujWidocznosc(false);
         Hide();
     }
 
-    /// <summary>
-    /// Melduje mostkom, czy ktos oglada karty. Gdy panel siedzi w zasobniku, stan wzmacniacza
-    /// nie jest nikomu potrzebny - a **zapytanie o niego wytraca RC-1216H z trybu "Remoted"**.
-    /// Patrz Mostek.PulsTla.
-    /// </summary>
-    private void MeldujWidocznosc(bool widoczny)
-    {
-        foreach (var m in _mostki) m.PanelWidoczny = widoczny;
-    }
 
     /// <summary>
     /// Konczy program. Nie polegamy na Close(), bo formularz moze nie miec

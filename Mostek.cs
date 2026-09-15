@@ -31,12 +31,6 @@ public sealed class Mostek : IDisposable
     private SemaphoreSlim _budzikPortu;
     private bool _trybEkranu;
 
-    /// <summary>
-    /// Czy panel glowny jest na ekranie. Gdy siedzi w zasobniku, **nikt nie oglada stanu
-    /// wzmacniacza** - i wtedy zamiast o niego pytac, trzymamy tryb zdalny. Patrz OdpytujSpe.
-    /// </summary>
-    public volatile bool PanelWidoczny;
-
     private volatile bool _trybStanu;
     private long _ostatniPulsRcu;
     private long _ostatnieZapytanieOStan;
@@ -1269,17 +1263,19 @@ public sealed class Mostek : IDisposable
             // **albo stan, albo stabilne "Remoted"**. Rozstrzygamy to tak, zeby uzytkownik
             // dostawal to, na co akurat patrzy - gdy oglada stan, pytamy; gdy panel siedzi
             // w zasobniku i zadne okno nie jest otwarte, pulsujemy i trzymamy tryb zdalny.
-            if (!_trybStanu && !PanelWidoczny && !_trybEkranu)
-            {
-                // **Nie pytamy i nie pulsujemy.** Nikt nie oglada stanu, wiec zapytanie byloby
-                // zmarnowane, a puls trzymalby RC-1216H w trybie "Remoted" - czyli **blokowal
-                // jego web GUI** (instrukcja str. 71) wtedy, gdy nasz panel siedzi w zasobniku
-                // i najpewniej chcesz uzyc wlasnie tamtej strony. Cisza jest tu najlepsza
-                // z trzech mozliwosci.
-                czytnik.PrzechwytujEkran = _trybEkranu;
-                await Task.Delay(500, ct);
-                continue;
-            }
+            // **Cisza na porcie nie jest darmowa - pytamy zawsze.**
+            //
+            // W 1.11.29 przestawalismy pytac, gdy panel schowal sie do zasobnika: skoro nikt
+            // nie oglada stanu, zapytanie wydawalo sie zmarnowane. Skutek zgloszony przez
+            // uzytkownika: strona RC-1216H przechodzila wtedy na **Off/Unknown**.
+            //
+            // Powod jest w tym, co mamy zapisane od dawna z drugiej strony: **przy zajetym
+            // porcie RC-1216H nie odpytuje wzmacniacza sam**. Dopoki trzymamy sesje RFC 2217,
+            // to **nasz ruch jest jedynym zrodlem danych** - takze dla jego wlasnej strony.
+            // Milczac, nie oddawalismy mu portu, tylko zostawialismy go bez odczytow.
+            //
+            // Czyli oszczedzanie zapytan nie ma tu zadnego zysku, a ma konkretna strate.
+            // Pytamy co sekunde przez caly czas polaczenia.
 
             // Przy wlaczonym podgladzie pytamy tylko wtedy, gdy ktos patrzy na okno
             // stanu - samo okno sterowania pokazuje stan na ekranie wzmacniacza.

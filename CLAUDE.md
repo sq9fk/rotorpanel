@@ -195,7 +195,27 @@ while the PC-program is in use, only the On/Off buttons is enabled"*. Stan **nas
 ma osobny wskaznik: **System info -> RFC2217: connected** (str. 59). Uzytkownik patrzyl na ten
 pierwszy, my mierzylismy drugi - stad poltora dnia gonienia wlasnego ogona.
 
-**Koniec watku "Remoted": swiezy stan wygrywa, przeskoki zostaja** (1.11.30). Decyzja
+**Cisza na porcie nie jest darmowa - i to jest sedno calego watku SPE** (1.11.31). W 1.11.30
+przestawalismy pytac o stan, gdy panel schowal sie do zasobnika: skoro nikt nie oglada, zapytanie
+wydawalo sie zmarnowane, a dodatkowo nie blokowalismy wtedy web GUI. Zgloszenie uzytkownika:
+strona RC-1216H przechodzila wtedy na **Off/Unknown**, a pomagalo dopiero wylaczenie i wlaczenie
+wzmacniacza.
+
+Powod siedzi w tym, co mamy zapisane od dawna **z drugiej strony**: *"przy polaczonym mostku
+strona RC-1216H nie odswieza stanu wzmacniacza - port szeregowy jest wtedy zajety"*. Dopoki
+trzymamy sesje RFC 2217, **RC-1216H nie odpytuje wzmacniacza sam**, wiec **nasz ruch jest
+jedynym zrodlem danych - takze dla jego wlasnej strony**. Milczac, nie oddawalismy mu portu,
+tylko zostawialismy go bez odczytow.
+
+Czyli oszczedzanie zapytan **nie ma tu zadnego zysku, a ma konkretna strate**. Pytamy co sekunde
+przez caly czas polaczenia i to jest stan docelowy tego watku.
+
+Cztery kolejne proby zmiany zachowania (1.11.25 tempo, 1.11.26 tryb, 1.11.28 puls, 1.11.30 cisza)
+i wszystkie cofniete. Zysk z nich jest jednak realny i nie lezy w kodzie: **wiemy teraz, co
+znaczy "Remoted", co znaczy RFC2217 i dlaczego te dwie rzeczy nie moga byc spelnione naraz.**
+Zapisane wyzej, zeby nikt nie zaczynal tego od nowa.
+
+**[cofniete] Koniec watku "Remoted": swiezy stan wygrywa, przeskoki zostaja (1.11.30).** Decyzja
 uzytkownika po przedstawieniu wyboru: *"odczyt musi byc swiezy, zeby wygladal na real time"*.
 Skoro tak, to przeskoki Standby/Remoted sa **cena swiezego stanu** i nie da sie ich uniknac -
 wzmacniacz nie wysyla stanu sam, wiec kazdy odczyt wymaga zapytania, a kazde zapytanie wytraca
