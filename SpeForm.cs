@@ -193,13 +193,18 @@ public sealed class SpeForm : Form
         {
             _puls.Stop();
 
-            // **RCU zostaje wlaczone.** Trybem zdalnym zarzadza teraz mostek: wlacza go przy
-            // zestawieniu lacza, wylacza przy zatrzymaniu. Gdyby okno gasilo go przy zamknieciu,
-            // wzmacniacz wracalby do trybu lokalnego mimo pracujacego mostka - czyli dokladnie
-            // to, co uzytkownik zglaszal jako przeskoki Standby/Remoted.
-            //
-            // Gasimy tylko przechwytywanie ekranu: bez pulsu klatki i tak nie przychodza.
-            _mostek.TrybEkranu = false;
+            // Na wzmacniacz nie czekamy tutaj. Blokujace GetResult zawieszalo caly
+            // program: zapis czeka na semafor mostka, a jego kontynuacja wraca na watek
+            // interfejsu, ktory wlasnie na tym GetResult stoi. Efekt byl taki, ze okno
+            // nie dawalo sie zamknac, zasobnik przestawal odpowiadac i zostawalo tylko
+            // zabicie procesu. RCU wylaczamy wiec w tle, a tryb ekranu gasimy dopiero
+            // po wyslaniu, zeby odpytywanie o stan nie wcisnelo sie przed nim.
+            var mostek = _mostek;
+            _ = Task.Run(async () =>
+            {
+                try { await mostek.WyslijKlawisz(EkranSpe.RcuWylacz, CancellationToken.None); }
+                finally { mostek.TrybEkranu = false; }
+            });
         };
 
         FormClosed += (_, _) => { _zegar.Dispose(); _puls.Dispose(); };

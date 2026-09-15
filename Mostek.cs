@@ -430,24 +430,6 @@ public sealed class Mostek : IDisposable
                 var czytnik = OdpytywacSpe ? new CzytnikSpe { PrzechwytujEkran = _trybEkranu } : null;
                 _czytnikSpe = czytnik;
 
-                // **Tryb zdalny trzymamy przez cale polaczenie.** Wzmacniacz pokazuje "Remoted"
-                // nie dlatego, ze ktos jest podlaczony, tylko dlatego, ze dostal komende RCU -
-                // sprawdzone w kodzie okna sterowania, ktore wysyla ja przy otwarciu i dlatego
-                // jako jedyne dawalo stabilny stan. Samo odpytywanie o status trybu nie zmienia,
-                // wiec wyswietlacz wracal do trybu lokalnego miedzy naszymi zapytaniami.
-                //
-                // Probowalem wczesniej wygrac to gestszym odpytywaniem (1.11.25) - nie pomoglo
-                // i **nie moglo**, bo przy otwartym oknie sterowania ruch bywa rzadszy, a stan
-                // i tak stoi. Przyczyna byla w trybie, nie w tempie.
-                //
-                // Ekranu tu **nie** przechwytujemy: bez pulsu wzmacniacz nie przysyla klatek,
-                // wiec nie ma czego zjadac klientowi na drugiej stronie pary.
-                if (OdpytywacSpe)
-                {
-                    try { await WyslijKlawisz(EkranSpe.RcuWlacz, ct); }
-                    catch (Exception ex) { Zapisz("nie udalo sie wlaczyc trybu RCU: " + ex.Message); }
-                }
-
                 // Bufor portu zbieral dane przez caly czas laczenia - patrz
                 // StrumienPortu.Wyczysc. Musi poleciec, zanim ruszy pompa.
                 int zalegalo = (port as StrumienPortu)?.Wyczysc() ?? 0;

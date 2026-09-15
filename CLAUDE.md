@@ -189,7 +189,36 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
-**Trybem zdalnym wzmacniacza zarzadza mostek, nie okno** (1.11.26). Wzmacniacz pokazuje
+**Przeskoki Standby/Remoted na microBIT: wyczerpalismy hipotezy** (1.11.27). Wykluczone
+pomiarem, po kolei:
+
+* **nie sledzi naszej sesji TCP** - 72 minuty bez jednej przerwy, zero wpisow `LACZE PADLO`,
+  a wyswietlacz przeskakiwal,
+* **nie sledzi trybu RCU** - puls okna sterowania to `RcuWylacz` + 20 ms + `RcuWlacz`, czyli
+  w **stabilnym** przypadku tryb jest bez przerwy wylaczany i wlaczany, a przy trzymaniu go
+  wlaczonego na stale (1.11.26) przeskakuje,
+* **nie sledzi tempa odpytywania** - gestsze nie pomoglo (1.11.25), a przy oknie sterowania ruch
+  bywa **rzadszy** niz nasze odpytywanie,
+* **nie ma drugiego klienta** - `/ip firewall connection` na MikroTiku pokazuje **jedno**
+  polaczenie do 192.168.6.7:13100.
+
+Jedyna rzecz, ktora wyroznia stabilny przypadek, to **strumien ramek ekranu**: 367 bajtow co
+1,25-11 s wobec dwudziestu bajtow statusu. Wskazywaloby to na wskaznik aktywnosci portu, ale
+z naszej strony tego nie da sie udowodnic ani na to wplynac. **To jest zachowanie firmware'u
+microBIT-a i tam nalezy je wyjasniac.**
+
+**[cofniete] Trybem zdalnym wzmacniacza zarzadza mostek, nie okno (1.11.26).** Nie osiagnelo celu,
+a trzymalo wzmacniacz w trybie zdalnym przez caly czas pracy mostka. Zostalo tylko to, o co
+prosil uzytkownik i co jest sluszne niezaleznie: **`RcuWylacz` przy zatrzymaniu mostka**, zeby
+wzmacniacz wrocil do trybu lokalnego i oddal port swojej stronie WWW. Wczesniej, gdy mostek
+zatrzymano przy otwartym oknie sterowania, RCU zostawalo wlaczone.
+
+Dwie proby pod rzad (1.11.25 tempo, 1.11.26 tryb) i obie chybione. Wniosek na przyszlosc:
+**gdy przypadek dzialajacy rozni sie od niedzialajacego na kilka sposobow naraz, najpierw ustal,
+ktora roznica jest istotna - zanim zaczniesz zmieniac ktorakolwiek.** Puls okazal sie przelaczac
+dokladnie ten parametr, ktory probowalem ustabilizowac, i wystarczylo przeczytac jego kod.
+
+**[historyczne] Trybem zdalnym wzmacniacza zarzadza mostek, nie okno** (1.11.26). Wzmacniacz pokazuje
 "Remoted" **nie dlatego, ze ktos jest podlaczony, tylko dlatego, ze dostal komende RCU**.
 Widac to wprost w kodzie okna sterowania: przy otwarciu wysyla `EkranSpe.RcuWlacz`, przy
 zamknieciu `RcuWylacz` - i dlatego jako jedyne dawalo stabilny stan. Samo odpytywanie o status
