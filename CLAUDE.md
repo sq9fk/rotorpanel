@@ -420,6 +420,37 @@ blokowac nasz zapis. Dla strumienia obrazu to dobry handel - zgubiona klatka jes
 bo nastepna przychodzi za 95 ms, a zablokowany zapis zatrzymuje **wszystko**, takze ramki
 statusu. Dla par rotorowych bylby to handel zly i tam tego robic nie wolno.
 
+**Siodma warstwa i sedno sprawy: zapis czekal na uchwyt portu** (1.11.45). Pomiar
+przepustowosci z 1.11.44 dal liczby, ktore nie zostawiaja miejsca na domysly - **juz przy
+buforach 64 kB i przy `zapisow niepelnych 0`**, czyli gdy bufor **nie byl pelny**:
+
+| zapis | czas | tempo |
+|---|---|---|
+| 70 B | 1222 ms | 57 B/s |
+| 56 B | 777 ms | 72 B/s |
+| 63 B | **6056 ms** | 10 B/s |
+
+Siedemdziesiat bajtow przez sekunde na **wirtualnej** parze portow to nie jest transmisja.
+I to nie jest dlawienie ze stalym tempem - 57, 72 i 10 B/s to **wyscig o zasob**, bo emulacja
+predkosci portu dawalaby za kazdym razem tyle samo (a `EmuBR` i tak jest wylaczony, sprawdzone
+w rejestrze).
+
+Przyczyna: port otwieramy **uchwytem synchronicznym**, a Windows szereguje operacje na takim
+uchwycie - dopoki trwa `ReadFile`, `WriteFile` czeka. Pompa odczytu chodzi w ciasnej petli
+z limitem 25 ms i zaraz po kazdym powrocie wydaje nastepne zadanie, wiec pisarz musi sie
+**wcisnac miedzy odczyty**. Gdy przegrywa wyscig kilkadziesiat razy z rzedu, jego zapis stoi
+sekundami. To jest **drugie pietro tego samego bledu**, ktory raz juz naprawilismy: wczesniej
+odczyt i zapis dzielily semafor `Stream.ReadAsync`/`WriteAsync` w .NET i objaw byl identyczny
+(408 zapisow, mediana 92 ms, najdluzszy 1,5 s). Ominelismy tamten semafor - i zostal ten
+systemowy, o pietro nizej.
+
+Rozwiazanie docelowe to uchwyt nakladkowy (`FILE_FLAG_OVERLAPPED`), przy ktorym odczyt i zapis
+w ogole sobie nie przeszkadzaja - ale to przebudowa wejscia-wyjscia **wszystkich** mostkow.
+Najpierw rzecz mala i sprawdzalna: skoro system i tak szereguje, **szeregujmy sami i uczciwie**.
+`KolejnoscPortu` daje zapisom pierwszenstwo, a odczyt ustepuje, gdy ktorys czeka. W tescie
+(trzy watki czytajace po 25 ms, czyli ciezej niz w rzeczywistosci, gdzie czytacz jest jeden)
+najgorsze czekanie zapisu spadlo do **110 ms**.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.

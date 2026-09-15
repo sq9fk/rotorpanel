@@ -255,6 +255,9 @@ internal sealed class StrumienPortu : Stream
 {
     private readonly SafeFileHandle _h;
 
+    // Uchwyt synchroniczny szereguje odczyt z zapisem na poziomie systemu - patrz KolejnoscPortu.
+    private readonly KolejnoscPortu _kolejnosc = new();
+
     public StrumienPortu(SafeFileHandle h) => _h = h;
 
     public override bool CanRead  => true;
@@ -293,7 +296,7 @@ internal sealed class StrumienPortu : Stream
         return zalegalo;
     }
 
-    public override int Read(byte[] bufor, int offset, int ile)
+    public override int Read(byte[] bufor, int offset, int ile) => _kolejnosc.Odczyt(() =>
     {
         var tymczasowy = new byte[ile];
         if (!PortIo.ReadFile(_h, tymczasowy, (uint)ile, out uint przeczytane, IntPtr.Zero))
@@ -301,7 +304,7 @@ internal sealed class StrumienPortu : Stream
         if (przeczytane > 0)
             Buffer.BlockCopy(tymczasowy, 0, bufor, offset, (int)przeczytane);
         return (int)przeczytane;
-    }
+    });
 
     /// <summary>
     /// Czy druga strona pary com0com ma port otwarty i podniesione linie sterujace.
@@ -354,24 +357,32 @@ internal sealed class StrumienPortu : Stream
     public override void Write(byte[] bufor, int offset, int ile)
     {
         var zegar = System.Diagnostics.Stopwatch.StartNew();
-        int poszlo = 0;
 
-        while (poszlo < ile)
+        // Pierwszenstwo przed pompa odczytu - patrz KolejnoscPortu. Bez tego zapis
+        // siedemdziesieciu bajtow potrafil czekac 1222 ms na wirtualnej parze portow,
+        // bo system szereguje operacje na uchwycie synchronicznym, a odczyt wydaje
+        // kolejne zadanie zaraz po kazdym powrocie.
+        _kolejnosc.Zapis(() =>
         {
-            var kawalek = new byte[ile - poszlo];
-            Buffer.BlockCopy(bufor, offset + poszlo, kawalek, 0, kawalek.Length);
+            int poszlo = 0;
 
-            if (!PortIo.WriteFile(_h, kawalek, (uint)kawalek.Length, out uint teraz, IntPtr.Zero))
-                throw new IOException("WriteFile: blad " + Marshal.GetLastWin32Error());
+            while (poszlo < ile)
+            {
+                var kawalek = new byte[ile - poszlo];
+                Buffer.BlockCopy(bufor, offset + poszlo, kawalek, 0, kawalek.Length);
 
-            if (teraz < kawalek.Length) _niepelne++;
-            poszlo += (int)teraz;
+                if (!PortIo.WriteFile(_h, kawalek, (uint)kawalek.Length, out uint teraz, IntPtr.Zero))
+                    throw new IOException("WriteFile: blad " + Marshal.GetLastWin32Error());
 
-            if (poszlo < ile && zegar.Elapsed > TimeSpan.FromSeconds(5))
-                throw new IOException("zapis na port utknal: " + poszlo + " z " + ile +
-                                      " B w " + zegar.ElapsedMilliseconds + " ms " +
-                                      "(druga strona pary nie odbiera)");
-        }
+                if (teraz < kawalek.Length) _niepelne++;
+                poszlo += (int)teraz;
+
+                if (poszlo < ile && zegar.Elapsed > TimeSpan.FromSeconds(5))
+                    throw new IOException("zapis na port utknal: " + poszlo + " z " + ile +
+                                          " B w " + zegar.ElapsedMilliseconds + " ms " +
+                                          "(druga strona pary nie odbiera)");
+            }
+        });
 
         OstatniZapisMs = zegar.ElapsedMilliseconds;
         OstatniZapisBajtow = ile;
