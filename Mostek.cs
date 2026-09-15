@@ -96,6 +96,9 @@ public sealed class Mostek : IDisposable
     private double _sumaMs, _minMs = double.MaxValue, _maxMs;
     private long _ostatniZrzutBraku, _ostatnieZerwanie;
 
+    // Kiedy ostatnio cokolwiek przyszlo od wzmacniacza i kiedy ostatnio zglosilismy przerwe.
+    private long _ostatniRuchWzmacniacza, _ostatniaZglszonaPrzerwa;
+
     // Patrz OdrzucicNieprawdopodobnyOdczyt.
     private int _ostatniaPozycja = -1;
     private DateTime _kiedyPozycja = DateTime.MinValue;
@@ -601,7 +604,14 @@ public sealed class Mostek : IDisposable
         // sterownikowi caly strumien i kolejna ramka zlozylaby mu sie z polowek dwoch
         // roznych. Cisza na porcie (odczyt bez danych, limit 25 ms) to jedyny znak
         // granicy, jaki mamy bez wnikania w protokol.
-        bool czekamNaCisze = zPortu;
+        //
+        // **Tylko przy rotorach.** Ramka SPID nie ma zadnego znacznika poczatku, wiec jedynym
+        // sposobem na trafienie w granice jest cisza. Ramka SPE ma `55 55 55` na poczatku
+        // i powtorzony bajt rozkazu na koncu, wiec sklada sie sama - a odrzucanie bylo tam
+        // szkodliwe: po kazdym zestawieniu lacza **gubilismy klientowi rozkazy przez sekunde**
+        // i on czekal na odpowiedz, ktorej nikt nie mial mu odeslac. Tak wyglada "znika
+        // na wiecej niz kilka sekund" po cichym zerwaniu sesji do wzmacniacza.
+        bool czekamNaCisze = zPortu && !OdpytywacSpe;
 
         // Bezpiecznik: gdyby klient z jakiegos powodu nadawal bez przerwy, mostek nie
         // moze utknac w odrzucaniu na zawsze - to byloby gorsze niz to, przed czym
@@ -636,6 +646,7 @@ public sealed class Mostek : IDisposable
             }
 
             if (zPortu) Interlocked.Exchange(ref _ostatniRuchKlienta, DateTime.UtcNow.Ticks);
+            else if (OdpytywacSpe) ZmierzPrzerwe();
 
             // Pulapka dziala zawsze, takze przy wylaczonym sladzie - inaczej zlapanie
             // rzadkiego objawu wymaga szczescia.
@@ -786,6 +797,57 @@ public sealed class Mostek : IDisposable
 
     /// <summary>Ile odpowiedzi przyszlo po terminie, gdy juz nikt na nie nie czekal.</summary>
     public int SpoznioneOdpowiedzi => Volatile.Read(ref _spoznionych);
+
+    /// <summary>
+    /// Mierzy przerwy w strumieniu od wzmacniacza i zapisuje te dluzsze niz trzy sekundy.
+    ///
+    /// **To jest przyrzad, nie naprawa** - i powstal po to, zeby rozstrzygnac jedno pytanie.
+    /// Zgloszenie brzmi: *"miga zdecydowanie rzadziej, ale dalej zdarza sie, ze zniknie na
+    /// wiecej niz kilka sekund"*. Znikniecie na kilka sekund ma inny podpis niz pocieta ramka
+    /// i moze miec trzy zrodla, ktorych z zewnatrz nie da sie rozroznic:
+    ///
+    /// - **wzmacniacz sam milknie** - zmierzone wczesniej odstepy miedzy klatkami od 1,25 s
+    ///   do **11 s**, czyli objaw istnialby takze bez nas,
+    /// - **pada sesja TCP do wzmacniacza** - wtedy w pliku stoi obok "LACZE PADLO",
+    /// - **to my gubimy bajty** - wtedy przerwa nie ma zadnego towarzystwa i trzeba szukac dalej.
+    ///
+    /// Do wpisu idzie kontekst: surowe bufory obu kierunkow i dziennik z osia czasu, wiec widac
+    /// **ostatnie bajty przed cisza i pierwsze po niej**. Dokladamy tez wiek ostatniego ruchu
+    /// klienta - jesli w czasie ciszy pytal, a nic nie dostal, to nie jest jego bezczynnosc.
+    ///
+    /// Dlawimy do jednego wpisu na dziesiec sekund: to ma byc dowod rzeczowy, nie dziennik.
+    /// </summary>
+    private void ZmierzPrzerwe()
+    {
+        long poprzedni = Interlocked.Exchange(ref _ostatniRuchWzmacniacza, DateTime.UtcNow.Ticks);
+        if (poprzedni == 0) return;
+
+        var przerwa = DateTime.UtcNow - new DateTime(poprzedni);
+        if (przerwa < ProgCiszy) return;
+
+        long ostatnie = Interlocked.Read(ref _ostatniaZglszonaPrzerwa);
+        if (ostatnie != 0 && DateTime.UtcNow - new DateTime(ostatnie) <= TimeSpan.FromSeconds(10)) return;
+        Interlocked.Exchange(ref _ostatniaZglszonaPrzerwa, DateTime.UtcNow.Ticks);
+
+        long klient = Interlocked.Read(ref _ostatniRuchKlienta);
+        string oKliencie = klient == 0
+            ? "klient nic nie przyslal od poczatku polaczenia"
+            : "ostatni rozkaz klienta " +
+              (DateTime.UtcNow - new DateTime(klient)).TotalSeconds.ToString("0.0") + " s temu";
+
+        Pulapka.Zapisz(Podpis,
+            "CISZA OD WZMACNIACZA " + przerwa.TotalSeconds.ToString("0.0") + " s" +
+            (KlientNaPorcie ? " przy kliencie na porcie" : " przy naszym odpytywaniu") +
+            ". " + oKliencie + ", lacze stoi " + _odPolaczenia.Elapsed.TotalSeconds.ToString("0") +
+            " s" + Environment.NewLine + "    " + CzujnikZastoju.Opis,
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
+    }
+
+    /// <summary>
+    /// Od ilu sekund ciszy uznajemy, ze wzmacniacz przestal nadawac. Trzy sekundy to prog
+    /// wziety z objawu: klient odpytuje czesciej, wiec kazda taka przerwa jest u niego widoczna.
+    /// </summary>
+    private static readonly TimeSpan ProgCiszy = TimeSpan.FromSeconds(3);
 
     /// <summary>
     /// Wpis o zerwanym polaczeniu.

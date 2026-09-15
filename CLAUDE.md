@@ -266,6 +266,27 @@ ze karta pokazuje liczby zlozone z dwoch roznych ramek. Wolimy nie pokazac nic.
 byc przezroczysty. Dopoki jest jedynym uczestnikiem, to nie szkodzi; w chwili, gdy po drugiej
 stronie pojawia sie ktos wlasny, **skladanie trzeba wylaczyc**, a nie tylko przestac nadawac.
 
+**Trzecia warstwa: co jeszcze moze zgasic obraz na kilka sekund** (1.11.38). Po 1.11.37
+migotanie zeslablo jeszcze raz, ale zostal objaw o **innym podpisie**: *"dalej zdarza sie,
+ze zniknie na wiecej niz kilka sekund"*. Kilka sekund to nie pocieta ramka. Zrodla sa trzy
+i z zewnatrz nie da sie ich rozroznic:
+
+- **wzmacniacz sam milknie** - zmierzone odstepy miedzy klatkami od 1,25 s do **11 s**,
+  czyli objaw istnialby takze bez nas,
+- **pada sesja TCP do wzmacniacza** - i wtedy do 1.11.37 dochodzil **nasz wlasny udzial**:
+  pompa `port->siec` zaczynala kazde polaczenie od odrzucania danych klienta **az do ciszy**,
+  wiec przez sekunde jego rozkazy szly do kosza i czekal na odpowiedz, ktorej nikt nie mial
+  mu odeslac. Ten resync ma sens **tylko przy rotorach**: ramka SPID nie ma znacznika poczatku,
+  wiec cisza jest jedyna granica, jaka mamy. Ramka SPE ma `55 55 55` i powtorzony bajt rozkazu,
+  czyli sklada sie sama - odrzucanie bylo tam czysta strata,
+- **my gubimy bajty** - wtedy przerwa nie ma zadnego towarzystwa i trzeba szukac dalej.
+
+Zeby to rozstrzygnac, a nie zgadywac po raz kolejny, kazda przerwa dluzsza niz **3 s** idzie
+do `podejrzane.txt` jako `CISZA OD WZMACNIACZA X s`, razem z surowymi buforami obu kierunkow
+i dziennikiem - widac wiec **ostatnie bajty przed cisza i pierwsze po niej** - oraz z wiekiem
+ostatniego rozkazu klienta. Jesli klient w czasie ciszy pytal i nic nie dostal, to nie jest
+jego bezczynnosc. Dlawione do jednego wpisu na 10 s.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.

@@ -201,14 +201,21 @@ public sealed class CzytnikSpe
     {
         _podglad.AddRange(dane);
 
-        // Bufor podgladu nie moze rosnac bez konca: gdy klient nie pyta o status, plyna przez
-        // nas same klatki wyswietlacza i nie ma czego z nich zdjac.
-        if (_podglad.Count > 8192) _podglad.RemoveRange(0, _podglad.Count - 1024);
-
         while (true)
         {
             int i = Szukaj(_podglad, StatusSpe.DlugoscRamki);
-            if (i < 0) return;
+
+            if (i < 0)
+            {
+                // Nic nie pasuje - przydac sie moze juz tylko ogon krotszy od ramki, reszta to
+                // klatki wyswietlacza, ktorych tu nie rozbieramy. Bez tego przycinania bufor
+                // dochodzil do kilku kilobajtow i **kazdy bajt z ser2neta kosztowal przejscie
+                // przez calosc** - a ser2net przysyla po jednym bajcie na segment. Tej pracy
+                // nie wolno dokladac watkowi pompy: raz juz sam wytwarzal zastoje, ktore mierzyl.
+                if (_podglad.Count >= StatusSpe.DlugoscRamki)
+                    _podglad.RemoveRange(0, _podglad.Count - (StatusSpe.DlugoscRamki - 1));
+                return;
+            }
 
             var znaki = new char[StatusSpe.DlugoscDanych];
             for (int z = 0; z < znaki.Length; z++)
