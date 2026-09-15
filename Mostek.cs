@@ -630,11 +630,12 @@ public sealed class Mostek : IDisposable
                 // ruch klienta, wiec nasze wlasne odpytywanie do nich nie wchodzi.
                 var dalej = czytnik.Przepusc(bufor, n);
 
-                // Kazda rozebrana ramka statusu to jedna odpowiedz - czyja, nie ma znaczenia:
-                // interesuje nas, czy wzmacniacz odpowiada w ogole i jak szybko. Wzmacniacz
-                // idzie tym samym tunelem po LTE co rotory, wiec podlega tym samym zastojom.
-                for (int i = _statusowPoprzednio; i < czytnik.IleStatusow; i++) ZanotujOdbior();
-                _statusowPoprzednio = czytnik.IleStatusow;
+                // **Tylko odpowiedzi na wlasne zapytania.** Ramki, o ktore poprosil klient na
+                // drugiej stronie pary, nie sa nasza wymiana i dopasowywanie ich do naszych
+                // zapytan dawalo czasy w rodzaju 61 ms - fizycznie niemozliwe - oraz braki
+                // i spoznienia wziete z powietrza.
+                for (int i = _statusowPoprzednio; i < czytnik.IleWlasnychOdpowiedzi; i++) ZanotujOdbior();
+                _statusowPoprzednio = czytnik.IleWlasnychOdpowiedzi;
 
                 _status = czytnik.Status ?? _status;
                 Interlocked.Add(ref _rx, dalej.Length);

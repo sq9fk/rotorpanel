@@ -189,6 +189,38 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Rotory sa czyste - zmierzone** (1.11.22). Siedemdziesiat minut na 1.11.21, po przeniesieniu
+katalogu poza OneDrive i po przeniesieniu zapisu pulapki do tla:
+
+```
+RAK 15m    zapytan 3196, odpowiedzi 3196   ZERO brakow   czasy 270/306/673 ms
+RAU 10m    zapytan 3210, odpowiedzi 3210   ZERO brakow   czasy 258/292/657 ms
+RAU A3S    zapytan 3217, odpowiedzi 3217   ZERO brakow   czasy 282/301/657 ms
+```
+
+Wczesniej bylo 13 / 8 / 17 brakow i 2 / 13 / 13. **Zero** znaczy, ze te braki byly nasze, a nie
+sterownikow - potwierdzenie rozpoznania z 1.11.19. Zostaly tylko zatory 650-680 ms, czyli tunel
+LTE, czego program nie naprawi.
+
+**Zlapane na goracym uczynku:** przy pierwszym wznowieniu lacza padl wpis
+`OGON Z POPRZEDNIEGO POLACZENIA (od sterownika): 57 03`. To jest **dokladnie** ten mechanizm,
+ktory produkowal 208: dwa bajty z ramki przecietej przez zerwane lacze, czekajace na sklejenie
+sie z pierwsza ramka nastepnego polaczenia. Poprawka z 1.11.20 zadzialala na prawdziwym
+przypadku, nie na wymyslonym.
+
+**Pomiar przy SPE mierzyl cudzy ruch** (1.11.22). Wszystkie 38 wpisow w tym przebiegu nalezalo
+do mostka wzmacniacza i wygladalo alarmujaco: `zapytan 4045, odpowiedzi 4026 (brak 18),
+po terminie 10, czasy 61/245/980 ms`. **Minimum 61 ms jest fizycznie niemozliwe** - sam rozkaz
+idzie do sterownika dluzej. Przyczyna: liczylem **kazda** rozebrana ramke statusu jako odpowiedz
+na nasze zapytanie, takze te, o ktore poprosil klient na drugiej stronie pary. Teraz liczymy
+wylacznie `CzytnikSpe.IleWlasnychOdpowiedzi`.
+
+Trzeci raz ten sam blad w tym sledztwie - **przyrzad mierzyl cos innego, niz myslalem**. Za
+pierwszym razem kolejka FIFO rozjezdzala sie po zgubie, za drugim zapis do pliku wytwarzal
+zastoje, teraz licznik zliczal cudzy ruch. Reguła: **zanim uwierzysz liczbie, sprawdz, czy jest
+fizycznie mozliwa.** 61 ms przy protokole, w ktorym samo zapytanie trwa 108 ms, powinno bylo
+zapalic lampke od razu.
+
 **Mostek SPE migocze - zestawia i traci lacze co dwie sekundy** (1.11.21). Wydobyte przez
 wlasna zmiane: do 1.11.18 pulapka byla przy SPE **wylaczona calkowicie**, wiec nie bylo o tym
 zadnej informacji. Po jej wlaczeniu plik z 15 wrzesnia pokazuje:
@@ -201,9 +233,14 @@ RAK 15m         3
 RAU A3S         3
 ```
 
-Rotory stoja stabilnie, wzmacniacz zestawia lacze i traci je w rytmie dwoch sekund. Problem
-istnial pewnie od dawna i **byl niewidoczny**, bo objawia sie tylko jako wzmacniacz, ktory
-"czasem nie pokazuje stanu".
+Rotory stoja stabilnie, wzmacniacz zestawia lacze i traci je w rytmie dwoch sekund.
+
+**[dopisane po pomiarze] To bylo przejsciowe.** Napisalem najpierw, ze problem pewnie istnial
+od dawna i byl tylko niewidoczny - uzytkownik to sprostowal: microBIT pokazywal wczesniej
+stabilne "Remoted", a migotanie widac bylo na jego wyswietlaczu jako ciagle przeskoki
+Standby/Remoted. Po restarcie programu migotanie **ustapilo samo** i w kolejnym, siedemdziesiecio
+minutowym przebiegu bylo **jedno** zestawienie lacza na mostek. Przyczyna nieustalona; gdyby
+wrocilo, wpis `LACZE PADLO` powie z czym.
 
 Sama linia "pulapka uzbrojona" mowi, ze lacze wstalo, ale nie mowi, **dlaczego padlo
 poprzednie** - a to jest jedyne pytanie, ktore ma tu sens. Stad `ZglosZerwanie`: wpis

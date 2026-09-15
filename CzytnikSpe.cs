@@ -38,6 +38,18 @@ public sealed class CzytnikSpe
     /// </summary>
     public int IleStatusow => Volatile.Read(ref _ileStatusow);
 
+    private int _ileWlasnych;
+
+    /// <summary>
+    /// Ile ramek statusu bylo odpowiedzia na **nasze** zapytanie.
+    ///
+    /// Do bilansu wymian wolno liczyc tylko te. Pierwsza wersja (1.11.18) liczyla **wszystkie**
+    /// ramki statusu, takze te, o ktore poprosil klient na drugiej stronie pary - i dopasowywala
+    /// je do naszych zapytan. Wychodzily z tego czasy w rodzaju **61 ms**, fizycznie niemozliwe,
+    /// oraz "brak 18" i "po terminie 10" wziete z powietrza. Przyrzad mierzyl cudzy ruch.
+    /// </summary>
+    public int IleWlasnychOdpowiedzi => Volatile.Read(ref _ileWlasnych);
+
     /// <summary>Ile wlasnych zapytan czeka na odpowiedz - do sladu diagnostycznego.</summary>
     public int WlasneOczekujace => Volatile.Read(ref _wlasneOczekujace);
 
@@ -163,6 +175,7 @@ public sealed class CzytnikSpe
         {
             if (Interlocked.Decrement(ref _wlasneOczekujace) < 0)
                 Interlocked.Exchange(ref _wlasneOczekujace, 0);
+            Interlocked.Increment(ref _ileWlasnych);
             _reszta.RemoveRange(0, StatusSpe.DlugoscRamki);
         }
         else
