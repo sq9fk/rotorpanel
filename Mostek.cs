@@ -1177,7 +1177,7 @@ public sealed class Mostek : IDisposable
     {
         var czytnik = _czytnikSpe;
         bool poszlo = await WyslijKlawisz(StatusSpe.Zapytanie, ct);
-        if (poszlo) { czytnik?.ZglosWlasneZapytanie(); ZanotujWyslanie(); }
+        if (poszlo && czytnik?.ZglosWlasneZapytanie() == true) ZanotujWyslanie();
         return poszlo;
     }
 
@@ -1263,8 +1263,7 @@ public sealed class Mostek : IDisposable
             {
                 await siec.WriteAsync(zapytanie, 0, zapytanie.Length, ct);
                 await siec.FlushAsync(ct);
-                czytnik.ZglosWlasneZapytanie();
-                ZanotujWyslanie();
+                if (czytnik.ZglosWlasneZapytanie()) ZanotujWyslanie();
                 Interlocked.Exchange(ref _ostatnieZapytanieOStan, DateTime.UtcNow.Ticks);
             }
             finally { _bramka.Release(); }

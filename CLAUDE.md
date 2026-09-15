@@ -189,6 +189,36 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Wzmacniacz raportuje ten sam stan co sekunde - przeskoki na microBIT nie sa w danych**
+(1.11.24). Siedemdziesiat dwie minuty na 1.11.23, kontekst pulapki wreszcie zbierany takze
+przy SPE. Dziennik pokazuje ramke statusu identyczna **co do bajtu**, raz na sekunde:
+
+```
+13:07:57.524  <- sterownik  AA AA AA 43 2C 31 33 4B 2C 53 2C 52 2C 41    (,13K,S,R,A...)
+13:07:58.534  <- sterownik  AA AA AA 43 2C 31 33 4B 2C 53 2C 52 2C 41
+13:07:59.544  <- sterownik  AA AA AA 43 2C 31 33 4B 2C 53 2C 52 2C 41
+```
+
+**Stan raportowany przez wzmacniacz sie nie zmienia.** Do tego zero wpisow `LACZE PADLO`
+i jedno zestawienie lacza na 72 minuty. Czyli przeskoki Standby/Remoted na wyswietlaczu
+**nie maja odpowiednika ani w naszym polaczeniu, ani w danych ze wzmacniacza**.
+
+Najlepiej pasujace wyjasnienie - **nie potwierdzone**: microBIT pokazuje **aktywnosc na porcie
+szeregowym**, a nie stan urzadzenia. Odpytujemy raz na sekunde, wiec miga raz na sekunde. Zgadza
+sie z cala reszta obserwacji uzytkownika: przy otwartym oknie sterowania (ciagly strumien ramek
+ekranu) jest stabilnie "Remoted", przy otwartym oknie stanu (wiecej zapytan) przeskakuje
+rzadziej, przy zamknietych oknach (jedno zapytanie na sekunde) przeskakuje najczesciej.
+Gradient idzie za **gestoscia ruchu**, nie za jego trescia.
+
+**Bilans SPE klamal drugi raz na tym samym mostku.** `CzytnikSpe.ZglosWlasneZapytanie` cicho nic
+nie robilo po przekroczeniu limitu dwoch oczekujacych zapytan, a ja liczylem kazde wyslane.
+Licznik odpowiedzi nie mial jak nadazyc, wiec rosl **wymyslony brak**, a czasy schodzily do
+**25 ms** - ponizej fizycznej mozliwosci. Teraz metoda zwraca `bool` i liczymy tylko te
+zapytania, ktore faktycznie sie zmiescily.
+
+Zasada, ktora powtarzam trzeci raz w tym pliku: **liczba fizycznie niemozliwa to nie ciekawostka,
+tylko blad przyrzadu.** 61 ms, potem 25 ms - obie powinny byly zatrzymac mnie od razu.
+
 **Przeskoki Standby/Remoted na microBIT to NIE jest zrywanie naszego polaczenia** (1.11.23).
 Wyciagnalem taki wniosek z 227 linii "pulapka uzbrojona" w jednym pliku i **byl bledny**.
 Dziewietnascie minut na 1.11.22, przy zglaszanych przez uzytkownika ciaglych przeskokach:

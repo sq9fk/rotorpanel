@@ -65,10 +65,20 @@ public sealed class CzytnikSpe
         DateTime.UtcNow - OstatniObcyStatus < TimeSpan.FromSeconds(3);
 
     /// <summary>Mostek melduje, ze wyslal wlasne zapytanie o status.</summary>
-    public void ZglosWlasneZapytanie()
+    /// <summary>
+    /// Melduje, ze wyslalismy wlasne zapytanie. **Zwraca false, gdy zapytanie sie nie zmiescilo**
+    /// w limicie oczekujacych - i to jest wazne dla bilansu wymian: takiej odpowiedzi nie
+    /// zdejmiemy ze strumienia, wiec nie wolno jej tez liczyc jako wyslanego zapytania.
+    ///
+    /// Bez tego licznik wyslanych rosl, licznik odpowiedzi nie nadazal i w podpowiedzi
+    /// wychodzil **wymyslony brak** - a czasy schodzily do 25 ms, czyli ponizej fizycznej
+    /// mozliwosci. Drugi raz ten sam blad na tym samym mostku.
+    /// </summary>
+    public bool ZglosWlasneZapytanie()
     {
-        if (Volatile.Read(ref _wlasneOczekujace) < MaksWlasnych)
-            Interlocked.Increment(ref _wlasneOczekujace);
+        if (Volatile.Read(ref _wlasneOczekujace) >= MaksWlasnych) return false;
+        Interlocked.Increment(ref _wlasneOczekujace);
+        return true;
     }
 
     public EkranSpe Ekran { get; private set; }
