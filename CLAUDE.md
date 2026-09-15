@@ -287,6 +287,39 @@ i dziennikiem - widac wiec **ostatnie bajty przed cisza i pierwsze po niej** - o
 ostatniego rozkazu klienta. Jesli klient w czasie ciszy pytal i nic nie dostal, to nie jest
 jego bezczynnosc. Dlawione do jednego wpisu na 10 s.
 
+**Co powiedzial pierwszy pomiar - i czemu przyrzad trzeba bylo przecelowac** (1.11.39).
+Plik z 15 wrzesnia, 41 sekund ruchu z podlaczonym SPE Term, dziennik z osia czasu:
+
+| co zmierzono | wynik |
+|---|---|
+| rozkazy klienta w oknie dziennika | **24** |
+| odpowiedzi wzmacniacza | **23** (24. poza oknem) |
+| czas odpowiedzi | min 21 ms, **srednio 89 ms**, max 312 ms |
+| odstepy miedzy rozkazami klienta | 0,1 / 0,9 / 1,0 / 2,2 / 3,2 / **3,9 s** |
+
+Czyli **mostek w tym oknie nie zgubil niczego** - a prog "cisza dluzsza niz 3 s" lapal chwile,
+w ktorych po prostu nikt o nic nie pytal. **Przyrzad mierzyl rytm klienta, nie usterke.**
+To ten sam blad co przy bilansie wymian SPE (61 ms, potem 25 ms): miara wzieta z wygodnego
+licznika zamiast z tego, co naprawde ma znaczenie.
+
+Wlasciwy ksztalt usterki to **rozkaz klienta bez odpowiedzi** - tego nie da sie pomylic z jego
+bezczynnoscia. Prog: sekunda, czyli trzy razy powyzej najwolniejszej zmierzonej odpowiedzi.
+
+**Drugie znalezisko tego samego pliku: przyrzad zmyslal.** Cztery wpisy z jednej milisekundy,
+wszystkie mowiace *"druga strona zamknela czysto (tak wyglada odebranie portu przez innego
+klienta)"* - a proces zyl dalej i zadnego obcego klienta nie bylo. Powod: `Stop` odwoluje token,
+`ReadAsync` rzuca `OperationCanceledException`, ta **nie ustawia `_blad`**, wiec wlasne
+zatrzymanie mostka bylo nie do odroznienia od cudzego przejecia portu - i jeszcze podbijalo
+licznik obcych przejec, ktory pokazujemy w interfejsie. **Przyrzad, ktory zmysla, jest gorszy
+niz brak przyrzadu**, bo kieruje szukanie w zla strone: w tym wypadku oskarzal siec o to,
+co zrobilismy sami.
+
+**Trzecie: jedyna przerwa, ktora klient naprawde zobaczyl, nie byla nigdzie zapisana.** Ostatnie
+dane o 17:21:31.881, nowe polaczenie o 17:21:38.36 - **6,9 s czarnego ekranu**. Nie widac tego
+ani we wpisie o zerwaniu, ani we wpisie o zestawieniu, bo lezy **miedzy nimi**, i obejmuje takze
+nieudane proby polaczenia. Stad wpis `LACZE WROCILO - przerwa w dostawie do klienta X s`,
+liczony od ostatniego bajtu od wzmacniacza, a nie od poczatku ostatniej proby.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
