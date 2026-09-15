@@ -205,9 +205,12 @@ public sealed class StatusForm : Form
             _naglowek.Text = "brak odczytu stanu";
             _naglowek.ForeColor = Theme.TekstSzary;
             _klopot.Text = "";
-            _stanDanych.Text = _mostek.Stan == StanMostka.Polaczony
-                ? "Mostek połączony — czekam na pierwszą ramkę statusu."
-                : "Mostek rozłączony.";
+            _stanDanych.Text = _mostek.Stan != StanMostka.Polaczony
+                ? "Mostek rozłączony."
+                : _mostek.KlientNaPorcie
+                    ? "Portem steruje program po drugiej stronie pary — nie pytamy o stan, " +
+                      "żeby nie zabierać mu ramek."
+                    : "Mostek połączony — czekam na pierwszą ramkę statusu.";
             foreach (var pole in _pola.Values) pole.Text = "—";
             _pasekMocy.Wyczysc(); _pasekPradu.Wyczysc();
             _pasekNapiecia.Wyczysc(); _pasekSwr.Wyczysc();
@@ -224,10 +227,13 @@ public sealed class StatusForm : Form
         _stanDanych.Text = wiek < 5
             ? "Odczyt sprzed " + wiek.ToString("0.0") + " s" +
               (_mostek.KlientNaPorcie ? " — z ramek programu na porcie." : ".")
-            : _mostek.TrybEkranu
+            : _mostek.KlientNaPorcie
                 ? "Odczyt sprzed " + wiek.ToString("0") +
-                  " s — przy otwartym podglądzie wyświetlacza stan idzie rzadziej."
-                : "Odczyt sprzed " + wiek.ToString("0") + " s — wzmacniacz nie odpowiada.";
+                  " s — portem steruje program po drugiej stronie pary, milczymy."
+                : _mostek.TrybEkranu
+                    ? "Odczyt sprzed " + wiek.ToString("0") +
+                      " s — przy otwartym podglądzie wyświetlacza stan idzie rzadziej."
+                    : "Odczyt sprzed " + wiek.ToString("0") + " s — wzmacniacz nie odpowiada.";
 
         if (!zmiana) return;   // wiek juz odswiezony, reszta bez zmian
 

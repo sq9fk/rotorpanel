@@ -74,6 +74,16 @@ public sealed class CzytnikSpe
     /// wychodzil **wymyslony brak** - a czasy schodzily do 25 ms, czyli ponizej fizycznej
     /// mozliwosci. Drugi raz ten sam blad na tym samym mostku.
     /// </summary>
+    /// <summary>
+    /// Zapomina wlasne zapytania czekajace na odpowiedz.
+    ///
+    /// Wolamy to w chwili, gdy port przejmuje klient. Licznik oczekujacych decyduje o tym,
+    /// czy ramke statusu zdejmiemy ze strumienia, czy przepuscimy - a on nie wie, czyja ona
+    /// jest. Zostawione po nas "jeszcze dwie nasze" zjadloby dwie pierwsze ramki, o ktore
+    /// poprosil klient, i jego odczyt zaczynalby sie od dziury.
+    /// </summary>
+    public void ZapomnijWlasne() => Interlocked.Exchange(ref _wlasneOczekujace, 0);
+
     public bool ZglosWlasneZapytanie()
     {
         if (Volatile.Read(ref _wlasneOczekujace) >= MaksWlasnych) return false;

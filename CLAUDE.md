@@ -215,6 +215,39 @@ wie, co robi wzmacniacz, a "Off/Unknown" - ze nie wie nic.
 Stad stan docelowy: **odpytujemy bez przerwy przez cale polaczenie**. Karta ma swiezy stan,
 a strona RC-1216H dostaje dane, ktorych sama nie moze sobie wziac.
 
+**...ale tylko dopoki nikt inny nie trzyma portu. Klient na parze com0com to cisza absolutna**
+(1.11.36). Gdy po drugiej stronie pary siedzi program kliencki (SPE Term, AetherSDR), wzmacniacz
+ma **jednego pana** i jest nim on. Zgloszenie, ktore to wydobylo: *"po polaczeniu SPE Term
+wyswietlanie pojawilo sie po 1 min i miga co jakis czas, tak jakby nasze odczyty przeszkadzaly"*.
+Przeszkadzaly - i to na trzy niezalezne sposoby:
+
+1. **Wykrycie klienta samo sie kasowalo.** `KlientNaPorcie` uznawalo klienta po ruchu od strony
+   portu **w ostatnich 5 s**, a badanie portu przyslugiwalo dopiero po **10 s** ciszy. Miedzy
+   piata a dziesiata sekunda cisza klienta - a on odpytuje we wlasnym rytmie, nie w naszym -
+   `_klientWykryty` bylo zerowane **bez zadnego sprawdzenia** i wchodzilismy mu w strumien
+   wlasnym `0x90`. To jest to "miga co jakis czas". Teraz wykrycie **zatrzaskuje sie** i schodzi
+   dopiero na dowod: `PortIo.Zajety` mowi, ze druga strona pary jest wolna.
+2. **Zabieralismy mu klatki.** W galezi "klient jest panem" stalo `PrzechwytujEkran = _trybEkranu`,
+   czyli przy wlasnym podgladzie zdejmowalismy ze strumienia ramki wyswietlacza, o ktore poprosil
+   **on**. Teraz twardo `false`.
+3. **Zjadalismy mu pierwsze ramki statusu.** O tym, czy ramke zdjac, decyduje licznik naszych
+   zapytan czekajacych na odpowiedz - a on nie wie, czyja ta ramka jest. Zostawione po nas
+   "jeszcze dwie nasze" zjadaly dwie pierwsze ramki klienta. Stad `CzytnikSpe.ZapomnijWlasne()`
+   w chwili przejecia portu.
+
+Do tego **jedno miejsce, w ktorym cisza jest egzekwowana**: `WyslijKlawisz` odmawia wysylki, gdy
+klient trzyma port. Sama cisza w petli odpytywania nie wystarczala, bo ta droga szly rozkazy RCU -
+puls okna sterowania, wlaczenie trybu zdalnego i **wylaczenie go przy zamykaniu okna**, czyli
+ostatnie wtracenie tuz po tym, jak obiecalismy milczec.
+
+Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
+przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
+Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
+
+Testy: `TestKlienta.Sprawdz` w scenariuszu harnessu - cudza ramka statusu przechodzi w calosci,
+wlasna nie, po `ZapomnijWlasne` obie ramki klienta przechodza, klatka ekranu idzie do klienta przy
+wylaczonym przechwytywaniu i znika przy wlaczonym.
+
 **Lekcja z calej serii (1.11.25-1.11.35, siedem zmian i szesc cofniec):** objaw byl opisany
 slowem z cudzego interfejsu - "przeskakuje Standby/Remoted" - i przez to od poczatku czytalem go
 jako "polaczenie sie zrywa". Zadna z czterech prob naprawy nie mogla trafic, bo naprawialy cos,

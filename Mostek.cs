@@ -137,9 +137,20 @@ public sealed class Mostek : IDisposable
             long ostatni = Interlocked.Read(ref _ostatniRuchKlienta);
             var odRuchu = ostatni == 0 ? TimeSpan.MaxValue
                                        : DateTime.UtcNow - new DateTime(ostatni);
-            if (odRuchu < TimeSpan.FromSeconds(5)) return true;
-
-            if (_czytnikSpe?.KlientPytaSam == true) return true;
+            // **Wykrycie zatrzaskujemy.** Bez tego wystarczylo, ze klient zamilkl na szesc
+            // sekund - odpytuje w swoim rytmie, nie w naszym - a badanie portu jeszcze nie
+            // przyslugiwalo (chodzilo dopiero po dziesieciu sekundach ciszy), zeby
+            // `_klientWykryty` zostalo **wyzerowane bez zadnego sprawdzenia**. Wtedy wchodzilismy
+            // mu w strumien wlasnym zapytaniem `0x90`. Tak wyglada zgloszone "wyswietlacz
+            // w SPE Term miga co jakis czas, jakby nasze odczyty przeszkadzaly": to nie byl
+            // przypadek, tylko regularna dziura miedzy piata a dziesiata sekunda jego ciszy.
+            //
+            // Od teraz raz wykryty klient zostaje az do **dowodu**, ze zwolnil port.
+            if (odRuchu < TimeSpan.FromSeconds(5) || _czytnikSpe?.KlientPytaSam == true)
+            {
+                _klientWykryty = true;
+                return true;
+            }
 
             // Reszta to zbuforowany wynik badania w tle. Wlasciwosc jest czytana
             // z watku interfejsu kilka razy na sekunde (karta i okno stanu), a kazde
@@ -181,10 +192,19 @@ public sealed class Mostek : IDisposable
                 // co widac bylo jako skoki opoznienia klatek. Zostaje ruch od strony
                 // portu (za darmo) i proba otwarcia drugiej strony pary, ktora idzie
                 // przez osobny uchwyt i pompie nie przeszkadza.
-                bool wynik = false;
+                // Wynik zmieniamy **tylko wtedy, gdy naprawde zbadalismy port**. Poprzednia
+                // wersja zaczynala od `wynik = false` i zapisywala go takze wtedy, gdy zadne
+                // badanie nie przyslugiwalo - czyli cisza klienta sama z siebie kasowala
+                // wykrycie. Patrz KlientNaPorcie.
+                bool zbadano = false, wynik = false;
 
-                if (odRuchu > TimeSpan.FromSeconds(10) &&
-                    !string.IsNullOrWhiteSpace(Punkt.Com))
+                if (string.IsNullOrWhiteSpace(Punkt.Com))
+                {
+                    // Bez nazwy drugiej strony pary nie mamy czym sprawdzic, wiec zatrzask
+                    // musi miec wlasny koniec - inaczej milczelibysmy juz do konca sesji.
+                    if (odRuchu > TimeSpan.FromSeconds(15)) { zbadano = true; wynik = false; }
+                }
+                else if (odRuchu > TimeSpan.FromSeconds(3))
                 {
                     long poprzednie = Interlocked.Read(ref _kiedyBadanyPort);
                     if (poprzednie == 0 ||
@@ -192,11 +212,15 @@ public sealed class Mostek : IDisposable
                     {
                         Interlocked.Exchange(ref _kiedyBadanyPort, DateTime.UtcNow.Ticks);
                         wynik = PortIo.Zajety(Punkt.Com);
+                        zbadano = true;
                     }
-                    else wynik = _klientWykryty;
                 }
 
-                _klientWykryty = wynik;
+                if (zbadano && wynik != _klientWykryty)
+                    Zapisz(wynik ? "druga strona pary zajeta - milkniemy"
+                                 : "druga strona pary wolna - wracamy do odpytywania");
+
+                if (zbadano) _klientWykryty = wynik;
 
                 if (Slad.Wlaczony && zegar.ElapsedMilliseconds > 5)
                     Zapisz("badanie klienta trwalo " + zegar.ElapsedMilliseconds + " ms");
@@ -220,7 +244,10 @@ public sealed class Mostek : IDisposable
         {
             _trybEkranu = value;
             var czytnik = _czytnikSpe;
-            if (czytnik is not null) czytnik.PrzechwytujEkran = value;
+
+            // Przy kliencie na porcie **nie zdejmujemy ramek wyswietlacza** - to jego klatki,
+            // on o nie poprosil. Wlasny podglad musi wtedy poczekac.
+            if (czytnik is not null) czytnik.PrzechwytujEkran = value && !KlientNaPorcie;
         }
     }
 
@@ -1204,6 +1231,22 @@ public sealed class Mostek : IDisposable
         var siec = _biezacaSiec;
         if (siec is null || Stan != StanMostka.Polaczony) return false;
 
+        // **Gdy port trzyma program kliencki, nie wysylamy nic - takze stad.**
+        //
+        // Cisza w petli odpytywania nie wystarczala, bo przez te droge szly rozkazy RCU:
+        // puls okna sterowania, wlaczenie trybu zdalnego i wylaczenie go przy zatrzymaniu
+        // mostka. Kazdy z nich sciaga wzmacniaczowi ramke ekranu, czyli wchodzi klientowi
+        // dokladnie w to, na co on czeka. Okno sterowania jest wprawdzie zamykane, gdy klient
+        // zostanie wykryty, ale zamykanie samo wysyla `RcuWylacz` - i to bylo ostatnie
+        // wtracenie tuz po tym, jak obiecalismy milczec.
+        //
+        // Wzmacniacz ma jednego pana naraz. Tu jest jedno miejsce, w ktorym to egzekwujemy.
+        if (OdpytywacSpe && KlientNaPorcie)
+        {
+            Zapisz("klawisz " + kod.ToString("X2") + " wstrzymany - portem steruje klient");
+            return false;
+        }
+
         var ramka = new byte[] { 0x55, 0x55, 0x55, 0x01, kod, kod };
 
         try
@@ -1246,8 +1289,15 @@ public sealed class Mostek : IDisposable
             // z jego ramek po drodze, a wzmacniacz nie dostaje podwojnego ruchu.
             if (KlientNaPorcie)
             {
-                // Klient jest panem lacza - oddajemy mu klatki i przestajemy pulsowac.
-                czytnik.PrzechwytujEkran = _trybEkranu;
+                // Klient jest panem lacza - oddajemy mu **wszystko**: i klatki wyswietlacza,
+                // i ramki statusu. Wczesniej bylo tu `PrzechwytujEkran = _trybEkranu`, wiec
+                // przy otwartym wlasnym podgladzie zabieralismy mu klatki, o ktore sam poprosil.
+                czytnik.PrzechwytujEkran = false;
+
+                // Kasujemy pamiec o wlasnych zapytaniach czekajacych na odpowiedz. Bez tego
+                // pierwsza ramka statusu **jego** zapytania trafialaby na nasz licznik, zostala
+                // uznana za nasza i zdjeta ze strumienia - a on zobaczylby dziure w odczycie.
+                czytnik.ZapomnijWlasne();
                 await Task.Delay(500, ct);
                 continue;
             }
