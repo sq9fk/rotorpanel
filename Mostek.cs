@@ -93,7 +93,7 @@ public sealed class Mostek : IDisposable
     private readonly Queue<long> _wymiany = new();
     private int _brakow, _spoznionych, _ileWymian, _zapytan, _odpowiedzi, _statusowPoprzednio;
     private double _sumaMs, _minMs = double.MaxValue, _maxMs;
-    private long _ostatniZrzutBraku;
+    private long _ostatniZrzutBraku, _ostatnieZerwanie;
 
     // Patrz OdrzucicNieprawdopodobnyOdczyt.
     private int _ostatniaPozycja = -1;
@@ -372,7 +372,12 @@ public sealed class Mostek : IDisposable
                 _blad = "";
                 Volatile.Write(ref _stan, (int)StanMostka.Polaczony);
 
-                Pulapka.Uzbrojono(Podpis);
+                // Przy migotaniu lacza ta linia zalewa plik - patrz ZglosZerwanie.
+                // Powod zerwania zapisujemy tak czy owak, wiec nic nie tracimy.
+                if (Interlocked.Read(ref _ostatnieZerwanie) == 0 ||
+                    DateTime.UtcNow - new DateTime(Interlocked.Read(ref _ostatnieZerwanie)) >
+                        TimeSpan.FromSeconds(30))
+                    Pulapka.Uzbrojono(Podpis);
 
                 // Ogon ramki z poprzedniego polaczenia skleilby sie z pierwszymi bajtami
                 // tego - i powstalaby ramka, ktorej nikt nie wyslal. Patrz SkladaczSpid.Wyczysc.
@@ -445,6 +450,9 @@ public sealed class Mostek : IDisposable
 
                 if (_blad.Length == 0 && Volatile.Read(ref _stan) == (int)StanMostka.Polaczony)
                     PoliczPrzejecie();
+
+                if (Volatile.Read(ref _stan) == (int)StanMostka.Polaczony)
+                    ZglosZerwanie();
 
                 _biezacyKlient = null;
                 _biezacyPort = null;
@@ -725,6 +733,34 @@ public sealed class Mostek : IDisposable
 
     /// <summary>Ile odpowiedzi przyszlo po terminie, gdy juz nikt na nie nie czekal.</summary>
     public int SpoznioneOdpowiedzi => Volatile.Read(ref _spoznionych);
+
+    /// <summary>
+    /// Wpis o zerwanym polaczeniu.
+    ///
+    /// **Bez tego nie widac migotania.** Wzmacniacz SPE potrafil zestawiac i tracic lacze
+    /// **co dwie sekundy** - w pliku z 15 wrzesnia 227 zestawien w niecala godzine, przy
+    /// trzech na kazdym rotorze. Do 1.11.18 pulapka byla przy SPE wylaczona calkowicie, wiec
+    /// nie bylo o tym **zadnej** informacji; wlaczenie jej wydobylo problem, ktory istnial
+    /// pewnie od dawna. Sama linia "pulapka uzbrojona" mowi, ze lacze wstalo, ale nie mowi
+    /// **dlaczego padlo poprzednie** - a to jest jedyne pytanie, ktore ma tu sens.
+    ///
+    /// Dlawimy do jednego wpisu na trzydziesci sekund na mostek. Przy migotaniu co dwie
+    /// sekundy plik zamienilby sie w dziennik, a to ma byc dowod rzeczowy.
+    /// </summary>
+    private void ZglosZerwanie()
+    {
+        long ostatni = Interlocked.Read(ref _ostatnieZerwanie);
+        if (ostatni != 0 && DateTime.UtcNow - new DateTime(ostatni) <= TimeSpan.FromSeconds(30)) return;
+        Interlocked.Exchange(ref _ostatnieZerwanie, DateTime.UtcNow.Ticks);
+
+        Pulapka.Zapisz(Podpis,
+            "LACZE PADLO po " + _odPolaczenia.Elapsed.TotalSeconds.ToString("0.0") + " s: " +
+            (_blad.Length > 0 ? _blad : "druga strona zamknela czysto, bez bledu " +
+                                        "(tak wyglada odebranie portu przez innego klienta)") +
+            ". Czystych przejec portu: " + Volatile.Read(ref _obcePrzejecia) +
+            ", " + BilansWymian + Environment.NewLine + "    " + CzujnikZastoju.Opis,
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
+    }
 
     /// <summary>
     /// Ile zapytan o pozycje wyszlo i ile odpowiedzi wrocilo. **Sama roznica tych dwoch liczb

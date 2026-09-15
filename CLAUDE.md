@@ -189,6 +189,36 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Mostek SPE migocze - zestawia i traci lacze co dwie sekundy** (1.11.21). Wydobyte przez
+wlasna zmiane: do 1.11.18 pulapka byla przy SPE **wylaczona calkowicie**, wiec nie bylo o tym
+zadnej informacji. Po jej wlaczeniu plik z 15 wrzesnia pokazuje:
+
+```
+mostek        zestawien lacza w 90 minut
+SPE Expert    227          (mediana odstepu: 2 s)
+RAU 10m         3
+RAK 15m         3
+RAU A3S         3
+```
+
+Rotory stoja stabilnie, wzmacniacz zestawia lacze i traci je w rytmie dwoch sekund. Problem
+istnial pewnie od dawna i **byl niewidoczny**, bo objawia sie tylko jako wzmacniacz, ktory
+"czasem nie pokazuje stanu".
+
+Sama linia "pulapka uzbrojona" mowi, ze lacze wstalo, ale nie mowi, **dlaczego padlo
+poprzednie** - a to jest jedyne pytanie, ktore ma tu sens. Stad `ZglosZerwanie`: wpis
+`LACZE PADLO po X s` z powodem (blad albo czyste zamkniecie przez druga strone), licznikiem
+czystych przejec portu i bilansem wymian. Czyste zamkniecie w takim rytmie to **podpis walki
+o port**: ktos inny laczy sie do 13100, a serwer oddaje mu polaczenie.
+
+Oba wpisy sa dlawione do jednego na trzydziesci sekund na mostek - inaczej przy migotaniu co
+dwie sekundy plik zamienia sie w dziennik, a ma byc dowodem rzeczowym.
+
+**Przeniesienie katalogu roboczego poza OneDrive zadzialalo - zmierzone.** Korelacja brakow
+odpowiedzi z zastojem wlasnego procesu spadla z **27 na 38** do **4 na 47**, a najdluzszy
+zastoj z 525 ms do 357 ms. To potwierdza rozpoznanie z 1.11.19: to pulapka piszaca
+synchronicznie do katalogu synchronizowanego przez OneDrive wspolwytwarzala braki.
+
 **Zatrzymanie mostka przy pracujacym kliencie potrafilo dac 208 - dwa osobne bledy** (1.11.20).
 Zgloszone przez uzytkownika: *"jak pstrotator jest wlaczony a wylacze w RotorPanel polaczenie
 z ser2net, to przeskakuje mi czasem na 208 pomimo filtru"*.
