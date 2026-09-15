@@ -1399,9 +1399,28 @@ public sealed class Mostek : IDisposable
             "TRZYMALISMY DANE KLIENTA " + zwloka.TotalMilliseconds.ToString("0") + " ms " +
             "miedzy odebraniem z sieci a zapisem na port. W kolejce " + _kolejkaPortu.Count +
             " kawalkow, zapisow niepelnych " + (pary?.NiepelneZapisy ?? -1) +
-            ", ostatni zapis " + (pary?.OstatniZapisMs ?? -1) + " ms" +
+            ", ostatni zapis " + (pary?.OstatniZapisBajtow ?? -1) + " B w " +
+            (pary?.OstatniZapisMs ?? -1) + " ms" + OpisPrzepustowosci(pary) +
             Environment.NewLine + "    " + CzujnikZastoju.Opis,
             _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
+    }
+
+    /// <summary>
+    /// Przelicza ostatni zapis na bajty na sekunde i na przyblizona predkosc transmisji.
+    ///
+    /// **To jest test na jedna konkretna przyczyne.** Jesli zapis na pare com0com idzie
+    /// w tempie odpowiadajacym 1200 czy 9600 bodom, to nie jest tak, ze program po drugiej
+    /// stronie nie odbiera - to para **dlawi transmisje celowo**, emulujac predkosc portu
+    /// (`EmuBR=yes` w konfiguracji com0com). Wtedy naprawa nie jest w naszym kodzie,
+    /// tylko w jednym ustawieniu pary.
+    /// </summary>
+    private static string OpisPrzepustowosci(StrumienPortu pary)
+    {
+        if (pary is null || pary.OstatniZapisMs <= 0 || pary.OstatniZapisBajtow <= 0) return "";
+
+        double bajtowNaSekunde = pary.OstatniZapisBajtow * 1000.0 / pary.OstatniZapisMs;
+        return " (" + bajtowNaSekunde.ToString("0") + " B/s, czyli jakby okolo " +
+               (bajtowNaSekunde * 10).ToString("0") + " bodow)";
     }
 
     /// <summary>

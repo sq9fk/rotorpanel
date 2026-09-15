@@ -47,6 +47,9 @@ public static class PortIo
     internal static extern bool GetCommModemStatus(SafeFileHandle h, out uint stan);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetupComm(SafeFileHandle h, uint wejscie, uint wyjscie);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool EscapeCommFunction(SafeFileHandle h, uint funkcja);
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -189,6 +192,13 @@ public static class PortIo
             uchwyt.Dispose();
             throw new IOException(nazwa + ": SetCommTimeouts, blad " + Marshal.GetLastWin32Error());
         }
+        // **Zapas w buforach portu.** Wzmacniacz odpowiada na kazde zapytanie klatka
+        // ekranu po 371 bajtow, a SPE Term potrafi pytac co 95 ms - zmierzone 15 wrzesnia:
+        // dziesiec zapytan w 700 ms, czyli blisko czterech kilobajtow w serii. Gdy bufor
+        // sie zapelni, `WriteFile` **stoi**, az druga strona odbierze; przy domyslnych
+        // rozmiarach widzielismy zapis trwajacy 3598 ms. Zapas nic nie kosztuje.
+        SetupComm(uchwyt, 65536, 65536);
+
         UstawOsiemBitow(uchwyt, nazwa);
 
         // Podnosimy DTR i RTS. Na prawdziwym laczu RS-232 robi to urzadzenie po drugiej
@@ -315,6 +325,15 @@ internal sealed class StrumienPortu : Stream
     public long OstatniZapisMs { get; private set; }
 
     /// <summary>
+    /// Ile bajtow szlo w ostatnim zapisie. Razem z <see cref="OstatniZapisMs"/> daje **realna
+    /// przepustowosc pary** - a ta odpowiada na pytanie, czy zapis czeka na program po drugiej
+    /// stronie, czy jest **dlawiony emulacja predkosci transmisji** przez com0com. Przy
+    /// `EmuBR=yes` para przepuszcza tyle, ile wynosi ustawiona predkosc: 1200 bodow to okolo
+    /// 120 bajtow na sekunde, czyli klatka ekranu SPE (371 B) idzie **trzy sekundy**.
+    /// </summary>
+    public int OstatniZapisBajtow { get; private set; }
+
+    /// <summary>
     /// Zapis na port **do skutku**, a nie "ile sie uda".
     ///
     /// Port jest otwarty z <c>WriteTotalTimeoutConstant = 2000</c>, wiec gdy bufor pary
@@ -355,6 +374,7 @@ internal sealed class StrumienPortu : Stream
         }
 
         OstatniZapisMs = zegar.ElapsedMilliseconds;
+        OstatniZapisBajtow = ile;
     }
 
     // Domyslne ReadAsync i WriteAsync klasy Stream przepuszczaja obie operacje przez

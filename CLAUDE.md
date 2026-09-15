@@ -392,6 +392,34 @@ o zwloce, wiec nastepny plik powie wprost, czy to bylo to.
 **Zasada:** kazde API, ktore zwraca "ile sie udalo", trzeba pytac, ile sie udalo. `out _`
 przy `WriteFile` to nie jest skrot - to jest miejsce, w ktorym dane znikaja bez sladu.
 
+**Potwierdzenie i to, co zostaje** (1.11.44). Pierwszy przebieg na 1.11.43 potwierdzil
+rozpoznanie wprost: `zapisow niepelnych 1`, `ostatni zapis 3598 ms`. Czyli **zapis na pare
+com0com naprawde opiera sie o limit czasu** i przed 1.11.43 tracil reszte kawalka po cichu.
+Teraz dopisuje do skutku - dane docieraja w calosci, ale **z opoznieniem**, i to opoznienie
+nadal widac jako mrugniecie.
+
+Sprawdzone, zeby nie doradzac na slepo: **para com0com nie dlawi transmisji**. W rejestrze
+(`HKLM\SYSTEM\CurrentControlSet\Services\com0com\Parameters`) przy CNCA0-3 i CNCB0-3 stoi
+sam `PortName`, bez `EmuBR` i bez `EmuOverrun` - czyli oba sa domyslnie **wylaczone**. Zapis nie
+czeka wiec na emulowana predkosc portu, tylko **na to, az program po drugiej stronie odbierze**.
+
+Obraz calosci z dziennika: SPE Term potrafi wejsc w szybkie odpytywanie - **jedenascie zapytan
+w 1,1 sekundy, co okolo 95 ms** - a kazde sciaga klatke ekranu po 371 bajtow. Cztery kilobajty
+w serii przepelniaja bufor odbiorczy, nasz zapis staje, odpowiedz przychodzi pozno, Term ponawia
+i **sam podkreca petle**. To jest zapchanie z dodatnim sprzezeniem zwrotnym, a nie usterka
+pojedynczego elementu.
+
+Co z tym robimy po naszej stronie: `SetupComm` na 64 kB w obie strony (zapas nic nie kosztuje)
+i pomiar **realnej przepustowosci zapisu** w bajtach na sekundę we wpisie o zwloce - bo to
+jedyna liczba, ktora odrozni "druga strona nie odbiera" od "cos dlawi transmisje".
+
+**Czego po naszej stronie zrobic nie mozna:** bufor odbiorczy nalezy do portu, ktory otwiera
+klient, i to on ustala jego rozmiar. Jesli zapchania beda wracac, jedyna dzwignia jest
+`EmuOverrun=yes` na **jego** koncu pary (CNCA3 = COM13): wtedy com0com **gubi** nadmiar zamiast
+blokowac nasz zapis. Dla strumienia obrazu to dobry handel - zgubiona klatka jest niewidoczna,
+bo nastepna przychodzi za 95 ms, a zablokowany zapis zatrzymuje **wszystko**, takze ramki
+statusu. Dla par rotorowych bylby to handel zly i tam tego robic nie wolno.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
