@@ -117,44 +117,6 @@ public sealed class Mostek : IDisposable
     public int ObcePrzejecia => Volatile.Read(ref _obcePrzejecia) >= 3
         ? Volatile.Read(ref _obcePrzejecia) : 0;
 
-    private int _zrzuconychEkranow;
-
-    /// <summary>
-    /// Zrzuca siatke znakow wyswietlacza do `podejrzane.txt` - **pierwsze dwa ekrany po
-    /// zestawieniu lacza i nic wiecej**.
-    ///
-    /// Po co: ekran wzmacniacza to siatka 40 na 8 **znakow**, a nie obrazek, wiec dolny pasek
-    /// (`IN | BAND | ANT | CAT | OUT | SWR | TEMP`) i liczby `PA OUT` / `I PA` da sie z niego
-    /// czytac wprost - **bez zapytania `0x90`, ktore wytraca RC-1216H z trybu "Remoted"**.
-    /// Zanim jednak napisze sie taki rozbior, trzeba znac **prawdziwe pozycje kolumn**.
-    /// Odczytywanie ich ze zrzutu ekranu byloby zgadywaniem, a tego w tej sprawie bylo juz dosc.
-    ///
-    /// Zrzut ma numery kolumn nad trescia, zeby dalo sie odczytac pozycje wprost z pliku.
-    /// </summary>
-    private void ZrzucEkran(EkranSpe ekran)
-    {
-        if (ekran is null || _zrzuconychEkranow >= 2) return;
-        _zrzuconychEkranow++;
-
-        var opis = new System.Text.StringBuilder("SIATKA WYSWIETLACZA (do rozbioru pol)");
-        opis.Append(Environment.NewLine).Append("        ");
-        for (int k = 0; k < EkranSpe.Kolumn; k++) opis.Append(k % 10);
-        for (int w = 0; w < ekran.Wiersze.Length; w++)
-            opis.Append(Environment.NewLine).Append("    ")
-                .Append(w).Append(" |").Append(ekran.Wiersze[w]).Append('|');
-
-        Pulapka.Zapisz(Podpis, opis.ToString(), null, null, TimeSpan.Zero);
-    }
-
-    /// <summary>
-    /// Stan odczytany z **wyswietlacza** wzmacniacza, o ile ekran akurat pokazuje pasek.
-    ///
-    /// Na razie tylko do pokazania w podpowiedzi - zeby dalo sie **porownac z tym, co widac
-    /// na wzmacniaczu**, zanim karta zacznie sie z tego karmic. Podstawienie liczb pod karte
-    /// bez takiego sprawdzenia byloby czwartym z rzedu ruchem na wyczucie w tej sprawie.
-    /// </summary>
-    public StanZEkranu StanEkranu { get; private set; }
-
     /// <summary>Ostatni odczytany stan wzmacniacza SPE albo null.</summary>
     public StatusSpe Status => _status;
 
@@ -461,7 +423,6 @@ public sealed class Mostek : IDisposable
                     _wymiany.Clear();
                     _ileWymian = 0; _sumaMs = 0; _minMs = double.MaxValue; _maxMs = 0;
                     _zapytan = 0; _odpowiedzi = 0; _statusowPoprzednio = 0;
-                    _zrzuconychEkranow = 0;
                 }
                 Volatile.Write(ref _brakow, 0);
                 Volatile.Write(ref _spoznionych, 0);
@@ -702,11 +663,6 @@ public sealed class Mostek : IDisposable
                 _statusowPoprzednio = czytnik.IleWlasnychOdpowiedzi;
 
                 _status = czytnik.Status ?? _status;
-                if (czytnik.Ekran is not null)
-                {
-                    ZrzucEkran(czytnik.Ekran);
-                    StanEkranu = StanZEkranu.Czytaj(czytnik.Ekran) ?? StanEkranu;
-                }
                 Interlocked.Add(ref _rx, dalej.Length);
 
                 if (Slad.Wlaczony)
@@ -1307,7 +1263,25 @@ public sealed class Mostek : IDisposable
             // **albo stan, albo stabilne "Remoted"**. Rozstrzygamy to tak, zeby uzytkownik
             // dostawal to, na co akurat patrzy - gdy oglada stan, pytamy; gdy panel siedzi
             // w zasobniku i zadne okno nie jest otwarte, pulsujemy i trzymamy tryb zdalny.
-            // **Cisza na porcie nie jest darmowa - pytamy zawsze.**
+            // **Pytamy tylko wtedy, gdy otwarte jest okno stanu.**
+            //
+            // Decyzja uzytkownika po calej serii prob: na karcie w oknie glownym stan nie jest
+            // pokazywany i nie jest odpytywany; pelny odczyt bierze sie dopiero po otwarciu
+            // okna stanu. Karta radzi sobie z tym sama - po pieciu sekundach bez swiezego
+            // statusu czysci linijke mocy i wraca do opisu trasy.
+            //
+            // **Cena jest znana i zmierzona:** dopoki trzymamy sesje RFC 2217, RC-1216H nie
+            // odpytuje wzmacniacza sam, wiec przy naszej ciszy jego wlasna strona przechodzi
+            // na **Off/Unknown**. Zglaszane wczesniej przy 1.11.30. To swiadomy wybor: zysk
+            // to stabilne "Remoted" i brak ruchu, ktorego nikt nie oglada.
+            if (!_trybStanu)
+            {
+                czytnik.PrzechwytujEkran = _trybEkranu;
+                await Task.Delay(500, ct);
+                continue;
+            }
+
+            // Historyczne uzasadnienie odpytywania bez przerwy - patrz wyzej, zastapione.
             //
             // W 1.11.29 przestawalismy pytac, gdy panel schowal sie do zasobnika: skoro nikt
             // nie oglada stanu, zapytanie wydawalo sie zmarnowane. Skutek zgloszony przez

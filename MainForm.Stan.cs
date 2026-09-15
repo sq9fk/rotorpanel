@@ -165,13 +165,6 @@ public partial class MainForm
         // Bilans wymian takze przy urzadzeniu. Wzmacniacz idzie tym samym tunelem po LTE
         // co rotory, wiec podlega tym samym zastojom - a do 1.11.18 nie bylo o tym zadnej
         // informacji, bo liczyliśmy tylko rotory.
-        // Odczyt z wyswietlacza - do porownania z tym, co pokazuje wzmacniacz. Patrz
-        // Mostek.StanEkranu: zanim karta zacznie sie z tego karmic, ma sie zgadzac co do znaku.
-        if (m?.StanEkranu != null)
-            dymek += Environment.NewLine + Environment.NewLine +
-                     "Z wyświetlacza (" + m.StanEkranu.Kiedy.ToLocalTime().ToString("HH:mm:ss") +
-                     "): " + m.StanEkranu;
-
         if (m != null && m.BilansWymian.Length > 0)
             dymek += Environment.NewLine + Environment.NewLine +
                      "Odpytywanie: " + m.BilansWymian +

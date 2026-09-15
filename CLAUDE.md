@@ -195,7 +195,25 @@ while the PC-program is in use, only the On/Off buttons is enabled"*. Stan **nas
 ma osobny wskaznik: **System info -> RFC2217: connected** (str. 59). Uzytkownik patrzyl na ten
 pierwszy, my mierzylismy drugi - stad poltora dnia gonienia wlasnego ogona.
 
-**Stan wzmacniacza da sie czytac z jego wlasnego wyswietlacza** (1.11.33). Wyjscie z konfliktu
+**Stan wzmacniacza odpytujemy tylko przy otwartym oknie stanu** (1.11.34). Decyzja uzytkownika
+konczaca cala serie: na karcie w oknie glownym stan **nie jest pokazywany i nie jest odpytywany**;
+pelny odczyt bierze sie dopiero po otwarciu okna stanu. Karta radzi sobie z tym sama - po pieciu
+sekundach bez swiezego statusu `OdswiezSpe` czysci linijke mocy i wraca do opisu trasy, wiec nie
+trzeba bylo ruszac interfejsu.
+
+**Cena jest znana i wybrana swiadomie:** dopoki trzymamy sesje RFC 2217, RC-1216H nie odpytuje
+wzmacniacza sam, wiec przy naszej ciszy jego wlasna strona przechodzi na **Off/Unknown** - dokladnie
+to, co zglaszalo 1.11.30. W zamian "Remoted" nie miga, a wzmacniacz nie dostaje ruchu, ktorego
+nikt nie oglada.
+
+**[cofniete] Stan wzmacniacza da sie czytac z jego wlasnego wyswietlacza (1.11.33).** Rozbior
+paska z siatki 40 na 8 dzialal i mial testy na prawdziwych zrzutach z obu trybow - ale przestal
+byc potrzebny, gdy stan przestal byc pokazywany na karcie. **Zostaje jako notatka: gdyby kiedys
+byly potrzebne swieze liczby bez zapytania `0x90`, ta droga jest sprawdzona** i wystarczy siegnac
+do historii (`StanZEkranu.cs`, zrzut siatki w 1.11.32). Pozycje pol: IN 0-3, BAND 5-10, ANT 12-14,
+CAT 16-20, OUT 22-26, SWR 28-32, TEMP 34-39; pasek stoi tak samo w Standby i Operate.
+
+**[historyczne] Stan wzmacniacza da sie czytac z jego wlasnego wyswietlacza** (1.11.33). Wyjscie z konfliktu
 "swiezy stan albo stabilne Remoted": zapytanie `0x90` wytraca RC-1216H z trybu zdalnego, ale
 **ekran w trybie RCU dostajemy za darmo przy kazdym pulsie**. A ekran to siatka **40 na 8
 znakow**, nie obrazek.
