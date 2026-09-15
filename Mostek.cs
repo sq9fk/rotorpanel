@@ -1399,6 +1399,7 @@ public sealed class Mostek : IDisposable
             "TRZYMALISMY DANE KLIENTA " + zwloka.TotalMilliseconds.ToString("0") + " ms " +
             "miedzy odebraniem z sieci a zapisem na port. W kolejce " + _kolejkaPortu.Count +
             " kawalkow, zapisow niepelnych " + (pary?.NiepelneZapisy ?? -1) +
+            ", porzuconych bajtow " + (pary?.PorzuconeBajty ?? -1) +
             ", ostatni zapis " + (pary?.OstatniZapisBajtow ?? -1) + " B w " +
             (pary?.OstatniZapisMs ?? -1) + " ms" + OpisPrzepustowosci(pary) +
             Environment.NewLine + "    " + CzujnikZastoju.Opis,

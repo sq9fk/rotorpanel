@@ -327,6 +327,30 @@ internal sealed class StrumienPortu : Stream
     /// <summary>Ile milisekund zajal ostatni zapis, razem z dopisywaniem reszty.</summary>
     public long OstatniZapisMs { get; private set; }
 
+    /// <summary>Ile bajtow porzucilismy, bo nikt ich po drugiej stronie nie odbieral.</summary>
+    public int PorzuconeBajty => _porzucone;
+    private int _porzucone;
+
+    /// <summary>
+    /// Ile bajtow czeka w kolejce nadawczej portu, zanim uznamy, ze **nikt po drugiej stronie
+    /// nie odbiera**. Cztery kilobajty przy buforze 64 kB to duzy zapas: pracujacy klient nigdy
+    /// tyle nie uzbiera, bo klatka ekranu ma 371 bajtow, a ramka pozycji rotora piec.
+    /// </summary>
+    private const uint ProgZatoru = 4096;
+
+    /// <summary>
+    /// Czy kolejka nadawcza jest juz tak dluga, ze zapis nie ma sensu. Pytamy o to **przed**
+    /// zapisem, bo sprawdzenie jest natychmiastowe, a zapis w tym stanie nie jest.
+    /// </summary>
+    private bool Zatkany()
+    {
+        try
+        {
+            return PortIo.ClearCommError(_h, out _, out var stan) && stan.cbOutQue > ProgZatoru;
+        }
+        catch { return false; }
+    }
+
     /// <summary>
     /// Ile bajtow szlo w ostatnim zapisie. Razem z <see cref="OstatniZapisMs"/> daje **realna
     /// przepustowosc pary** - a ta odpowiada na pytanie, czy zapis czeka na program po drugiej
@@ -357,6 +381,27 @@ internal sealed class StrumienPortu : Stream
     public override void Write(byte[] bufor, int offset, int ile)
     {
         var zegar = System.Diagnostics.Stopwatch.StartNew();
+
+        // **Port szeregowy nie moze zatrzymac mostka.**
+        //
+        // Gdy po drugiej stronie pary nikt nie odbiera - a tak jest zawsze przez pierwsze
+        // sekundy polaczenia, zanim program kliencki w ogole otworzy port - kolejka nadawcza
+        // sie zapelnia i `WriteFile` **stoi az do swojego limitu czasu**. Zmierzone
+        // 15 wrzesnia, szesc sekund po zestawieniu lacza: 388 bajtow w **5964 ms** przy dwoch
+        // zapisach niepelnych, czyli dwa limity po dwie sekundy pod rzad. Ten jeden
+        // zablokowany zapis opoznia wszystko, co idzie po nim - takze pierwsze dane,
+        // na ktore czeka klient, gdy juz sie podlaczy.
+        //
+        // Prawdziwa linia szeregowa zachowuje sie dokladnie tak, jak robimy to teraz: bajty
+        // wychodza i **gina, jesli nikt ich nie slucha**. Zadne z nich nie jest warte
+        // zatrzymania mostka na szesc sekund.
+        if (Zatkany())
+        {
+            Interlocked.Add(ref _porzucone, ile);
+            OstatniZapisMs = 0;
+            OstatniZapisBajtow = 0;
+            return;
+        }
 
         // Pierwszenstwo przed pompa odczytu - patrz KolejnoscPortu. Bez tego zapis
         // siedemdziesieciu bajtow potrafil czekac 1222 ms na wirtualnej parze portow,

@@ -451,6 +451,28 @@ Najpierw rzecz mala i sprawdzalna: skoro system i tak szereguje, **szeregujmy sa
 (trzy watki czytajace po 25 ms, czyli ciezej niz w rzeczywistosci, gdzie czytacz jest jeden)
 najgorsze czekanie zapisu spadlo do **110 ms**.
 
+**Osma warstwa: port szeregowy nie moze zatrzymac mostka** (1.11.46). Pierwszy przebieg
+na 1.11.45 rozdzielil dwa przypadki, ktore dotad wygladaly tak samo:
+
+| kiedy | zapis | wniosek |
+|---|---|---|
+| ustalona praca, 36 s po zestawieniu | **84 B w 8 ms** (10 500 B/s) | pierwszenstwo zapisu **dziala** |
+| 6 s po zestawieniu lacza | 388 B w **5964 ms**, zapisow niepelnych **2** | co innego, nizej |
+
+Osiem milisekund zamiast 1222 - wyscig o uchwyt z 1.11.45 jest zalatwiony. Zostalo to drugie:
+**dwa zapisy niepelne pod rzad to dwa limity czasu po dwie sekundy**, czyli port nie przyjmowal
+danych przez cztery sekundy. Przy buforze 64 kB nie ma mowy o przepelnieniu przez natlok -
+za to jest oczywisty powod, ktory umknal: **przez pierwsze sekundy polaczenia po drugiej
+stronie pary nie ma jeszcze nikogo**. Program kliencki dopiero sie podlaczy. Piszemy do portu,
+z ktorego nikt nie czyta, kolejka nadawcza sie zapycha i zapis stoi az do limitu - a ten jeden
+zablokowany zapis opoznia wszystko po nim, **takze pierwsze dane, na ktore klient czeka,
+gdy juz przyjdzie**. Stad mrugniecie zaraz po starcie.
+
+Naprawa jest tym, czym od poczatku byla prawdziwa linia szeregowa: **bajty wychodza i gina,
+jesli nikt ich nie slucha**. Przed kazdym zapisem patrzymy na `cbOutQue`; powyzej czterech
+kilobajtow porzucamy kawalek i liczymy go w `PorzuconeBajty` (licznik idzie do wpisu o zwloce).
+Zaden bajt obrazu nie jest wart zatrzymania mostka na szesc sekund.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
