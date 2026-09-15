@@ -189,6 +189,37 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Pulapka wspolwytwarzala usterke, ktorej szukala** (1.11.19). Dziewiec godzin pracy, 33 255
+wymian na kazdym z trzech rotorow, braki 13 / 8 / 17 czyli **0,02-0,05 %** - i czujnik zastoju
+dal odpowiedz na pytanie, ktorego nie dalo sie rozstrzygnac z wnetrza mostka:
+
+```
+rodzaj wpisu            zastoj procesu w ciagu 1,5 s   ile
+BRAK ODPOWIEDZI         TAK                             27
+BRAK ODPOWIEDZI         nie                             11
+ZATOR                   nie                             11
+ZATOR                   TAK                              1
+```
+
+**Dwie rozne przyczyny, wyraznie rozdzielone.** Zatory (odpowiedz po 600-700 ms) to w wiekszosci
+tunel - proces wtedy chodzil. Braki odpowiedzi to w 27 przypadkach na 38 **nasz wlasny zastoj**.
+
+A zrodlo tego zastoju siedzialo w pulapce: `Zapisz` otwieral plik, dopisywal kilka kilobajtow
+i zamykal, **synchronicznie, w watku pompy**, ktora w tym czasie nie czytala gniazda. Plik lezy
+przy pliku wykonywalnym, a ten u uzytkownika stoi w katalogu **synchronizowanym przez OneDrive**,
+wiec kazdy dopis budzi synchronizacje. Kazdy wpis podnosil wiec szanse na nastepny.
+
+Teraz tresc skladana jest na miejscu - dziennik i bufory musza byc sfotografowane w chwili
+zdarzenia - a do tla idzie wylacznie gotowy tekst, wlasnym watkiem (nie pula, bo to wlasnie
+jej zaglodzenie eliminujemy).
+
+**Zasada ogolniejsza: narzedzie diagnostyczne na drodze danych musi byc bezkosztowe albo
+asynchroniczne.** Inaczej mierzy wlasny wplyw i prowadzi sledztwo w kolko. Ten sam blad
+popelnilem tu dwa razy - raz w pomiarze czasow (kolejka FIFO, ktora rozjezdzala sie po pierwszej
+zgubie), raz w zapisie. **Zawsze pytaj, czy przyrzad nie zmienia tego, co mierzy.**
+
+Osobno warto powiedziec uzytkownikowi: **katalog roboczy programu nie powinien lezec w OneDrive**.
+
 **Co z tej diagnostyki przenosi sie na wzmacniacz SPE, a co nie** (1.11.18). Wzmacniacz idzie
 **tym samym tunelem** (192.168.6.7, ta sama podsiec co Pi), wiec podlega tym samym zastojom.
 Przeglad, pozycja po pozycji:

@@ -174,37 +174,88 @@ public static class Pulapka
                TimeSpan.Zero);
     }
 
+    /// <summary>
+    /// Sklada wpis **w watku wolajacym** i oddaje go do zapisu w tle.
+    ///
+    /// **Zapis do pliku nie moze stac na drodze danych.** Do 1.11.18 `Zapisz` otwieral plik,
+    /// dopisywal kilka kilobajtow i zamykal - wszystko synchronicznie, w watku pompy, ktora
+    /// w tym czasie **nie czytala gniazda**. Plik lezy przy pliku wykonywalnym, a ten u
+    /// uzytkownika stoi w katalogu synchronizowanym przez OneDrive, wiec kazdy dopis budzi
+    /// synchronizacje. Czujnik zastoju zlapal to wprost: **27 z 38** wpisow "BRAK ODPOWIEDZI"
+    /// mialo zastoj procesu w ciagu poltorej sekundy. Narzedzie do szukania usterki zaczelo
+    /// ja wspolwytwarzac.
+    ///
+    /// Tresc skladamy nadal na miejscu - dziennik i bufory musza byc sfotografowane **w chwili
+    /// zdarzenia**, nie kilkaset milisekund pozniej. Do tla idzie wylacznie gotowy tekst.
+    /// </summary>
     public static void Zapisz(string podpis, string powod, Bufor doSterownika, Bufor odSterownika,
                               TimeSpan odPolaczenia, Dziennik dziennik = null)
     {
         try
         {
-            string katalog = Path.GetDirectoryName(Application.ExecutablePath) ?? ".";
-            string plik = Path.Combine(katalog, "podejrzane.txt");
-
-            lock (_zamek)
+            var tekst = new System.Text.StringBuilder();
+            tekst.AppendLine("=== " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "  " + podpis);
+            tekst.AppendLine("    " + powod);
+            if (doSterownika != null)
             {
-                if (File.Exists(plik) && new FileInfo(plik).Length > MaksymalnyRozmiar) return;
-
-                using var pisarz = new StreamWriter(plik, append: true);
-                pisarz.WriteLine("=== " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "  " + podpis);
-                pisarz.WriteLine("    " + powod);
-                if (doSterownika != null)
-                {
-                    pisarz.WriteLine("    od zestawienia lacza: " +
-                                     odPolaczenia.TotalSeconds.ToString("0.0") + " s");
-                    pisarz.WriteLine("    do sterownika (ostatnie bajty): " + doSterownika.Hex());
-                    pisarz.WriteLine("    od sterownika (ostatnie bajty): " + odSterownika.Hex());
-                }
-                if (dziennik != null)
-                {
-                    pisarz.WriteLine("    przebieg w jednej osi czasu (najstarsze u gory):");
-                    pisarz.WriteLine("      " + dziennik.Wypisz());
-                }
-                pisarz.WriteLine();
+                tekst.AppendLine("    od zestawienia lacza: " +
+                                 odPolaczenia.TotalSeconds.ToString("0.0") + " s");
+                tekst.AppendLine("    do sterownika (ostatnie bajty): " + doSterownika.Hex());
+                tekst.AppendLine("    od sterownika (ostatnie bajty): " + odSterownika.Hex());
             }
+            if (dziennik != null)
+            {
+                tekst.AppendLine("    przebieg w jednej osi czasu (najstarsze u gory):");
+                tekst.AppendLine("      " + dziennik.Wypisz());
+            }
+            tekst.AppendLine();
+
+            Dopisz(tekst.ToString());
         }
         catch { /* pulapka nie moze przeszkadzac w pracy */ }
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentQueue<string> _doZapisu = new();
+    private static readonly SemaphoreSlim _budzik = new(0);
+    private static Thread _pisarz;
+
+    private static void Dopisz(string tekst)
+    {
+        lock (_zamek)
+        {
+            if (_pisarz is null)
+            {
+                // Wlasny watek, nie pula - zapis bywa dlugi, a pula jest wspoldzielona
+                // z pompami mostkow i to wlasnie jej zaglodzenie chcemy tu wyeliminowac.
+                _pisarz = new Thread(Petla) { IsBackground = true, Name = "pulapka" };
+                _pisarz.Start();
+            }
+        }
+
+        // Przy zalewie wpisow wolimy zgubic najstarsze niz rosnac bez konca.
+        if (_doZapisu.Count > 200) _doZapisu.TryDequeue(out _);
+
+        _doZapisu.Enqueue(tekst);
+        _budzik.Release();
+    }
+
+    private static void Petla()
+    {
+        string katalog = Path.GetDirectoryName(Application.ExecutablePath) ?? ".";
+        string plik = Path.Combine(katalog, "podejrzane.txt");
+
+        while (true)
+        {
+            _budzik.Wait();
+            if (!_doZapisu.TryDequeue(out string tekst)) continue;
+
+            try
+            {
+                if (File.Exists(plik) && new FileInfo(plik).Length > MaksymalnyRozmiar) continue;
+                File.AppendAllText(plik, tekst);
+            }
+            catch { /* pulapka nie moze przeszkadzac w pracy */ }
+        }
     }
 
     private static string Bajty(byte[] dane, int od, int ile)
