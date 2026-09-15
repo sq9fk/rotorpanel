@@ -189,6 +189,23 @@ Widac tez, ze samo lacze jest ciasne: **kazda** odpowiedz przychodzi rozbita na 
 ciszy + `03 06 00 20`, a pelny obrot zapytanie-odpowiedz trwa 250-350 ms przy 1200 bodach,
 gdzie same dane to 42 ms.
 
+**Odpytywanie wzmacniacza jest samotaktujace, nie zegarowe** (1.11.25). Uzytkownik poprosil
+o gestsze odpytywanie, zeby microBIT trzymal port i pokazywal "Remoted" bez przerwy zamiast
+przeskakiwac w rytmie naszych zapytan.
+
+Sztywne skrocenie zegara byloby zlym sposobem z dwoch powodow, oba zmierzone: **nadmiar ruchu
+gubi wzmacniaczowi odpowiedzi**, a zapytania wysylane szybciej, niz on odpowiada, i tak wpadaja
+na limit dwoch oczekujacych (`MaksWlasnych`) i przestaja byc nasze.
+
+Dlatego `OdczekajPoZapytaniu` czeka, az wroci poprzednia odpowiedz (albo minie zawor 1500 ms),
+i dopiero wtedy odlicza 200 ms przerwy. Cykl schodzi z 1000 ms do okolo 450 ms - ponad dwa razy
+gesciej - ale **w locie jest zawsze jedno zapytanie**. Gdy wzmacniacz milknie, tempo samo spada
+do zaworu i nie zasypujemy go prosbami.
+
+**Kryterium odwrotu jest sprawdzalne, nie uznaniowe:** jesli to za gesto, w bilansie wymian
+zacznie rosnac "brak". Wczesniej bylo tam zero rzeczywistych brakow (po poprawce licznika
+z 1.11.24), wiec porownanie jest czyste.
+
 **Wzmacniacz raportuje ten sam stan co sekunde - przeskoki na microBIT nie sa w danych**
 (1.11.24). Siedemdziesiat dwie minuty na 1.11.23, kontekst pulapki wreszcie zbierany takze
 przy SPE. Dziennik pokazuje ramke statusu identyczna **co do bajtu**, raz na sekunde:

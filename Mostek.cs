@@ -1268,9 +1268,37 @@ public sealed class Mostek : IDisposable
             }
             finally { _bramka.Release(); }
 
-
-            await Task.Delay(1000, ct);
+            await OdczekajPoZapytaniu(czytnik, ct);
         }
+    }
+
+    /// <summary>
+    /// Odstep przed nastepnym zapytaniem o stan. **Samotaktujacy: czekamy na odpowiedz, nie na
+    /// zegar.**
+    ///
+    /// Wczesniej bylo sztywne 1000 ms. Uzytkownik poprosil o gestsze odpytywanie, zeby microBIT
+    /// trzymal port i pokazywal "Remoted" bez przerwy zamiast przeskakiwac w rytmie naszych
+    /// zapytan. Sztywne skrocenie zegara byloby jednak zlym sposobem: **zmierzone wczesniej,
+    /// ze nadmiar ruchu gubi wzmacniaczowi odpowiedzi**, a zapytania wysylane szybciej, niz on
+    /// odpowiada, i tak wpadlyby na limit dwoch oczekujacych i przestaly byc nasze.
+    ///
+    /// Dlatego czekamy, az poprzednia odpowiedz wroci (albo minie zawor czasowy), i dopiero
+    /// wtedy odliczamy krotka przerwe. W praktyce daje to cykl okolo 450 ms zamiast 1000 ms -
+    /// ponad dwa razy gesciej - ale **nigdy nie kolejkuje zapytan**: w locie jest zawsze jedno.
+    /// Gdy wzmacniacz milknie, tempo samo spada do zaworu i nie zasypujemy go prosbami.
+    ///
+    /// Jesli okaze sie, ze to jednak za gesto, zobaczymy to wprost w bilansie wymian: zacznie
+    /// rosnac "brak". To jest sprawdzalne kryterium, a nie kwestia gustu.
+    /// </summary>
+    private static async Task OdczekajPoZapytaniu(CzytnikSpe czytnik, CancellationToken ct)
+    {
+        var zegar = System.Diagnostics.Stopwatch.StartNew();
+        while (!ct.IsCancellationRequested &&
+               czytnik.WlasneOczekujace > 0 &&
+               zegar.ElapsedMilliseconds < 1500)
+            await Task.Delay(50, ct);
+
+        await Task.Delay(200, ct);
     }
 
     public void Dispose()
