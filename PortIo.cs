@@ -185,7 +185,13 @@ public static class PortIo
             ReadTotalTimeoutMultiplier = uint.MaxValue,
             ReadTotalTimeoutConstant   = 25,
             WriteTotalTimeoutMultiplier = 0,
-            WriteTotalTimeoutConstant   = 2000
+            // **Dwiescie milisekund, nie dwie sekundy.** Limit czasu zapisu to jedyna dzwignia,
+            // ktora mamy na uchwycie synchronicznym: gdy program po drugiej stronie pary
+            // przestaje odbierac, `WriteFile` stoi **dokladnie tyle**. Zmierzone 16 wrzesnia:
+            // przy dwoch sekundach jeden zapis 431 bajtow trwal **4542 ms** (dwa limity pod
+            // rzad), a czekanie na uchwyt w tym samym wpisie wynioslo **32 ms** - czyli
+            // szeregowanie z odczytem bylo juz zalatwione, a blokada siedziala w samym zapisie.
+            WriteTotalTimeoutConstant   = 200
         };
         if (!SetCommTimeouts(uchwyt, ref limity))
         {
@@ -344,24 +350,13 @@ internal sealed class StrumienPortu : Stream
     private int _porzucone;
 
     /// <summary>
-    /// Ile bajtow czeka w kolejce nadawczej portu, zanim uznamy, ze **nikt po drugiej stronie
-    /// nie odbiera**. Cztery kilobajty przy buforze 64 kB to duzy zapas: pracujacy klient nigdy
-    /// tyle nie uzbiera, bo klatka ekranu ma 371 bajtow, a ramka pozycji rotora piec.
+    /// Ile lacznie wolno stac na jednym kawalku, zanim uznamy, ze nikt go nie odbierze.
+    ///
+    /// **Zgubiony kawalek obrazu jest tanszy niz zamrozony mostek.** Nastepna klatka przychodzi
+    /// za okolo 95 ms, wiec strata jest ledwie widoczna; czterosekundowy przestoj widac
+    /// natychmiast i zatrzymuje takze ramki statusu.
     /// </summary>
-    private const uint ProgZatoru = 4096;
-
-    /// <summary>
-    /// Czy kolejka nadawcza jest juz tak dluga, ze zapis nie ma sensu. Pytamy o to **przed**
-    /// zapisem, bo sprawdzenie jest natychmiastowe, a zapis w tym stanie nie jest.
-    /// </summary>
-    private bool Zatkany()
-    {
-        try
-        {
-            return PortIo.ClearCommError(_h, out _, out var stan) && stan.cbOutQue > ProgZatoru;
-        }
-        catch { return false; }
-    }
+    private static readonly TimeSpan LimitZapisu = TimeSpan.FromMilliseconds(300);
 
     /// <summary>
     /// Ile bajtow szlo w ostatnim zapisie. Razem z <see cref="OstatniZapisMs"/> daje **realna
@@ -394,27 +389,11 @@ internal sealed class StrumienPortu : Stream
     {
         var zegar = System.Diagnostics.Stopwatch.StartNew();
 
-        // **Port szeregowy nie moze zatrzymac mostka.**
-        //
-        // Gdy po drugiej stronie pary nikt nie odbiera - a tak jest zawsze przez pierwsze
-        // sekundy polaczenia, zanim program kliencki w ogole otworzy port - kolejka nadawcza
-        // sie zapelnia i `WriteFile` **stoi az do swojego limitu czasu**. Zmierzone
-        // 15 wrzesnia, szesc sekund po zestawieniu lacza: 388 bajtow w **5964 ms** przy dwoch
-        // zapisach niepelnych, czyli dwa limity po dwie sekundy pod rzad. Ten jeden
-        // zablokowany zapis opoznia wszystko, co idzie po nim - takze pierwsze dane,
-        // na ktore czeka klient, gdy juz sie podlaczy.
-        //
-        // Prawdziwa linia szeregowa zachowuje sie dokladnie tak, jak robimy to teraz: bajty
-        // wychodza i **gina, jesli nikt ich nie slucha**. Zadne z nich nie jest warte
-        // zatrzymania mostka na szesc sekund.
-        if (Zatkany())
-        {
-            Interlocked.Add(ref _porzucone, ile);
-            OstatniZapisMs = 0;
-            OstatniZapisBajtow = 0;
-            return;
-        }
-
+        // **Port szeregowy nie moze zatrzymac mostka.** Gdy po drugiej stronie pary nikt nie
+        // odbiera - a tak jest zawsze przez pierwsze sekundy polaczenia, zanim program kliencki
+        // otworzy port - `WriteFile` stoi az do swojego limitu czasu. Prawdziwa linia szeregowa
+        // zachowuje sie tak, jak robimy to nizej: bajty wychodza i **gina, jesli nikt ich nie
+        // slucha**. Patrz LimitZapisu.
         var czekanie = System.Diagnostics.Stopwatch.StartNew();
 
         // Pierwszenstwo przed pompa odczytu - patrz KolejnoscPortu. Bez tego zapis
@@ -439,10 +418,19 @@ internal sealed class StrumienPortu : Stream
                 if (teraz < kawalek.Length) _niepelne++;
                 poszlo += (int)teraz;
 
-                if (poszlo < ile && zegar.Elapsed > TimeSpan.FromSeconds(5))
-                    throw new IOException("zapis na port utknal: " + poszlo + " z " + ile +
-                                          " B w " + zegar.ElapsedMilliseconds + " ms " +
-                                          "(druga strona pary nie odbiera)");
+                // **Po limicie porzucamy reszte, zamiast dobijac sie dalej.**
+                //
+                // Pytanie "czy kolejka nadawcza jest dluga" na com0com **nie dziala** -
+                // zmierzone 16 wrzesnia: zapis stal 4542 ms, a licznik porzuconych zostal
+                // na zerze, bo `cbOutQue` przez caly ten czas byl ponizej progu. Para nie
+                // buforuje i nie zglasza zatoru; ona po prostu **wstrzymuje zapis**, dopoki
+                // druga strona nie odbierze. Jedyne, co widzimy, to czas - wiec na czasie
+                // stawiamy granice.
+                if (poszlo < ile && zegar.Elapsed > LimitZapisu)
+                {
+                    Interlocked.Add(ref _porzucone, ile - poszlo);
+                    break;
+                }
             }
         });
 

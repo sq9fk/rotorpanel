@@ -473,6 +473,33 @@ jesli nikt ich nie slucha**. Przed kazdym zapisem patrzymy na `cbOutQue`; powyze
 kilobajtow porzucamy kawalek i liczymy go w `PorzuconeBajty` (licznik idzie do wpisu o zwloce).
 Zaden bajt obrazu nie jest wart zatrzymania mostka na szesc sekund.
 
+**Dziewiata warstwa i rozstrzygniecie** (1.11.49). Rozdzielenie pomiaru na "czekanie na uchwyt"
+i "sam zapis" dalo odpowiedz w jednym wpisie:
+
+```
+ostatni zapis 431 B w 4542 ms, czekanie na uchwyt 32 ms
+```
+
+**Trzydziesci dwa kontra cztery i pol tysiaca.** `KolejnoscPortu` z 1.11.45 dziala i szeregowanie
+z pompa odczytu jest zalatwione; blokada siedzi **w samym `WriteFile`**. Drugi wpis z tego samego
+przebiegu pokazuje skutek: `14 B w 0 ms, czekanie 0 ms`, ale **11 kawalkow w kolejce** i 2748 ms
+zwloki - czyli jeden zablokowany zapis, za nim korek, potem wszystko splywa naraz.
+
+**Zatkania nie da sie wykryc pytaniem o kolejke.** Prog na `cbOutQue` z 1.11.46 **nie zadzialal
+ani razu** - przy zapisie stojacym 4542 ms licznik porzuconych zostal na zerze. com0com nie
+buforuje i nie zglasza zatoru; on **wstrzymuje zapis**, dopoki druga strona nie odbierze.
+Jedyne, co widac z naszej strony, to **czas**.
+
+Stad limity: `WriteTotalTimeoutConstant` z 2000 na **200 ms**, a caly kawalek ma na siebie
+**300 ms** - potem porzucamy reszte i liczymy ja w `PorzuconeBajty`. Zgubiony kawalek obrazu
+jest tanszy niz zamrozony mostek: nastepna klatka przychodzi za okolo 95 ms, a czterosekundowy
+przestoj zatrzymuje takze ramki statusu.
+
+**Jesli to nie wystarczy, zostaje `FILE_FLAG_OVERLAPPED`** - uchwyt nakladkowy, przy ktorym
+odczyt i zapis nie szereguja sie w jadrze, a zapis da sie **anulowac** zamiast czekac na limit.
+To przebudowa wejscia-wyjscia wszystkich mostkow i dlatego jest ostatnia w kolejce, a nie
+pierwsza.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.
