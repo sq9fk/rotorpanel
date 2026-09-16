@@ -97,6 +97,7 @@ public sealed class Mostek : IDisposable
     private int _brakow, _spoznionych, _ileWymian, _zapytan, _odpowiedzi, _statusowPoprzednio;
     private double _sumaMs, _minMs = double.MaxValue, _maxMs;
     private long _ostatniZrzutBraku, _ostatnieZerwanie;
+    private int _odrzuconych;
 
     // Kiedy ostatnio cokolwiek przyszlo od wzmacniacza i kiedy ostatnio zglosilismy przerwe.
     // Kiedy ostatnio cokolwiek przyszlo od urzadzenia po drugiej stronie - sterownika
@@ -801,12 +802,18 @@ public sealed class Mostek : IDisposable
             // Skutek byl taki, ze kazdy wpis dotyczacy wzmacniacza mial puste bufory i pusty
             // dziennik, czyli byl dowodem bez dowodu. Zgloszenie "microBIT przeskakuje
             // Standby/Remoted" nie mialo sie o co oprzec.
-            (zPortu ? _doSterownika : _odSterownika).Dopisz(bufor, n);
-            _dziennik.Dopisz(zPortu ? "PC ->" : "   <- sterownik", bufor, n);
+            // **Zbieramy tylko wtedy, gdy ktos to przeczyta.** Kopiowanie do buforow i zlozenie
+            // linii dziennika idzie przy **kazdym kawalku**, na watku pompy - przy wylaczonej
+            // pulapce jest to praca wykonana po to, zeby ja wyrzucic.
+            if (Pulapka.Wlaczona)
+            {
+                (zPortu ? _doSterownika : _odSterownika).Dopisz(bufor, n);
+                _dziennik.Dopisz(zPortu ? "PC ->" : "   <- sterownik", bufor, n);
+            }
 
             // Rozbior nastaw zostaje przy rotorach - tam `2F` znaczy nastawe, a przy
             // wzmacniaczu ten sam bajt nie znaczy nic.
-            if (!OdpytywacSpe)
+            if (!OdpytywacSpe && Pulapka.Wlaczona)
             {
                 // Zapisujemy **kazda** nastawe, nie tylko podejrzana. Jest ich kilka na
                 // godzine, a bez pelnej listy nie da sie powiedziec, czy 208 przyszlo
@@ -941,6 +948,20 @@ public sealed class Mostek : IDisposable
 
     /// <summary>Ile odpowiedzi przyszlo po terminie, gdy juz nikt na nie nie czekal.</summary>
     public int SpoznioneOdpowiedzi => Volatile.Read(ref _spoznionych);
+
+    /// <summary>Ile zapytan o pozycje wyslalismy od zestawienia lacza.</summary>
+    public int Zapytan { get { lock (_wymiany) return _zapytan; } }
+
+    /// <summary>Ile odpowiedzi wrocilo od zestawienia lacza.</summary>
+    public int Odpowiedzi { get { lock (_wymiany) return _odpowiedzi; } }
+
+    /// <summary>
+    /// Ile odczytow pozycji odrzucil filtr - **licznik jest zawsze, takze przy wylaczonej
+    /// pulapce**. Dane o polozeniu anteny nie moga znikac po cichu, a przy diagnostyce
+    /// zgaszonej nie ma pliku, w ktorym dalo by sie to zobaczyc. Liczba idzie do podpowiedzi
+    /// ser2neta.
+    /// </summary>
+    public int OdrzuconeOdczyty => Volatile.Read(ref _odrzuconych);
 
     /// <summary>
     /// Znaczy chwile, w ktorej cokolwiek przyszlo od wzmacniacza.
@@ -1319,6 +1340,7 @@ public sealed class Mostek : IDisposable
         }
 
         _odrzuconeZRzedu++;
+        Interlocked.Increment(ref _odrzuconych);
         ZglosNieprawdopodobny("ODRZUCONY ODCZYT", poprzednia, pozycja, ramka, sekundy, dopuszczalny);
         return true;
     }

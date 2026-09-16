@@ -190,6 +190,11 @@ public partial class SettingsForm
 
         _cfg.AutoPolacz     = _autoPolacz.Checked;
         _cfg.SprawdzajAktualizacje = _sprawdzajAktualizacje.Checked;
+
+        // Dziala od razu - zeby dalo sie wlaczyc zbieranie w chwili, gdy usterka wlasnie trwa,
+        // bez zamykania programu i tracenia tego, co sie dzieje.
+        _cfg.PulapkaRamek = _pulapkaRamek.Checked;
+        Pulapka.Wlaczona = _pulapkaRamek.Checked;
         _cfg.PiIp           = _ip.Text.Trim();
         _cfg.SterownikAnten = Config.NormalizujHost(_sterownik.Text);
         _cfg.Setupc         = _setupc.Text.Trim();

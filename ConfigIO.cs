@@ -11,7 +11,8 @@ public partial class Config
             Setupc = "C:/Program Files (x86)/com0com/setupc.exe",
             SterownikAnten = "",
             AutoPolacz = false,
-            SprawdzajAktualizacje = true
+            SprawdzajAktualizacje = true,
+            PulapkaRamek = false
         };
         for (int i = 1; i <= 6; i++)
             cfg.Anteny.Add(new Antena { Nr = i, Nazwa = "ANT" + i });
@@ -36,8 +37,12 @@ public partial class Config
             Setupc         = Json.Tekst(korzen, "setupc"),
             SterownikAnten = NormalizujHost(Json.Tekst(korzen, "sterownikAnten")),
             AutoPolacz     = Json.Flaga(korzen, "autoPolacz", false),
-            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true)
+            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true),
+            PulapkaRamek = Json.Flaga(korzen, "pulapkaRamek", false)
         };
+
+        // Wylacznik musi zadzialac **zanim ruszy pierwszy mostek**, a pulapka jest statyczna.
+        Pulapka.Wlaczona = cfg.PulapkaRamek;
 
         CzytajRotory(cfg, korzen);
         CzytajUrzadzenia(cfg, korzen);
@@ -270,6 +275,7 @@ public partial class Config
         korzen.Dodaj("sterownikAnten", SterownikAnten);
         korzen.Dodaj("autoPolacz", AutoPolacz);
         korzen.Dodaj("sprawdzajAktualizacje", SprawdzajAktualizacje);
+        korzen.Dodaj("pulapkaRamek", PulapkaRamek);
         korzen.Dodaj("rotory", rotory);
         korzen.Dodaj("urzadzenia", urzadzenia);
         korzen.Dodaj("anteny", anteny);

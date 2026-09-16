@@ -1920,6 +1920,49 @@ watkow (`ZaplanujBadanieStrony`, pola czytane atomowo), a przebudowa listy uzywa
 kazdej linii, w sciezce danych mostka. Teraz trzyma otwarty uchwyt, a po 10 MB przewija plik
 na `.old`.
 
+## Wersja produkcyjna: diagnostyka na zadanie, nie na stale
+
+**Pulapka ramek jest domyslnie wylaczona** (1.12.0). Wlacza sie ja w Ustawieniach polem
+*Diagnostyka ramek (podejrzane.txt)*, a przelacznik dziala **od razu** - zeby dalo sie zaczac
+zbierac w chwili, gdy usterka wlasnie trwa, bez zamykania programu.
+
+Powod nie jest kosmetyczny. Pulapka kosztuje przy **kazdym kawalku danych**: kopiuje go
+do buforow obu kierunkow i sklada linie dziennika, na watku pompy. Przy czterech mostkach
+i kilkudziesieciu kawalkach na sekunde to praca wykonywana wylacznie po to, zeby ja zaraz
+wyrzucic. Przy wylaczonej diagnostyce **nie powstaje nawet plik** - i to samo w sobie jest
+informacja: brak pliku znaczy wtedy "nie zbieralismy", a nie "nic nie bylo".
+
+**Czego nie wolno bylo przy tym stracic.** Zasada z calego tego sledztwa brzmi: *dane
+o polozeniu anteny nie moga znikac po cichu*. Filtr pozycji dziala dalej niezaleznie od
+diagnostyki, wiec bez pliku odrzucony odczyt nie mialby gdzie zostawic sladu. Dlatego
+`Mostek.OdrzuconeOdczyty` liczy sie **zawsze**, a liczba stoi w podpowiedzi ser2neta jako
+osobna uwaga. Licznik w interfejsie zastepuje wpis w pliku, nie znosi go.
+
+**Czerwona stopka tylko dla rotorow.** Zgubiona odpowiedz przy rotorze jest wskaznikiem
+wyprzedzajacym zlego odczytu pozycji - to bylo zmierzone i dlatego trafila na stopke. Przy
+wzmacniaczu nie znaczy nic, co dalo by sie zrobic: SPE co jakis czas po prostu nie odpowiada,
+a odczyt przyjdzie za sekunde. Czerwony napis z takiego powodu to falszywy alarm i w wersji
+produkcyjnej go nie ma.
+
+**Podpowiedz ser2neta jest tabela z procentami.** Zdanie na mostek bylo do czytania, nie do
+porownywania - a przy trzech rotorach cale pytanie brzmi "ktory gubi wiecej". Tabela ma stale
+szerokosci kolumn, liczby wyrownane do prawej i **udzial brakow w procentach**:
+
+```
+Port  Rotor    Stan       Zapytań  Braki     %  Czasy min/śr/max
+────  ───────  ─────────  ───────  ─────  ────  ────────────────
+4101  RAU A3S  połączony     3217      0  0,0%  282/301/657 ms
+4102  RAK 15m  połączony     3196      3  0,1%  270/306/673 ms
+4103  RAU 10m  łączenie…        —      —     —  —
+```
+
+Dymek rysuje sie **czcionka o stalej szerokosci** (`Theme.Mono`, wlasny `ToolTip`
+z `OwnerDraw`) - domyslna czcionka dymka jest proporcjonalna i kolumny by sie rozjechaly,
+a wtedy tabela nie ma przewagi nad zdaniem. Uwagi, ktore nie sa liczbami - blad polaczenia,
+przejmowanie portu, odrzucone odczyty - ida pod tabela, zeby nie rozpychac kolumn.
+Sprawdza to `TestTabeli` w harnessie: kolumna stanu stoi w pionie, liczby koncza sie rowno
+z naglowkiem, kreski maja dlugosc naglowka.
+
 ## Zielone swiatlo ma znaczyc "przychodza odpowiedzi"
 
 **Zdarzenie z 15 wrzesnia, 18:34:58** - jedyne w calej serii, ktore bylo prawdziwa usterka

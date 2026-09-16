@@ -139,6 +139,9 @@ public partial class Config
     public bool   AutoPolacz     { get; set; }
     public bool   SprawdzajAktualizacje { get; set; } = true;
 
+    /// <summary>Diagnostyka ramek do <c>podejrzane.txt</c>. Patrz <see cref="Pulapka.Wlaczona"/>.</summary>
+    public bool   PulapkaRamek { get; set; }
+
     public List<Rotor>      Rotory     { get; set; } = new List<Rotor>();
     public List<Urzadzenie> Urzadzenia { get; set; } = new List<Urzadzenie>();
     public List<Antena>     Anteny     { get; set; } = new List<Antena>();

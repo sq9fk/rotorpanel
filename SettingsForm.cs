@@ -9,7 +9,7 @@ public partial class SettingsForm : Form
     private readonly Config _cfg;
 
     private TextBox _ip, _sterownik, _setupc;
-    private CheckBox _autoPolacz, _sprawdzajAktualizacje;
+    private CheckBox _autoPolacz, _sprawdzajAktualizacje, _pulapkaRamek;
     private Label _info;
 
     private DataGridView _siatkaRotorow, _siatkaUrzadzen, _siatkaAnten;
@@ -105,6 +105,18 @@ public partial class SettingsForm : Form
             BackColor = Color.Transparent
         };
         Controls.Add(_sprawdzajAktualizacje);
+
+        _pulapkaRamek = new CheckBox
+        {
+            Text = "Diagnostyka ramek (podejrzane.txt)",
+            Checked = cfg.PulapkaRamek,
+            Location = new Point(490, 782),
+            Size = new Size(248, 22),
+            Font = Theme.Zwykly(),
+            ForeColor = Theme.Tekst,
+            BackColor = Color.Transparent
+        };
+        Controls.Add(_pulapkaRamek);
 
         _info = Ui.Etykieta("", Theme.Maly(), Theme.TekstSzary,
             new Point(20, 810), new Size(440, 18));

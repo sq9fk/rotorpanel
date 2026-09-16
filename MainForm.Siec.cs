@@ -36,50 +36,60 @@ public partial class MainForm
         _opisSer2net.Text = "ser2net " + _cfg.PiIp;
 
         int polaczone = 0, wbledzie = 0, zatrzymane = 0;
-        var opisy = new List<string>();
+        var wiersze = new List<string[]>();
+        var uwagi = new List<string>();
 
         foreach (var rotor in rotory)
         {
             var mostek = _mostki.FirstOrDefault(m => ReferenceEquals(m.Punkt, rotor));
-            string adres = _cfg.AdresDla(rotor) + ":" + rotor.Port;
-            string skad;
+            string stan;
 
             switch (mostek?.Stan)
             {
                 case StanMostka.Polaczony:
                     polaczone++;
-                    skad = "odpowiada — mostek połączony";
+                    stan = "połączony";
                     break;
 
                 case StanMostka.Laczenie when mostek.Blad.Length > 0:
                     wbledzie++;
-                    skad = "nie odpowiada: " + mostek.Blad;
+                    stan = "bez łączności";
+                    uwagi.Add(rotor.Etykieta + ": " + mostek.Blad);
                     break;
 
                 case StanMostka.Laczenie:
-                    skad = "łączenie…";
+                    stan = "łączenie…";
                     break;
 
                 default:
                     zatrzymane++;
-                    skad = "nie sprawdzam — mostek zatrzymany";
+                    stan = "zatrzymany";
                     break;
             }
 
             if (mostek is { ObcePrzejecia: > 0 })
-                skad += "; port przejmowany przez inny program (" + mostek.ObcePrzejecia + "×)";
+                uwagi.Add(rotor.Etykieta + ": port przejmowany przez inny program (" +
+                          mostek.ObcePrzejecia + "×)");
 
-            // Czasy wymiany przy KAZDYM rotorze osobno. Sonda wpieta wprost w port szeregowy
-            // Pi zmierzyla na sterowniku 243/245/247 ms, wiec wszystko ponad to dokladamy
-            // my albo ser2net - a zeby to zobaczyc, trzeba miec te trzy tory obok siebie.
-            if (mostek != null && mostek.OpisWymiany.Length > 0)
+            // Odrzucone odczyty pozycji pokazujemy **zawsze**, takze przy wylaczonej
+            // diagnostyce ramek - inaczej przy produkcyjnych ustawieniach znikalyby bez sladu.
+            if (mostek is { OdrzuconeOdczyty: > 0 })
+                uwagi.Add(rotor.Etykieta + ": odrzucone odczyty pozycji — " +
+                          mostek.OdrzuconeOdczyty + "×");
+
+            int zapytan = mostek?.Zapytan ?? 0;
+            int braki = mostek?.BrakiOdpowiedzi ?? 0;
+
+            wiersze.Add(new[]
             {
-                skad += "; wymiana " + mostek.OpisWymiany + "; " + mostek.BilansWymian;
-                if (mostek.SpoznioneOdpowiedzi > 0)
-                    skad += ", po terminie " + mostek.SpoznioneOdpowiedzi;
-            }
-
-            opisy.Add(rotor.Etykieta + " " + adres + " — " + skad);
+                rotor.Port.ToString(),
+                rotor.Etykieta,
+                stan,
+                zapytan > 0 ? zapytan.ToString() : "—",
+                zapytan > 0 ? braki.ToString() : "—",
+                zapytan > 0 ? (braki * 100.0 / zapytan).ToString("0.0") + "%" : "—",
+                mostek != null && mostek.OpisWymiany.Length > 0 ? mostek.OpisWymiany : "—"
+            });
         }
 
         bool przejmowany = _mostki.Any(m => m.ObcePrzejecia > 0);
@@ -95,11 +105,105 @@ public partial class MainForm
             zatrzymane == rotory.Count ? "mostki zatrzymane — nie sprawdzam portów"
                                        : polaczone + " z " + rotory.Count + " portów odpowiada";
 
-        Podpowiedz(_diodaSer2net, _opisSer2net,
-            _cfg.PiIp + " — " + podsumowanie + Environment.NewLine +
-            string.Join(Environment.NewLine, opisy) + Environment.NewLine +
-            "Portów nie badamy własnym połączeniem: ser2net oddaje port nowemu klientowi " +
-            "i zerwałoby to mostek — także w innej kopii programu.");
+        var tekst = new System.Text.StringBuilder();
+        tekst.AppendLine(_cfg.PiIp + " — " + podsumowanie);
+        tekst.AppendLine();
+        tekst.Append(Tabela(new[] { "Port", "Rotor", "Stan", "Zapytań", "Braki", "%",
+                                    "Czasy min/śr/max" }, wiersze));
+
+        if (uwagi.Count > 0)
+        {
+            tekst.AppendLine();
+            foreach (var u in uwagi) tekst.AppendLine(u);
+        }
+
+        tekst.AppendLine();
+        tekst.Append("Portów nie badamy własnym połączeniem: ser2net oddaje port nowemu" +
+                     Environment.NewLine +
+                     "klientowi i zerwałoby to mostek — także w innej kopii programu.");
+
+        PodpowiedzTabela(_diodaSer2net, _opisSer2net, tekst.ToString());
+    }
+
+    /// <summary>
+    /// Sklada tabele o stalej szerokosci kolumn. Liczby wyrownujemy do prawej, tekst do lewej -
+    /// inaczej procenty i liczniki nie daja sie porownac wzrokiem, a o to w tabeli chodzi.
+    /// </summary>
+    internal static string Tabela(string[] naglowki, List<string[]> wiersze)
+    {
+        int kolumn = naglowki.Length;
+        var szerokosci = new int[kolumn];
+
+        for (int k = 0; k < kolumn; k++)
+        {
+            szerokosci[k] = naglowki[k].Length;
+            foreach (var w in wiersze) szerokosci[k] = Math.Max(szerokosci[k], w[k].Length);
+        }
+
+        // Kolumny liczbowe (zapytania, braki, procenty) ida do prawej.
+        bool DoPrawej(int k) => k >= 3 && k <= 5;
+
+        string Linia(string[] pola)
+        {
+            var s = new System.Text.StringBuilder();
+            for (int k = 0; k < kolumn; k++)
+            {
+                if (k > 0) s.Append("  ");
+                s.Append(DoPrawej(k) ? pola[k].PadLeft(szerokosci[k])
+                                     : pola[k].PadRight(szerokosci[k]));
+            }
+            return s.ToString().TrimEnd();
+        }
+
+        var tekst = new System.Text.StringBuilder();
+        tekst.AppendLine(Linia(naglowki));
+        tekst.AppendLine(Linia(szerokosci.Select(s => new string('─', s)).ToArray()));
+        foreach (var w in wiersze) tekst.AppendLine(Linia(w));
+        return tekst.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Podpowiedz rysowana czcionka o stalej szerokosci - bez niej tabela sie rozjezdza,
+    /// bo domyslna czcionka dymka jest proporcjonalna i kolumny nie stoja w pionie.
+    /// </summary>
+    private void PodpowiedzTabela(Control a, Control b, string tekst)
+    {
+        var dymek = DymekTabeli();
+        dymek.SetToolTip(a, tekst);
+        dymek.SetToolTip(b, tekst);
+    }
+
+    private ToolTip _dymekTabeli;
+    private readonly Font _fontTabeli = Theme.Mono();
+
+    private ToolTip DymekTabeli()
+    {
+        if (_dymekTabeli != null) return _dymekTabeli;
+
+        // Dluzszy czas wyswietlania: tabela ma kilkanascie linii i domyslne piec sekund
+        // nie wystarcza, zeby ja przeczytac.
+        _dymekTabeli = new ToolTip { OwnerDraw = true, AutoPopDelay = 30000 };
+
+        _dymekTabeli.Popup += (_, e) =>
+        {
+            var rozmiar = TextRenderer.MeasureText(_dymekTabeli.GetToolTip(e.AssociatedControl),
+                                                   _fontTabeli);
+            e.ToolTipSize = new Size(rozmiar.Width + 16, rozmiar.Height + 12);
+        };
+
+        _dymekTabeli.Draw += (_, e) =>
+        {
+            e.DrawBackground();
+            e.DrawBorder();
+            TextRenderer.DrawText(e.Graphics, e.ToolTipText, _fontTabeli,
+                                  new Rectangle(e.Bounds.X + 8, e.Bounds.Y + 6,
+                                                e.Bounds.Width - 16, e.Bounds.Height - 12),
+                                  SystemColors.InfoText,
+                                  TextFormatFlags.Left | TextFormatFlags.Top |
+                                  TextFormatFlags.NoPadding);
+        };
+
+        return _dymekTabeli;
     }
 
     // ------------------------------------------------------- sterownik anten

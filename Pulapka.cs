@@ -14,6 +14,21 @@
 /// </summary>
 public static class Pulapka
 {
+    /// <summary>
+    /// Czy zbierac diagnostyke ramek. **W wersji produkcyjnej domyslnie wylaczone.**
+    ///
+    /// Pulapka powstala do polowania na rzadkie usterki i do tego jest niezastapiona - ale
+    /// kosztuje przy **kazdym kawalku danych**: kopiowanie do buforow obu kierunkow i zlozenie
+    /// napisu do dziennika, na watku pompy. Gdy nikt tych danych nie czyta, jest to praca
+    /// wykonywana wylacznie po to, zeby ja zaraz wyrzucic.
+    ///
+    /// Wylacznik jest w Ustawieniach. Gdy jest zgaszony, **nie powstaje nawet plik** - a to
+    /// samo w sobie jest informacja: pusty katalog znaczy "nie zbieralismy", nie "nic nie bylo".
+    /// Dlatego liczniki, ktore mialy sens diagnostyczny (odrzucone odczyty pozycji, braki
+    /// odpowiedzi), zostaly **przeniesione do interfejsu** i licza sie zawsze.
+    /// </summary>
+    public static volatile bool Wlaczona;
+
     private static readonly object _zamek = new();
     private const long MaksymalnyRozmiar = 2L * 1024 * 1024;
 
@@ -175,6 +190,7 @@ public static class Pulapka
     /// </summary>
     public static void Uzbrojono(string podpis)
     {
+        if (!Wlaczona) return;
         Zapisz(podpis, "pulapka uzbrojona, wersja " +
                System.Reflection.Assembly.GetExecutingAssembly().GetName().Version, null, null,
                TimeSpan.Zero);
@@ -197,6 +213,8 @@ public static class Pulapka
     public static void Zapisz(string podpis, string powod, Bufor doSterownika, Bufor odSterownika,
                               TimeSpan odPolaczenia, Dziennik dziennik = null)
     {
+        if (!Wlaczona) return;
+
         try
         {
             var tekst = new System.Text.StringBuilder();

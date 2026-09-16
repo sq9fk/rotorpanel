@@ -391,7 +391,13 @@ public partial class MainForm
         // to wskaznik wyprzedzajacy zlych odczytow pozycji.
         if (ostatniBlad.Length == 0)
         {
-            var gubiacy = _mostki.OrderByDescending(m => m.BrakiOdpowiedzi)
+            // **Tylko rotory.** Przy rotorze zgubiona odpowiedz jest wskaznikiem
+            // wyprzedzajacym zlego odczytu pozycji i warto ja widziec od razu. Przy
+            // wzmacniaczu nie znaczy nic, co dalo by sie zrobic: zmierzone, ze SPE
+            // co jakis czas po prostu nie odpowiada, a odczyt przyjdzie za sekunde.
+            // Czerwona stopka z takiego powodu to falszywy alarm w wersji produkcyjnej.
+            var gubiacy = _mostki.Where(m => m.Punkt is Rotor)
+                                 .OrderByDescending(m => m.BrakiOdpowiedzi)
                                  .FirstOrDefault(m => m.BrakiOdpowiedzi > 0);
             if (gubiacy != null)
                 ostatniBlad = gubiacy.Punkt.Etykieta + ": sterownik nie odpowiedział " +
