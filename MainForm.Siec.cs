@@ -78,14 +78,23 @@ public partial class MainForm
                           mostek.OdrzuconeOdczyty + "×");
 
             int zapytan = mostek?.Zapytan ?? 0;
+            int odpowiedzi = mostek?.Odpowiedzi ?? 0;
             int braki = mostek?.BrakiOdpowiedzi ?? 0;
 
+            // **Odpowiedzi sa w tabeli po to, zeby dalo sie ja sprawdzic bez pytania nikogo.**
+            // Zapytania, odpowiedzi i braki to trzy liczby z trzech roznych miejsc kodu:
+            // pierwsza rosnie przy wysylce ramki, druga przy rozebraniu odpowiedzi, trzecia
+            // przy porzuceniu zapytania starszego niz 700 ms. Jesli sie nie skladaja - poza
+            // jednym zapytaniem, ktore akurat jest w locie - to nie lacze jest chore, tylko
+            // licznik. Pytanie "czy zero brakow przy 11 000 zapytan jest poprawne" ma sie
+            // rozstrzygac w tabeli, a nie w rozmowie.
             wiersze.Add(new[]
             {
                 rotor.Port.ToString(),
                 rotor.Etykieta,
                 stan,
                 zapytan > 0 ? zapytan.ToString() : "—",
+                zapytan > 0 ? odpowiedzi.ToString() : "—",
                 zapytan > 0 ? braki.ToString() : "—",
                 zapytan > 0 ? (braki * 100.0 / zapytan).ToString("0.0") + "%" : "—",
                 mostek != null && mostek.OpisWymiany.Length > 0 ? mostek.OpisWymiany : "—"
@@ -108,8 +117,11 @@ public partial class MainForm
         var tekst = new System.Text.StringBuilder();
         tekst.AppendLine(_cfg.PiIp + " — " + podsumowanie);
         tekst.AppendLine();
-        tekst.Append(Tabela(new[] { "Port", "Rotor", "Stan", "Zapytań", "Braki", "%",
-                                    "Czasy min/śr/max" }, wiersze));
+        tekst.Append(Tabela(
+            new[] { "Port", "Rotor", "Stan", "Zapytań", "Odpowiedzi", "Braki", "%",
+                    "Czasy min/śr/max" },
+            new[] { false, false, false, true, true, true, true, false },
+            wiersze));
 
         if (uwagi.Count > 0)
         {
@@ -129,7 +141,7 @@ public partial class MainForm
     /// Sklada tabele o stalej szerokosci kolumn. Liczby wyrownujemy do prawej, tekst do lewej -
     /// inaczej procenty i liczniki nie daja sie porownac wzrokiem, a o to w tabeli chodzi.
     /// </summary>
-    internal static string Tabela(string[] naglowki, List<string[]> wiersze)
+    internal static string Tabela(string[] naglowki, bool[] doPrawej, List<string[]> wiersze)
     {
         int kolumn = naglowki.Length;
         var szerokosci = new int[kolumn];
@@ -140,16 +152,13 @@ public partial class MainForm
             foreach (var w in wiersze) szerokosci[k] = Math.Max(szerokosci[k], w[k].Length);
         }
 
-        // Kolumny liczbowe (zapytania, braki, procenty) ida do prawej.
-        bool DoPrawej(int k) => k >= 3 && k <= 5;
-
         string Linia(string[] pola)
         {
             var s = new System.Text.StringBuilder();
             for (int k = 0; k < kolumn; k++)
             {
                 if (k > 0) s.Append("  ");
-                s.Append(DoPrawej(k) ? pola[k].PadLeft(szerokosci[k])
+                s.Append(doPrawej[k] ? pola[k].PadLeft(szerokosci[k])
                                      : pola[k].PadRight(szerokosci[k]));
             }
             return s.ToString().TrimEnd();

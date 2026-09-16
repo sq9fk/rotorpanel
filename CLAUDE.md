@@ -1949,12 +1949,26 @@ porownywania - a przy trzech rotorach cale pytanie brzmi "ktory gubi wiecej". Ta
 szerokosci kolumn, liczby wyrownane do prawej i **udzial brakow w procentach**:
 
 ```
-Port  Rotor    Stan       Zapytań  Braki     %  Czasy min/śr/max
-────  ───────  ─────────  ───────  ─────  ────  ────────────────
-4101  RAU A3S  połączony     3217      0  0,0%  282/301/657 ms
-4102  RAK 15m  połączony     3196      3  0,1%  270/306/673 ms
-4103  RAU 10m  łączenie…        —      —     —  —
+Port  Rotor    Stan       Zapytań  Odpowiedzi  Braki     %  Czasy min/śr/max
+────  ───────  ─────────  ───────  ──────────  ─────  ────  ────────────────
+4101  RAU A3S  połączony     3217        3217      0  0,0%  282/301/657 ms
+4102  RAK 15m  połączony     3196        3193      3  0,1%  270/306/673 ms
+4103  RAU 10m  łączenie…        —           —      —     —  —
 ```
+
+**Kolumna z odpowiedziami jest tam po to, zeby tabela sprawdzala sie sama.** Pytanie
+uzytkownika brzmialo: *"przy 11 000 zapytan pokazuje zero brakow - czy to poprawne?"*
+- i takie pytanie nie powinno wymagac rozmowy. Te trzy liczby pochodza z **trzech roznych
+miejsc kodu**: zapytania rosna przy wysylce ramki (`ZanotujWyslanie`), odpowiedzi przy jej
+rozebraniu (`ZanotujOdbior`), braki przy porzuceniu zapytania starszego niz 700 ms
+(`PorzucPrzeterminowane`). Jesli `zapytania = odpowiedzi + braki` z dokladnoscia do jednego
+zapytania w locie, licznik jest zdrowy i zero jest zerem. Jesli nie - chory jest przyrzad,
+nie lacze.
+
+Warto tez wiedziec, ze **"braki" w tabeli to co innego niz "brak" w dawnym bilansie**:
+tu jest licznik **porzuconych** zapytan (odpowiedz nie przyszla w 700 ms), tam byla roznica
+arytmetyczna `zapytania - odpowiedzi - w locie`. Zgodnosc tych dwoch liczb jest wlasnie tym,
+co tabela teraz pokazuje.
 
 Dymek rysuje sie **czcionka o stalej szerokosci** (`Theme.Mono`, wlasny `ToolTip`
 z `OwnerDraw`) - domyslna czcionka dymka jest proporcjonalna i kolumny by sie rozjechaly,
