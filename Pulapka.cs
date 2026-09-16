@@ -141,8 +141,23 @@ public static class Pulapka
     /// </summary>
     public sealed class Dziennik
     {
-        private readonly Queue<string> _wpisy = new();
+        // Wpis gotowy (napis) albo odlozony (chwila, kierunek, kilkanascie bajtow).
+        // Patrz Optymalizacje.OszczedzajBufory.
+        private readonly Queue<object> _wpisy = new();
         private const int Ile = 150;
+
+        private sealed class Odlozony
+        {
+            public DateTime Kiedy;
+            public string Kierunek;
+            public byte[] Poczatek;
+            public int Ile;
+
+            public override string ToString() =>
+                Kiedy.ToString("HH:mm:ss.fff") + "  " + Kierunek + "  " +
+                Slad.Podglad(Poczatek, Math.Min(Ile, Poczatek.Length)) +
+                (Ile > Poczatek.Length ? "..." : "");
+        }
 
         /// <summary>
         /// Czy rozbierac bajty jak ramki SPID. Przy wzmacniaczu **nie** - `SladSpid` opisywalby
@@ -152,9 +167,29 @@ public static class Pulapka
 
         public void Dopisz(string kierunek, byte[] dane, int ile)
         {
-            string opis = RozbierajSpid ? SladSpid.Opis(dane, ile) : "";
-            string wpis = DateTime.Now.ToString("HH:mm:ss.fff") + "  " + kierunek + "  " +
-                          Slad.Podglad(dane, ile) + (opis.Length > 0 ? "   " + opis : "");
+            // **Formatowanie odkladamy tylko tam, gdzie da sie to zrobic taniej.** Przy
+            // wzmacniaczu do wpisu idzie i tak podglad kilkunastu bajtow, wiec kopiujemy je
+            // i skladamy napis dopiero przy wypisywaniu. Przy rotorach opis wymaga **calego**
+            // kawalka (rozbior ramek SPID), a kopia calosci bylaby drozsza niz gotowy napis -
+            // wiec tam zostaje po staremu.
+            object wpis;
+
+            if (Optymalizacje.OszczedzajBufory && !RozbierajSpid)
+            {
+                int n = Math.Min(ile, 16);
+                var poczatek = new byte[n];
+                Buffer.BlockCopy(dane, 0, poczatek, 0, n);
+                wpis = new Odlozony
+                {
+                    Kiedy = DateTime.Now, Kierunek = kierunek, Poczatek = poczatek, Ile = ile
+                };
+            }
+            else
+            {
+                string opis = RozbierajSpid ? SladSpid.Opis(dane, ile) : "";
+                wpis = DateTime.Now.ToString("HH:mm:ss.fff") + "  " + kierunek + "  " +
+                       Slad.Podglad(dane, ile) + (opis.Length > 0 ? "   " + opis : "");
+            }
 
             lock (_wpisy)
             {
@@ -165,7 +200,9 @@ public static class Pulapka
 
         public string Wypisz()
         {
-            lock (_wpisy) return string.Join(Environment.NewLine + "      ", _wpisy);
+            lock (_wpisy)
+                return string.Join(Environment.NewLine + "      ",
+                                   _wpisy.Select(w => w.ToString()));
         }
     }
 

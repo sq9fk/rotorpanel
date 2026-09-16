@@ -500,6 +500,31 @@ odczyt i zapis nie szereguja sie w jadrze, a zapis da sie **anulowac** zamiast c
 To przebudowa wejscia-wyjscia wszystkich mostkow i dlatego jest ostatnia w kolejce, a nie
 pierwsza.
 
+**Proba z wylacznikiem: mniej alokacji w goracej sciezce** (1.11.50). Stan po 1.11.49 jest taki,
+ze **zapis jest czysty** - `0 ms`, `zapisow niepelnych 0`, `porzuconych bajtow 0`, czekanie
+na uchwyt 0-24 ms - a kawalek i tak potrafi przeczekac w kolejce 221-885 ms. Przy najdluzszym
+z nich zastoj procesu wypadl **0,0 s wczesniej**.
+
+**To jest hipoteza, nie ustalenie**, i stad forma: zmiana ma wylacznik w Ustawieniach
+("Oszczedzaj pamiec w mostkach") dzialajacy **od razu**, bez ponownego uruchamiania, oraz flage
+`oszczedzajBufory` w `rotory.json`. Do kazdego wpisu pulapki dochodza **liczniki odsmiecen
+gen0/gen1/gen2** i informacja, czy oszczedzanie bylo wlaczone - zeby dalo sie porownac dwa
+przebiegi zamiast dyskutowac.
+
+Co oszczedzamy:
+- **odczyt pisze wprost do bufora pompy** zamiast do kopii posredniej (kilobajt na kazdy
+  odczyt, okolo czterdziestu odczytow na sekunde na mostek),
+- **zapis oddaje ten sam bufor**, gdy idzie w calosci i od poczatku - a tak konczy sie
+  zdecydowana wiekszosc zapisow,
+- **dziennik pulapki przy wzmacniaczu odklada formatowanie**: kopiuje szesnascie bajtow
+  i sklada napis dopiero przy powstawaniu wpisu. Przy rotorach zostaje po staremu, bo tam
+  opis wymaga **calego** kawalka (rozbior SPID) i kopia calosci bylaby drozsza niz napis.
+
+**Uwaga na przyszlosc:** `FILE_FLAG_OVERLAPPED` tego **nie naprawi**. Zwloka nie siedzi juz
+w wejsciu-wyjsciu, tylko miedzy wrzuceniem do kolejki a podjeciem przez pisarza - czyli
+w szeregowaniu watkow. Gdyby nie rozdzielenie pomiaru w 1.11.48, poszlaby na to przebudowa
+calej warstwy I/O czterech mostkow i objaw zostalby.
+
 Czego **nie** wylaczamy: **czytania**. Ramki, ktore klient sciaga dla siebie, i tak przeplywaja
 przez nas, wiec karta i okno stanu pokazuja je dalej - to nie kosztuje ani jednego bajtu na porcie.
 Gdy klient o status nie pyta, karta po pieciu sekundach czysci sie sama i nie pokazuje nic.

@@ -11,7 +11,8 @@ public partial class Config
             Setupc = "C:/Program Files (x86)/com0com/setupc.exe",
             SterownikAnten = "",
             AutoPolacz = false,
-            SprawdzajAktualizacje = true
+            SprawdzajAktualizacje = true,
+            OszczedzajBufory = true
         };
         for (int i = 1; i <= 6; i++)
             cfg.Anteny.Add(new Antena { Nr = i, Nazwa = "ANT" + i });
@@ -36,8 +37,13 @@ public partial class Config
             Setupc         = Json.Tekst(korzen, "setupc"),
             SterownikAnten = NormalizujHost(Json.Tekst(korzen, "sterownikAnten")),
             AutoPolacz     = Json.Flaga(korzen, "autoPolacz", false),
-            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true)
+            SprawdzajAktualizacje = Json.Flaga(korzen, "sprawdzajAktualizacje", true),
+            OszczedzajBufory = Json.Flaga(korzen, "oszczedzajBufory", true)
         };
+
+        // Przelacznik proby musi zadzialac **zanim ruszy pierwszy mostek**, a mostki czytaja
+        // go przez statyczne pole, nie przez konfiguracje - patrz Optymalizacje.
+        Optymalizacje.OszczedzajBufory = cfg.OszczedzajBufory;
 
         CzytajRotory(cfg, korzen);
         CzytajUrzadzenia(cfg, korzen);
@@ -270,6 +276,7 @@ public partial class Config
         korzen.Dodaj("sterownikAnten", SterownikAnten);
         korzen.Dodaj("autoPolacz", AutoPolacz);
         korzen.Dodaj("sprawdzajAktualizacje", SprawdzajAktualizacje);
+        korzen.Dodaj("oszczedzajBufory", OszczedzajBufory);
         korzen.Dodaj("rotory", rotory);
         korzen.Dodaj("urzadzenia", urzadzenia);
         korzen.Dodaj("anteny", anteny);

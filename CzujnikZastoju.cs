@@ -1,4 +1,4 @@
-namespace RotorPanel;
+﻿namespace RotorPanel;
 
 /// <summary>
 /// Wykrywa zastoje **wlasnego procesu** - i tylko po to istnieje.
@@ -62,13 +62,21 @@ public static class CzujnikZastoju
     {
         get
         {
+            // **Liczniki odsmiecania ida do kazdego wpisu.** Zastoj i odsmiecanie to dwie
+            // rozne rzeczy, ktore wygladaja tak samo z zewnatrz; dopiero zestawione obok
+            // siebie mowia, czy warto bylo oszczedzac pamiec. Patrz Optymalizacje.
+            string odsmiecanie = ", odsmiecen: " + GC.CollectionCount(0) + " / " +
+                                 GC.CollectionCount(1) + " / " + GC.CollectionCount(2) +
+                                 (Optymalizacje.OszczedzajBufory ? ", oszczedzanie wlaczone"
+                                                                 : ", oszczedzanie wylaczone");
+
             long kiedy = Volatile.Read(ref _kiedyZastoj);
-            if (kiedy == 0) return "proces nie stanal ani razu";
+            if (kiedy == 0) return "proces nie stanal ani razu" + odsmiecanie;
 
             double temu = TimeSpan.FromTicks(DateTime.UtcNow.Ticks - kiedy).TotalSeconds;
             return "ostatni zastoj procesu: " + Volatile.Read(ref _dlugoscZastoju).ToString("0") +
                    " ms, " + temu.ToString("0.0") + " s temu (razem " +
-                   Volatile.Read(ref _ileZastojow) + ")";
+                   Volatile.Read(ref _ileZastojow) + ")" + odsmiecanie;
         }
     }
 }

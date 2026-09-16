@@ -190,6 +190,11 @@ public partial class SettingsForm
 
         _cfg.AutoPolacz     = _autoPolacz.Checked;
         _cfg.SprawdzajAktualizacje = _sprawdzajAktualizacje.Checked;
+
+        // Dziala od razu, bez ponownego uruchamiania - to ma byc proba, ktora da sie
+        // wlaczyc i wylaczyc przy otwartym programie i porownac dwa przebiegi.
+        _cfg.OszczedzajBufory = _oszczedzajBufory.Checked;
+        Optymalizacje.OszczedzajBufory = _oszczedzajBufory.Checked;
         _cfg.PiIp           = _ip.Text.Trim();
         _cfg.SterownikAnten = Config.NormalizujHost(_sterownik.Text);
         _cfg.Setupc         = _setupc.Text.Trim();

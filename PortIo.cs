@@ -304,6 +304,16 @@ internal sealed class StrumienPortu : Stream
 
     public override int Read(byte[] bufor, int offset, int ile) => _kolejnosc.Odczyt(() =>
     {
+        // **Bez kopii posredniej.** Kazda nasza pompa czyta od poczatku wlasnego bufora,
+        // wiec `ReadFile` moze pisac wprost do niego. Inaczej idzie kilobajt na kazdy
+        // odczyt, a odczytow jest okolo czterdziestu na sekunde na mostek.
+        if (Optymalizacje.OszczedzajBufory && offset == 0)
+        {
+            if (!PortIo.ReadFile(_h, bufor, (uint)ile, out uint wprost, IntPtr.Zero))
+                throw new IOException("ReadFile: blad " + Marshal.GetLastWin32Error());
+            return (int)wprost;
+        }
+
         var tymczasowy = new byte[ile];
         if (!PortIo.ReadFile(_h, tymczasowy, (uint)ile, out uint przeczytane, IntPtr.Zero))
             throw new IOException("ReadFile: blad " + Marshal.GetLastWin32Error());
@@ -409,13 +419,25 @@ internal sealed class StrumienPortu : Stream
 
             while (poszlo < ile)
             {
-                var kawalek = new byte[ile - poszlo];
-                Buffer.BlockCopy(bufor, offset + poszlo, kawalek, 0, kawalek.Length);
+                // Pierwsze podejscie od poczatku bufora idzie bez kopii - a tak konczy sie
+                // zdecydowana wiekszosc zapisow, bo dopisywanie reszty jest rzadkie.
+                byte[] kawalek;
+                int dlugosc = ile - poszlo;
 
-                if (!PortIo.WriteFile(_h, kawalek, (uint)kawalek.Length, out uint teraz, IntPtr.Zero))
+                if (Optymalizacje.OszczedzajBufory && offset == 0 && poszlo == 0)
+                {
+                    kawalek = bufor;
+                }
+                else
+                {
+                    kawalek = new byte[dlugosc];
+                    Buffer.BlockCopy(bufor, offset + poszlo, kawalek, 0, dlugosc);
+                }
+
+                if (!PortIo.WriteFile(_h, kawalek, (uint)dlugosc, out uint teraz, IntPtr.Zero))
                     throw new IOException("WriteFile: blad " + Marshal.GetLastWin32Error());
 
-                if (teraz < kawalek.Length) _niepelne++;
+                if (teraz < dlugosc) _niepelne++;
                 poszlo += (int)teraz;
 
                 // **Po limicie porzucamy reszte, zamiast dobijac sie dalej.**

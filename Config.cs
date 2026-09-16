@@ -139,6 +139,9 @@ public partial class Config
     public bool   AutoPolacz     { get; set; }
     public bool   SprawdzajAktualizacje { get; set; } = true;
 
+    /// <summary>Proba: mniej alokacji w mostkach. Patrz <see cref="Optymalizacje"/>.</summary>
+    public bool   OszczedzajBufory { get; set; } = true;
+
     public List<Rotor>      Rotory     { get; set; } = new List<Rotor>();
     public List<Urzadzenie> Urzadzenia { get; set; } = new List<Urzadzenie>();
     public List<Antena>     Anteny     { get; set; } = new List<Antena>();
