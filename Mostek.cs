@@ -400,6 +400,14 @@ public sealed class Mostek : IDisposable
             catch { /* zatrzymania nie wolno blokowac */ }
         }
 
+        // **Zerujemy licznik ciszy urzadzenia.** Bez tego "LACZE WROCILO" po recznym
+        // rozlaczeniu podaje czas od ostatniego bajtu **sprzed przerwy**, a nie dlugosc
+        // usterki: w pliku z 16 wrzesnia stoi przez to `przerwa w dostawie do klienta
+        // 40008,2 s`, czyli jedenascie godzin, przez ktore mostek byl **celowo wylaczony**.
+        // Liczba prawdziwa i bezuzyteczna - a taka jest gorsza niz zadna, bo wyglada
+        // na usterke.
+        Interlocked.Exchange(ref _ostatniRuchZUrzadzenia, 0);
+
         try { _cts?.Cancel(); } catch { /* nic */ }
 
         // Zamkniecie uchwytow przerywa zawieszone odczyty - bez tego kazde
