@@ -324,8 +324,20 @@ internal sealed class StrumienPortu : Stream
     public int NiepelneZapisy => _niepelne;
     private int _niepelne;
 
-    /// <summary>Ile milisekund zajal ostatni zapis, razem z dopisywaniem reszty.</summary>
+    /// <summary>Ile milisekund zajal sam <c>WriteFile</c>, razem z dopisywaniem reszty.</summary>
     public long OstatniZapisMs { get; private set; }
+
+    /// <summary>
+    /// Ile milisekund zapis **czekal na uchwyt**, zanim w ogole ruszyl.
+    ///
+    /// Bez rozdzielenia tych dwoch liczb wpis o zwloce nie odpowiada na pytanie, ktore ma
+    /// znaczenie. W pliku z 16 wrzesnia stoi `98 B w 622 ms` - i dopoki obie fazy byly liczone
+    /// razem, nie dalo sie powiedziec, czy to **system nie przyjmuje danych**, czy **my
+    /// czekamy w kolejce po uchwyt**. Pierwsze znaczy prace przy `FILE_FLAG_OVERLAPPED`,
+    /// drugie - ze `KolejnoscPortu` nadal przegrywa z pompa odczytu. Dwie zupelnie rozne
+    /// naprawy, wiec przyrzad musi je rozroznic.
+    /// </summary>
+    public long OstatnieCzekanieMs { get; private set; }
 
     /// <summary>Ile bajtow porzucilismy, bo nikt ich po drugiej stronie nie odbieral.</summary>
     public int PorzuconeBajty => _porzucone;
@@ -403,12 +415,17 @@ internal sealed class StrumienPortu : Stream
             return;
         }
 
+        var czekanie = System.Diagnostics.Stopwatch.StartNew();
+
         // Pierwszenstwo przed pompa odczytu - patrz KolejnoscPortu. Bez tego zapis
         // siedemdziesieciu bajtow potrafil czekac 1222 ms na wirtualnej parze portow,
         // bo system szereguje operacje na uchwycie synchronicznym, a odczyt wydaje
         // kolejne zadanie zaraz po kazdym powrocie.
         _kolejnosc.Zapis(() =>
         {
+            OstatnieCzekanieMs = czekanie.ElapsedMilliseconds;
+            zegar.Restart();
+
             int poszlo = 0;
 
             while (poszlo < ile)

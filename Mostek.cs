@@ -407,6 +407,8 @@ public sealed class Mostek : IDisposable
         // Liczba prawdziwa i bezuzyteczna - a taka jest gorsza niz zadna, bo wyglada
         // na usterke.
         Interlocked.Exchange(ref _ostatniRuchZUrzadzenia, 0);
+        Interlocked.Exchange(ref _ostatniRuchKlienta, 0);
+        Interlocked.Exchange(ref _zgloszonyBrak, 0);
 
         try { _cts?.Cancel(); } catch { /* nic */ }
 
@@ -476,6 +478,21 @@ public sealed class Mostek : IDisposable
                             bezDanych.TotalSeconds.ToString("0.0") + " s",
                             _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
                 }
+
+                // **Pamiec o ruchu klienta nalezy do polaczenia, nie do sesji programu.**
+                //
+                // Blad wlasny, wprowadzony w 1.11.47 i zlapany pierwszym przebiegiem: zerowanie
+                // `_ostatniRuchZUrzadzenia` przy zatrzymaniu mostka sprawilo, ze po ponownym
+                // polaczeniu `SprawdzBrakOdpowiedzi` porownywalo **swiezo wyzerowany** czas
+                // urzadzenia ze **starym** czasem rozkazu klienta sprzed przerwy - i meldowalo
+                // "KLIENT BEZ ODPOWIEDZI 6,9 s" w 0,1 sekundy po zestawieniu lacza, gdy nikt
+                // o nic jeszcze nie zapytal.
+                //
+                // Naprawilem jeden zmyslajacy przyrzad i tym samym ruchem zepsulem drugi.
+                // Stad zasada: **liczniki jednego polaczenia zeruje sie razem**, w jednym
+                // miejscu, a nie po jednym tam, gdzie akurat boli.
+                Interlocked.Exchange(ref _ostatniRuchKlienta, 0);
+                Interlocked.Exchange(ref _zgloszonyBrak, 0);
 
                 // Przy migotaniu lacza ta linia zalewa plik - patrz ZglosZerwanie.
                 // Powod zerwania zapisujemy tak czy owak, wiec nic nie tracimy.
@@ -1410,6 +1427,7 @@ public sealed class Mostek : IDisposable
             ", porzuconych bajtow " + (pary?.PorzuconeBajty ?? -1) +
             ", ostatni zapis " + (pary?.OstatniZapisBajtow ?? -1) + " B w " +
             (pary?.OstatniZapisMs ?? -1) + " ms" + OpisPrzepustowosci(pary) +
+            ", czekanie na uchwyt " + (pary?.OstatnieCzekanieMs ?? -1) + " ms" +
             Environment.NewLine + "    " + CzujnikZastoju.Opis,
             _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
