@@ -500,25 +500,38 @@ odczyt i zapis nie szereguja sie w jadrze, a zapis da sie **anulowac** zamiast c
 To przebudowa wejscia-wyjscia wszystkich mostkow i dlatego jest ostatnia w kolejce, a nie
 pierwsza.
 
-**Proba z wylacznikiem: mniej alokacji w goracej sciezce** (1.11.50). Stan po 1.11.49 jest taki,
-ze **zapis jest czysty** - `0 ms`, `zapisow niepelnych 0`, `porzuconych bajtow 0`, czekanie
-na uchwyt 0-24 ms - a kawalek i tak potrafi przeczekac w kolejce 221-885 ms. Przy najdluzszym
-z nich zastoj procesu wypadl **0,0 s wczesniej**.
+**[cofniete] Proba z wylacznikiem: mniej alokacji w goracej sciezce** (1.11.50, cofniete
+w 1.11.51). Po 1.11.49 zapis byl juz czysty - `0 ms`, `zapisow niepelnych 0`, czekanie na
+uchwyt 0-24 ms - a kawalek i tak potrafil przeczekac w kolejce 221-885 ms, przy czym w jednym
+przypadku zastoj procesu wypadl **0,0 s wczesniej**. Stad hipoteza: winne odsmiecanie, bo
+odczyt alokowal kilobajt na kazde wywolanie, a dziennik pulapki skladal napis przy kazdym
+kawalku.
 
-**To jest hipoteza, nie ustalenie**, i stad forma: zmiana ma wylacznik w Ustawieniach
-("Oszczedzaj pamiec w mostkach") dzialajacy **od razu**, bez ponownego uruchamiania, oraz flage
-`oszczedzajBufory` w `rotory.json`. Do kazdego wpisu pulapki dochodza **liczniki odsmiecen
-gen0/gen1/gen2** i informacja, czy oszczedzanie bylo wlaczone - zeby dalo sie porownac dwa
-przebiegi zamiast dyskutowac.
+**Zmiana miala wylacznik i to on ja obalil w jednym przebiegu** - nie trzeba bylo nawet
+porownywac dwoch:
 
-Co oszczedzamy:
-- **odczyt pisze wprost do bufora pompy** zamiast do kopii posredniej (kilobajt na kazdy
-  odczyt, okolo czterdziestu odczytow na sekunde na mostek),
-- **zapis oddaje ten sam bufor**, gdy idzie w calosci i od poczatku - a tak konczy sie
-  zdecydowana wiekszosc zapisow,
-- **dziennik pulapki przy wzmacniaczu odklada formatowanie**: kopiuje szesnascie bajtow
-  i sklada napis dopiero przy powstawaniu wpisu. Przy rotorach zostaje po staremu, bo tam
-  opis wymaga **calego** kawalka (rozbior SPID) i kopia calosci bylaby drozsza niz napis.
+| czas | zwloka | zastoje / 40 s | odsmiecenia gen0 / 40 s |
+|---|---|---|---|
+| 08:58:00 | 158 ms | **+9,2** | +6,5 |
+| 08:58:42 | 159 ms | **+6,7** | +5,7 |
+| 08:59:18 | 281 ms | **+1,1** | +6,7 |
+| 08:59:57 | 593 ms | **+1,0** | +6,1 |
+
+**Odsmiecanie stoi jak wryte, zastoje spadaja dziewieciokrotnie.** Gdyby to smieci robily
+zastoje, obie kolumny szlyby razem. Do tego magnitudy sie nie zgadzaja: szesc odsmiecen gen0
+na czterdziesci sekund, kazde ponizej milisekundy, nie da dziewieciu przerw po 150-350 ms
+(gen1 trzy razy w cztery minuty, gen2 raz).
+
+**Mocniejszy wniosek jest taki, ze to prawdopodobnie w ogole nie jest nasz kod.** Nasze
+obciazenie bylo przez caly przebieg stale - klient odpytywal bez przerwy - a zastoje spadly
+z dziewieciu na jeden. Cos **na maszynie** bylo zajete przez pierwsza minute i sie uspokoilo.
+
+Zostaly **liczniki odsmiecen gen0/gen1/gen2 w opisie czujnika zastoju**: kosztuja jedno
+wywolanie, a to one rozstrzygnely sprawe. Przy nastepnym podejrzeniu o odsmiecanie odpowiedz
+bedzie w pliku od razu, bez nowego wydania.
+
+**Wzor, ktory sie tu potwierdzil:** zmiana wprowadzona **z wylacznikiem i wlasnym licznikiem**
+sama sie rozlicza. Bez tych dwoch rzeczy zostalaby w kodzie na zawsze jako "pewnie pomaga".
 
 **Uwaga na przyszlosc:** `FILE_FLAG_OVERLAPPED` tego **nie naprawi**. Zwloka nie siedzi juz
 w wejsciu-wyjsciu, tylko miedzy wrzuceniem do kolejki a podjeciem przez pisarza - czyli

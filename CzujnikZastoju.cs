@@ -62,13 +62,11 @@ public static class CzujnikZastoju
     {
         get
         {
-            // **Liczniki odsmiecania ida do kazdego wpisu.** Zastoj i odsmiecanie to dwie
-            // rozne rzeczy, ktore wygladaja tak samo z zewnatrz; dopiero zestawione obok
-            // siebie mowia, czy warto bylo oszczedzac pamiec. Patrz Optymalizacje.
+            // **Liczniki odsmiecania zostaja, choc proba oszczedzania pamieci zostala
+            // cofnieta.** To one ja obalily i kosztuja jedno wywolanie: przy nastepnym
+            // podejrzeniu o odsmiecanie odpowiedz bedzie w pliku od razu, bez nowego wydania.
             string odsmiecanie = ", odsmiecen: " + GC.CollectionCount(0) + " / " +
-                                 GC.CollectionCount(1) + " / " + GC.CollectionCount(2) +
-                                 (Optymalizacje.OszczedzajBufory ? ", oszczedzanie wlaczone"
-                                                                 : ", oszczedzanie wylaczone");
+                                 GC.CollectionCount(1) + " / " + GC.CollectionCount(2);
 
             long kiedy = Volatile.Read(ref _kiedyZastoj);
             if (kiedy == 0) return "proces nie stanal ani razu" + odsmiecanie;
