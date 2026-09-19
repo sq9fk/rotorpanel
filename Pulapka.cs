@@ -147,6 +147,36 @@ public static class Pulapka
     }
 
     /// <summary>
+    /// Sam azymut nastawy, bez skladania opisu - do listy, ktora mostek trzyma **zawsze**,
+    /// takze przy zgaszonej diagnostyce.
+    ///
+    /// Dzielnik to ten, ktory zgadza sie ze sterownikiem: cyfry 5400 przy rozdzielczosci 1
+    /// to 180 stopni, czyli `wartosc / (10 * rozdzielczosc) - 360`. Podejrzenie liczymy
+    /// szerzej, tak jak <see cref="OpiszNastawe"/> - jesli **ktorykolwiek** sensowny dzielnik
+    /// daje 208, chcemy o tym wiedziec, bo pomylka w dzielniku ukrylaby wlasnie ta nastawe,
+    /// ktorej szukamy.
+    /// </summary>
+    public static double? AzymutNastawy(byte[] r, out bool podejrzana)
+    {
+        podejrzana = false;
+        if (r.Length < 13 || r[11] != 0x2F) return null;
+
+        int wartosc = 0;
+        for (int k = 1; k <= 4; k++)
+        {
+            int cyfra = r[k] - '0';
+            if (cyfra < 0 || cyfra > 9) { podejrzana = true; return null; }
+            wartosc = wartosc * 10 + cyfra;
+        }
+
+        int rozdzielczosc = r[5] > 0 ? r[5] : 1;
+        foreach (int dzielnik in new[] { 1, 2, 4, 10, 10 * rozdzielczosc })
+            if (Math.Abs((double)wartosc / dzielnik - 360 - 208) < 0.05) podejrzana = true;
+
+        return (double)wartosc / (10 * rozdzielczosc) - 360;
+    }
+
+    /// <summary>
     /// Dziennik obu kierunkow w **jednej** osi czasu.
     ///
     /// Bufory "do sterownika" i "od sterownika" pokazuja, co przeszlo, ale nie pokazuja

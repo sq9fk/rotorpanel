@@ -1920,6 +1920,28 @@ watkow (`ZaplanujBadanieStrony`, pola czytane atomowo), a przebudowa listy uzywa
 kazdej linii, w sciezce danych mostka. Teraz trzyma otwarty uchwyt, a po 10 MB przewija plik
 na `.old`.
 
+## Nastawy pamietamy zawsze, bo tylko one ruszaja antena
+
+19 wrzesnia 10m **stanal na 208** - nie odczyt, tylko sama antena. W dzienniku sterownika
+widac to bez cienia watpliwosci: 250, 243, 237, 231, 225, 219, 212, a potem `57 02 00 08 20`
+powtorzone **okolo piecdziesiat razy pod rzad**, co do bajtu tak samo. Nie ma mowy o
+przeklamaniu bitu - rotor dojechal do 208, stanal i stal. Po nastawie 0 ruszyl 208 -> 360
+krotsza droga i zaparkowal. Mechanika i sterownik sa zdrowe; pytanie brzmi **kto kazal mu
+jechac na 208**.
+
+I na to pytanie nie bylo czym odpowiedziec. Lista nastaw byla tylko w `podejrzane.txt`,
+a plik zaczynal sie minute po zdarzeniu. Dlatego od 1.12.3 rozbior nastaw **nie jest gaszony
+razem z diagnostyka**: mostek trzyma osiem ostatnich w pamieci i pokazuje je w podpowiedzi
+ser2neta, z godzina i ze znakiem ⚠ przy 208.
+
+Kosztuje to tyle co nic i tym rozni sie od pulapki, ktora gasimy: rozkazy ida trzynastoma
+bajtami raz na kilkadziesiat sekund, a bufory pulapki kopiowaly **kazdy kawalek**. To ta sama
+zasada, co `OdrzuconeOdczyty` w 1.12.0 - wylacznik diagnostyki ma zdejmowac zbieranie ramek,
+nie widocznosc danych o polozeniu anteny.
+
+**Pusta lista jest odpowiedzia, nie brakiem odpowiedzi.** Znaczy: przez nas nic nie przeszlo -
+i kieruje szukanie na drugiego klienta ser2neta albo na panel sterownika, zamiast na nasz kod.
+
 ## Filtr pozycji ma prawo ustapic, ale nie po cichu
 
 Filtr odrzuca odczyt, ktory odbiega od poprzedniego bardziej, niz pozwala uplyniety czas,

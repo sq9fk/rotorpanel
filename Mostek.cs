@@ -98,6 +98,7 @@ public sealed class Mostek : IDisposable
     private double _sumaMs, _minMs = double.MaxValue, _maxMs;
     private long _ostatniZrzutBraku, _ostatnieZerwanie;
     private int _odrzuconych, _ustapien;
+    private readonly Queue<string> _nastawy = new();
 
     // Kiedy ostatnio cokolwiek przyszlo od wzmacniacza i kiedy ostatnio zglosilismy przerwe.
     // Kiedy ostatnio cokolwiek przyszlo od urzadzenia po drugiej stronie - sterownika
@@ -813,20 +814,30 @@ public sealed class Mostek : IDisposable
 
             // Rozbior nastaw zostaje przy rotorach - tam `2F` znaczy nastawe, a przy
             // wzmacniaczu ten sam bajt nie znaczy nic.
-            if (!OdpytywacSpe && Pulapka.Wlaczona)
-            {
-                // Zapisujemy **kazda** nastawe, nie tylko podejrzana. Jest ich kilka na
-                // godzine, a bez pelnej listy nie da sie powiedziec, czy 208 przyszlo
-                // z komputera, czy pojawilo sie gdzies dalej.
-                if (zPortu)
-                    foreach (var ramka in _rozkazy.Ramki(bufor, n))
-                    {
-                        string opis = Pulapka.OpiszNastawe(ramka, out _);
-                        if (opis != null)
-                            Pulapka.Zapisz(Podpis, opis, _doSterownika, _odSterownika,
-                                           _odPolaczenia.Elapsed);
-                    }
-            }
+            //
+            // **Ta galaz nie jest gaszona razem z diagnostyka.** Nastawa to jedyna rzecz
+            // w calym torze, ktora **rusza antena** - i 19 wrzesnia 10m stanal na 208, a na
+            // pytanie "kto wyslal te nastawe" nie bylo czym odpowiedziec, bo plik zaczynal
+            // sie minute pozniej. Rozbior kosztuje tyle co nic: rozkazy ida trzynastoma
+            // bajtami raz na kilkadziesiat sekund, a nie przy kazdym kawalku jak bufory
+            // pulapki. Do pliku nadal piszemy tylko przy wlaczonej diagnostyce, ale
+            // **lista ostatnich nastaw zyje zawsze** i stoi w podpowiedzi ser2neta.
+            if (!OdpytywacSpe && zPortu)
+                foreach (var ramka in _rozkazy.Ramki(bufor, n))
+                {
+                    double? az = Pulapka.AzymutNastawy(ramka, out bool podejrzana);
+                    if (az.HasValue || podejrzana) ZapamietajNastawe(az, podejrzana);
+
+                    if (!Pulapka.Wlaczona) continue;
+
+                    // Zapisujemy **kazda** nastawe, nie tylko podejrzana. Jest ich kilka na
+                    // godzine, a bez pelnej listy nie da sie powiedziec, czy 208 przyszlo
+                    // z komputera, czy pojawilo sie gdzies dalej.
+                    string opis = Pulapka.OpiszNastawe(ramka, out _);
+                    if (opis != null)
+                        Pulapka.Zapisz(Podpis, opis, _doSterownika, _odSterownika,
+                                       _odPolaczenia.Elapsed);
+                }
 
             if (czytnik is null)
             {
@@ -973,6 +984,31 @@ public sealed class Mostek : IDisposable
     /// pozycja. Licznik stoi w podpowiedzi ser2neta obok odrzuconych odczytow.
     /// </summary>
     public int UstapieniaFiltra => Volatile.Read(ref _ustapien);
+
+    /// <summary>
+    /// Ostatnie nastawy, jakie przeszly przez mostek - **niezaleznie od diagnostyki**.
+    ///
+    /// Nastawa jest jedyna rzecza w tym torze, ktora rusza antena, wiec pytanie "kto kazal
+    /// jej tam pojechac" musi miec odpowiedz zawsze, a nie tylko wtedy, gdy ktos wczesniej
+    /// pomyslal o wlaczeniu zbierania ramek. Pusta lista znaczy wtedy dokladnie jedno:
+    /// **przez nas nic nie przeszlo** - a to juz jest odpowiedz, bo kieruje szukanie na
+    /// drugiego klienta ser2neta albo na panel sterownika.
+    /// </summary>
+    public string OstatnieNastawy { get { lock (_nastawy) return string.Join(", ", _nastawy); } }
+
+    /// <summary>Dopisuje nastawe do listy ostatnich. Trzymamy osiem - tyle mieści sie w dymku.</summary>
+    private void ZapamietajNastawe(double? azymut, bool podejrzana)
+    {
+        string wpis = DateTime.Now.ToString("HH:mm:ss") + " → " +
+                      (azymut.HasValue ? azymut.Value.ToString("0.#") + "°" : "nieczytelna") +
+                      (podejrzana ? " ⚠" : "");
+
+        lock (_nastawy)
+        {
+            _nastawy.Enqueue(wpis);
+            while (_nastawy.Count > 8) _nastawy.Dequeue();
+        }
+    }
 
     /// <summary>
     /// Znaczy chwile, w ktorej cokolwiek przyszlo od wzmacniacza.

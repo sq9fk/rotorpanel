@@ -79,6 +79,11 @@ public partial class MainForm
 
             // Ustapienie filtra to moment, w ktorym program **zmienil zdanie** o polozeniu
             // anteny. Wazniejsze od samego odrzucenia i dlatego osobno.
+            // Lista nastaw jest najwazniejsza uwaga przy ucieczce rotora: albo pokazuje,
+            // kto kazal antenie tam pojechac, albo jest pusta - i wtedy nie kazalismy my.
+            if (mostek != null && mostek.OstatnieNastawy.Length > 0)
+                uwagi.Add(rotor.Etykieta + ": nastawy — " + mostek.OstatnieNastawy);
+
             if (mostek is { UstapieniaFiltra: > 0 })
                 uwagi.Add(rotor.Etykieta + ": filtr pozycji ustąpił — " +
                           mostek.UstapieniaFiltra + "× przyjął odczyt, który odrzucał");
