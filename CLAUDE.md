@@ -1920,6 +1920,34 @@ watkow (`ZaplanujBadanieStrony`, pola czytane atomowo), a przebudowa listy uzywa
 kazdej linii, w sciezce danych mostka. Teraz trzyma otwarty uchwyt, a po 10 MB przewija plik
 na `.old`.
 
+## Filtr pozycji ma prawo ustapic, ale nie po cichu
+
+Filtr odrzuca odczyt, ktory odbiega od poprzedniego bardziej, niz pozwala uplyniety czas,
+**ale po trzech odrzuceniach z rzedu przyjmuje odczyt jako prawdziwy**. To jest slusznie:
+filtr, ktory potrafi sie zablokowac, jest gorszy od braku filtra (1.11.3 - antena przekrecona
+recznie przy zamknietym programie zostawala odrzucana w nieskonczonosc).
+
+Do 1.12.1 to ustapienie **nie zostawialo sladu**. W dzienniku z 19 wrzesnia widac jeden wpis
+`ODRZUCONY ODCZYT: 252 -> 208` i nic wiecej - bo zawor pieciu sekund zjadal kolejne
+odrzucenia, a czwarty odczyt wchodzil juz jako prawdziwy bez slowa. Uzytkownik widzial
+"antene zatrzymana na 208" i nie mial jak odroznic zepsutego sterownika od programu, ktory
+przestal sie sprzeciwiac. Od 1.12.2 kazde ustapienie idzie do `podejrzane.txt`
+**z pominieciem zaworu** (to jest wlasnie ten jeden wpis, ktory zawor by zjadl) i liczy sie
+w `Mostek.UstapieniaFiltra`, osobno od odrzucen, w podpowiedzi ser2neta.
+
+Zasada: odrzucenie to "nie wierzymy", ustapienie to "**zmienilismy zdanie**". Druga rzecz
+jest wazniejsza od pierwszej, bo od niej liczba jedzie do programu sterujacego jako pozycja.
+
+**Skad bierze sie 208 w odpowiedzi.** Ramka `57 02 00 08 20` z 19 wrzesnia byla cala
+i poprawnie zamknieta - wiec ani lacze, ani skladacz nie mialy sie czego zaczepic. Zla byla
+liczba, nie ramka. `Skad208.SprawdzOdpowiedzi` w harnessie przeczesuje wszystkie pozycje
+i wszystkie pojedyncze przekrecone bity: te ramke daje dziewiec innych pozycji, a wsrod nich
+**248 stopni - bajt 2, bit 2, `0x04 -> 0x00`**. Rotor jechal wlasnie przez 252 w strone 180,
+wiec spodziewany nastepny odczyt to okolo 248. Sklejka dwoch odpowiedzi nie daje tej ramki
+w zadnym przypadku, co zdejmuje podejrzenie ze skladacza. To przeklamanie jednego bitu
+na torze szeregowym, nie skok anteny - a 208 wychodzi z tego dlatego, ze **zgaszony bit
+zawsze prowadzi w strone zer**, tak samo jak przy czytaniu pustego bufora (`0x00 - '0' = 208`).
+
 ## Wersja produkcyjna: diagnostyka na zadanie, nie na stale
 
 **Pulapka ramek jest domyslnie wylaczona** (1.12.0). Wlacza sie ja w Ustawieniach polem

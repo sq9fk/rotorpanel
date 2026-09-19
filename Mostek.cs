@@ -97,7 +97,7 @@ public sealed class Mostek : IDisposable
     private int _brakow, _spoznionych, _ileWymian, _zapytan, _odpowiedzi, _statusowPoprzednio;
     private double _sumaMs, _minMs = double.MaxValue, _maxMs;
     private long _ostatniZrzutBraku, _ostatnieZerwanie;
-    private int _odrzuconych;
+    private int _odrzuconych, _ustapien;
 
     // Kiedy ostatnio cokolwiek przyszlo od wzmacniacza i kiedy ostatnio zglosilismy przerwe.
     // Kiedy ostatnio cokolwiek przyszlo od urzadzenia po drugiej stronie - sterownika
@@ -964,6 +964,17 @@ public sealed class Mostek : IDisposable
     public int OdrzuconeOdczyty => Volatile.Read(ref _odrzuconych);
 
     /// <summary>
+    /// Ile razy filtr **ustapil**: przyjal jako prawdziwy odczyt, ktory sam chwile wczesniej
+    /// nazwal niemozliwym, bo sterownik powtorzyl go trzy razy z rzedu.
+    ///
+    /// To nie jest usterka, tylko zabezpieczenie przed zablokowaniem filtra - ale jest
+    /// **zmiana zdania programu o polozeniu anteny** i dlatego nie moze przejsc bez sladu.
+    /// Od tej chwili liczba, ktorej nie wierzylismy, jedzie do programu sterujacego jako
+    /// pozycja. Licznik stoi w podpowiedzi ser2neta obok odrzuconych odczytow.
+    /// </summary>
+    public int UstapieniaFiltra => Volatile.Read(ref _ustapien);
+
+    /// <summary>
     /// Znaczy chwile, w ktorej cokolwiek przyszlo od wzmacniacza.
     ///
     /// Sluzy dwom przyrzadom naraz: <see cref="SprawdzBrakOdpowiedzi"/> porownuje to z chwila
@@ -1318,12 +1329,29 @@ public sealed class Mostek : IDisposable
 
         double dopuszczalny = sekundy >= 60 ? double.MaxValue : 5 * sekundy + 10;
 
-        bool wiarygodny = poprzednia < 0 ||
-                          Math.Abs(pozycja - poprzednia) <= dopuszczalny ||
-                          _odrzuconeZRzedu >= 3;
-
-        if (wiarygodny)
+        if (poprzednia < 0 || Math.Abs(pozycja - poprzednia) <= dopuszczalny)
         {
+            Zapamietaj(pozycja);
+            return false;
+        }
+
+        // **Ustapienie filtra musi zostawic slad.** Po trzech odrzuceniach z rzedu
+        // przyjmujemy odczyt, bo filtr, ktory potrafi sie zablokowac, jest gorszy od braku
+        // filtra. Do tej pory dzialo sie to **po cichu**: chwile po wpisie "ODRZUCONY ODCZYT
+        // 252 -> 208" ta sama liczba wchodzila jako prawdziwa i nic tego nie odnotowywalo -
+        // ani plik, ani licznik. Uzytkownik widzial wtedy antene "zatrzymana na 208" i nie
+        // mial jak odroznic zepsutego sterownika od programu, ktory przestal sie sprzeciwiac.
+        //
+        // Zgloszenie idzie **z pominieciem zaworu pieciu sekund**. Zawor jest po to, zeby
+        // przy zerwanym torze plik nie zamienil sie w dziennik, ale caly ciag odrzucen miesci
+        // sie zwykle w dwoch sekundach - wiec to wlasnie ten jeden wpis, ktory zawor by zjadl.
+        if (rotor.FiltrPozycji && _odrzuconeZRzedu >= 3)
+        {
+            Interlocked.Increment(ref _ustapien);
+            ZglosNieprawdopodobny(
+                "FILTR USTAPIL po " + _odrzuconeZRzedu + " odrzuceniach z rzedu - " +
+                "przyjmuje ten odczyt jako prawdziwy",
+                poprzednia, pozycja, ramka, sekundy, dopuszczalny, true);
             Zapamietaj(pozycja);
             return false;
         }
@@ -1357,10 +1385,11 @@ public sealed class Mostek : IDisposable
     /// takich odczytow potrafi byc kilka na sekunde i plik zamienilby sie w dziennik.
     /// </summary>
     private void ZglosNieprawdopodobny(string co, int poprzednia, int pozycja, byte[] ramka,
-                                       double sekundy, double dopuszczalny)
+                                       double sekundy, double dopuszczalny, bool zawsze = false)
     {
         long ostatni = Interlocked.Read(ref _ostatniZrzut);
-        if (ostatni != 0 && DateTime.UtcNow - new DateTime(ostatni) <= TimeSpan.FromSeconds(5)) return;
+        if (!zawsze && ostatni != 0 &&
+            DateTime.UtcNow - new DateTime(ostatni) <= TimeSpan.FromSeconds(5)) return;
 
         Interlocked.Exchange(ref _ostatniZrzut, DateTime.UtcNow.Ticks);
         Pulapka.Zapisz(Podpis,

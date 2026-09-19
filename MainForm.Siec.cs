@@ -77,6 +77,12 @@ public partial class MainForm
                 uwagi.Add(rotor.Etykieta + ": odrzucone odczyty pozycji — " +
                           mostek.OdrzuconeOdczyty + "×");
 
+            // Ustapienie filtra to moment, w ktorym program **zmienil zdanie** o polozeniu
+            // anteny. Wazniejsze od samego odrzucenia i dlatego osobno.
+            if (mostek is { UstapieniaFiltra: > 0 })
+                uwagi.Add(rotor.Etykieta + ": filtr pozycji ustąpił — " +
+                          mostek.UstapieniaFiltra + "× przyjął odczyt, który odrzucał");
+
             int zapytan = mostek?.Zapytan ?? 0;
             int odpowiedzi = mostek?.Odpowiedzi ?? 0;
             int braki = mostek?.BrakiOdpowiedzi ?? 0;
