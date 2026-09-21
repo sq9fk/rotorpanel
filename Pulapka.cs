@@ -297,19 +297,54 @@ public static class Pulapka
     {
         string katalog = Path.GetDirectoryName(Application.ExecutablePath) ?? ".";
         string plik = Path.Combine(katalog, "podejrzane.txt");
+        string poprzedni = Path.Combine(katalog, "podejrzane.1.txt");
 
         while (true)
         {
             _budzik.Wait();
             if (!_doZapisu.TryDequeue(out string tekst)) continue;
 
-            try
-            {
-                if (File.Exists(plik) && new FileInfo(plik).Length > MaksymalnyRozmiar) continue;
-                File.AppendAllText(plik, tekst);
-            }
+            try { Dopisz(plik, poprzedni, tekst, MaksymalnyRozmiar); }
             catch { /* pulapka nie moze przeszkadzac w pracy */ }
         }
+    }
+
+    /// <summary>
+    /// Dopisuje wpis, a po przekroczeniu limitu **zaczyna nowy plik** zamiast zamilknac.
+    ///
+    /// Do 1.12.3 zapis po prostu ustawal. Plik konczyl sie w polowie usterki, a jego ostatnia
+    /// linia wygladala dokladnie tak samo jak koniec spokojnej sesji - czyli narzedzie klamalo
+    /// w najgorszym momencie, bo "nic wiecej nie ma" znaczylo naraz "nic sie nie dzialo"
+    /// i "przestalem patrzec". 21 wrzesnia tak wlasnie wyszlo: sto piecdziesiat wpisow
+    /// "BRAK ODPOWIEDZI", kazdy z pelnym dziennikiem, wypelnilo dwa megabajty w dwie i pol
+    /// godziny - a najnowsze zdarzenia, czyli jedyne istotne, nie mialy sie juz gdzie zapisac.
+    ///
+    /// Zostawiamy **jedno pokolenie wstecz** (`podejrzane.1.txt`). Nowsze jest wazniejsze od
+    /// starszego, bo usterki szuka sie od konca; stare trzymamy, zeby nie zgubic poczatku
+    /// dlugiej usterki. Stary plik dostaje na koncu linie, ktora mowi, gdzie szukac dalej -
+    /// inaczej "koniec pliku" nadal bylby dwuznaczny.
+    ///
+    /// Wydzielone z <see cref="Petla"/>, zeby dalo sie to sprawdzic w harnessie na plikach
+    /// tymczasowych. Bez tego jedynym testem byloby uruchomienie programu na dwie godziny.
+    /// </summary>
+    internal static void Dopisz(string plik, string poprzedni, string tekst, long limit)
+    {
+        if (File.Exists(plik) && new FileInfo(plik).Length > limit)
+        {
+            // Rozmiar piszemy tak, zeby zawsze byl prawdziwy - "limit 0 MB" w pliku
+            // diagnostycznym podwaza zaufanie do wszystkiego, co jest obok.
+            string ile = limit >= 1024 * 1024 ? limit / 1024 / 1024 + " MB"
+                       : limit >= 1024       ? limit / 1024 + " kB"
+                                             : limit + " B";
+
+            File.AppendAllText(plik, "=== plik osiagnal limit " + ile +
+                                     " - dalszy ciag w podejrzane.txt ===" +
+                                     Environment.NewLine + Environment.NewLine);
+            File.Delete(poprzedni);
+            File.Move(plik, poprzedni);
+        }
+
+        File.AppendAllText(plik, tekst);
     }
 
     private static string Bajty(byte[] dane, int od, int ile)

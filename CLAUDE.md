@@ -1920,6 +1920,27 @@ watkow (`ZaplanujBadanieStrony`, pola czytane atomowo), a przebudowa listy uzywa
 kazdej linii, w sciezce danych mostka. Teraz trzyma otwarty uchwyt, a po 10 MB przewija plik
 na `.old`.
 
+## Plik pulapki sie obraca, bo inaczej klamie w najgorszym momencie
+
+Limit dwoch megabajtow byl od poczatku - zeby plik obok pliku wykonywalnego nie rosl bez
+konca. Ale po jego przekroczeniu zapis **po prostu ustawal**, bez slowa. Ostatnia linia
+wygladala wtedy dokladnie tak samo jak koniec spokojnej sesji, czyli "nic wiecej nie ma"
+znaczylo naraz dwie rzeczy: *nic sie nie dzialo* i *przestalem patrzec*.
+
+21 wrzesnia tak wlasnie wyszlo. Trzy rotory zamilkly na dobre, kazde odpytanie konczylo sie
+wpisem `BRAK ODPOWIEDZI` z pelnym dziennikiem obu kierunkow - sto piecdziesiat wpisow, dwa
+megabajty w dwie i pol godziny. Plik zatrzymal sie na 21:47, program chodzil dalej, a wpisy
+z tego, co dzialo sie **potem**, nie mialy sie juz gdzie zapisac.
+
+Od 1.12.4 po limicie `podejrzane.txt` wedruje do `podejrzane.1.txt` i zaczyna sie nowy.
+Jedno pokolenie wstecz, bo poczatek dlugiej usterki tez bywa potrzebny, ale **nowsze jest
+wazniejsze od starszego** - usterki szuka sie od konca. Stary plik konczy sie linia, ktora
+mowi, gdzie szukac dalej, zeby "koniec pliku" przestal byc dwuznaczny.
+
+Obrot jest wydzielony jako `Pulapka.Dopisz(plik, poprzedni, tekst, limit)` - inaczej jedynym
+testem byloby uruchomienie programu na dwie godziny. `TestObrotu` sprawdza, ze najnowszy wpis
+ladnie ląduje w pliku, do ktorego uzytkownik zaglada, a nie w tym odlozonym na bok.
+
 ## Nastawy pamietamy zawsze, bo tylko one ruszaja antena
 
 19 wrzesnia 10m **stanal na 208** - nie odczyt, tylko sama antena. W dzienniku sterownika
