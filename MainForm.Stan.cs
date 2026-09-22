@@ -301,6 +301,35 @@ public partial class MainForm
     private static TimeSpan ProgCiszyUrzadzenia(Mostek m) =>
         TimeSpan.FromSeconds(m.KlientNaPorcie ? 15 : 5);
 
+    internal enum StanKarty { Polaczony, NiktNiePyta, RecznyTryb, NieOdpowiada }
+
+    /// <summary>
+    /// Co napisac na karcie, gdy gniazdo jest otwarte. Wydzielone z <see cref="Odswiez"/>,
+    /// bo to **ta wlasnie decyzja** myli sie najczesciej i musi dac sie sprawdzic bez okna.
+    ///
+    /// Kolejnosc nie jest dowolna - to hierarchia wyjasnien, od najbardziej niewinnego:
+    ///
+    /// 1. **Nikt nie pyta.** Przy rotorze o pozycje nie pytamy wcale, rytm nadaje program
+    ///    sterujacy. Po zamknieciu PstRotatora cisza sterownika jest normalna, a karta
+    ///    meldowala wtedy "sterownik nie odpowiada" - wskazywala winnego, ktory nic nie
+    ///    zrobil, i kazala szukac usterki tam, gdzie jej nie bylo.
+    /// 2. **Sam naglowek.** Sterownik slyszy i zaczyna odpowiadac, ale urywa przed pozycja.
+    ///    To nie jest niemy sterownik, tylko sterownik poza trybem A.
+    /// 3. **Nie odpowiada.** Dopiero gdy pytamy, a nie wraca nic.
+    ///
+    /// Przy wzmacniaczu punkt pierwszy nie obowiazuje: jego odpytujemy sami, wiec cisza
+    /// zawsze jest jego cisza.
+    /// </summary>
+    internal static StanKarty OcenKarte(bool rotor, TimeSpan ciszaUrzadzenia,
+                                        TimeSpan ciszaKlienta, int samychNaglowkow,
+                                        TimeSpan prog)
+    {
+        if (samychNaglowkow >= 5 && ciszaKlienta <= prog) return StanKarty.RecznyTryb;
+        if (ciszaUrzadzenia <= prog) return StanKarty.Polaczony;
+        if (rotor && ciszaKlienta > prog) return StanKarty.NiktNiePyta;
+        return StanKarty.NieOdpowiada;
+    }
+
     private void Odswiez()
     {
         string ostatniBlad = "";
@@ -323,12 +352,32 @@ public partial class MainForm
                     var cisza = m.MilczyOd;
                     bool milczy = cisza > ProgCiszyUrzadzenia(m);
 
-                    u.Dioda.Kolor = milczy ? Theme.Pomarancz : Theme.Zielony;
-                    u.Stan.Text = milczy
-                        ? (m.Punkt is Rotor ? "sterownik" : "wzmacniacz") +
-                          " nie odpowiada " + cisza.TotalSeconds.ToString("0") + " s"
-                        : "połączony";
-                    u.Stan.ForeColor = milczy ? Theme.Pomarancz : Theme.Tekst;
+                    var ocena = OcenKarte(m.Punkt is Rotor, cisza, m.CiszaKlienta,
+                                          m.SamychNaglowkow, ProgCiszyUrzadzenia(m));
+
+                    u.Dioda.Kolor = ocena switch
+                    {
+                        StanKarty.NiktNiePyta => Theme.Szary,
+                        StanKarty.Polaczony   => Theme.Zielony,
+                        _                     => Theme.Pomarancz
+                    };
+
+                    u.Stan.Text = ocena switch
+                    {
+                        StanKarty.NiktNiePyta  => "bezczynny — nikt nie odpytuje",
+                        StanKarty.RecznyTryb   => "sterownik w trybie ręcznym?",
+                        StanKarty.NieOdpowiada => (m.Punkt is Rotor ? "sterownik" : "wzmacniacz") +
+                                                  " nie odpowiada " +
+                                                  cisza.TotalSeconds.ToString("0") + " s",
+                        _                      => "połączony"
+                    };
+
+                    u.Stan.ForeColor = ocena switch
+                    {
+                        StanKarty.NiktNiePyta => Theme.Szary,
+                        StanKarty.Polaczony   => Theme.Tekst,
+                        _                     => Theme.Pomarancz
+                    };
                     UstawPrzycisk(u.Przelacz, "Rozłącz", glowny: false);
                     break;
 

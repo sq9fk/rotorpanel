@@ -79,6 +79,12 @@ public partial class MainForm
 
             // Ustapienie filtra to moment, w ktorym program **zmienil zdanie** o polozeniu
             // anteny. Wazniejsze od samego odrzucenia i dlatego osobno.
+            // Sam naglowek zamiast pozycji to sterownik poza trybem A. Nazwane wprost,
+            // bo rozpoznanie tego z surowych bajtow zajelo dwa dni.
+            if (mostek is { SamychNaglowkow: >= 5 })
+                uwagi.Add(rotor.Etykieta + ": sterownik odpowiada samym nagłówkiem (" +
+                          mostek.SamychNaglowkow + "× z rzędu) — sprawdź tryb A (Auto)");
+
             // Lista nastaw jest najwazniejsza uwaga przy ucieczce rotora: albo pokazuje,
             // kto kazal antenie tam pojechac, albo jest pusta - i wtedy nie kazalismy my.
             if (mostek != null && mostek.OstatnieNastawy.Length > 0)

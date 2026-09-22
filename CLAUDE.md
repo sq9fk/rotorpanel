@@ -1920,6 +1920,41 @@ watkow (`ZaplanujBadanieStrony`, pola czytane atomowo), a przebudowa listy uzywa
 kazdej linii, w sciezce danych mostka. Teraz trzyma otwarty uchwyt, a po 10 MB przewija plik
 na `.old`.
 
+## Sam naglowek `0x57` znaczy "sterownik nie jest w trybie A"
+
+21 wrzesnia trzy rotory przestaly odpowiadac. Dwa milczaly zupelnie, trzeci odsylal na kazde
+zapytanie **jeden bajt `0x57` i nic wiecej**, z opoznieniem **182 ms +-6**, przez godziny.
+Postawilem wtedy na zasilanie i uklady nadawcze - **i bylem w bledzie**. Sterowniki byly
+przestawione w tryb **reczny** zamiast A (Auto); w recznym SPID nie oddaje pozycji.
+
+Ten metronom jest rozpoznawalny i program ma go teraz nazywac sam:
+
+* `Mostek.SamychNaglowkow` liczy odpowiedzi z rzedu zlozone z samego `0x57`; pelna ramka
+  zeruje licznik,
+* po pieciu z rzedu idzie **jeden** wpis do `podejrzane.txt` - nie jeden na sekunde -
+  mowiacy wprost, zeby sprawdzic tryb A,
+* karta mostka pisze "sterownik w trybie ręcznym?" zamiast swiecic na zielono.
+
+Zielono, bo **bajty przychodzily**, wiec `MilczyOd` bylo male i wszystko wygladalo zdrowo
+przy zupelnie martwym sterowaniu. To ta sama pulapka co z zielona dioda przy stojacej sesji
+TCP, tylko o poziom nizej.
+
+## Cisza znaczy co innego, gdy nikt nie pyta
+
+Przy rotorze **o pozycje nie pytamy wcale** - rytm nadaje program sterujacy. Po zamknieciu
+PstRotatora sterownik milczy dlatego, ze nikt sie do niego nie odzywa, a karta meldowala
+wtedy "sterownik nie odpowiada X s" i zapalala pare na zolto. Wskazywala winnego, ktory nic
+nie zrobil.
+
+Ten sam blad byl juz raz po stronie wzmacniacza (patrz `Mostek.TrybStanu`: *"okno stanu po
+pieciu sekundach meldowalo, ze wzmacniacz nie odpowiada, choc to my przestawalismy pytac"*).
+Naprawa dotyczyla wtedy **naszego** odpytywania, wiec wrocil od drugiej strony - cudzego.
+
+`MainForm.OcenKarte` jest wydzielona i sprawdzana w `TestKarty`, bo to wlasnie **ta decyzja**
+myli sie najczesciej. Hierarchia wyjasnien, od najbardziej niewinnego: *nikt nie pyta* ->
+*sam naglowek* -> *nie odpowiada*. Przy wzmacniaczu punkt pierwszy nie obowiazuje, bo jego
+odpytujemy sami.
+
 ## Plik pulapki sie obraca, bo inaczej klamie w najgorszym momencie
 
 Limit dwoch megabajtow byl od poczatku - zeby plik obok pliku wykonywalnego nie rosl bez

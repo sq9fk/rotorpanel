@@ -98,6 +98,7 @@ public sealed class Mostek : IDisposable
     private double _sumaMs, _minMs = double.MaxValue, _maxMs;
     private long _ostatniZrzutBraku, _ostatnieZerwanie;
     private int _odrzuconych, _ustapien;
+    private int _samychNaglowkow;
     private readonly Queue<string> _nastawy = new();
 
     // Kiedy ostatnio cokolwiek przyszlo od wzmacniacza i kiedy ostatnio zglosilismy przerwe.
@@ -145,6 +146,30 @@ public sealed class Mostek : IDisposable
             if (Stan != StanMostka.Polaczony) return TimeSpan.Zero;
             long ostatni = Interlocked.Read(ref _ostatniRuchZUrzadzenia);
             return ostatni == 0 ? TimeSpan.Zero : DateTime.UtcNow - new DateTime(ostatni);
+        }
+    }
+
+    /// <summary>
+    /// Jak dawno **klient** przyslal ostatni bajt, czyli jak dawno ktokolwiek o cokolwiek
+    /// zapytal. <see cref="TimeSpan.MaxValue"/>, gdy nie przyslal nic od zestawienia lacza.
+    ///
+    /// Potrzebne, zeby rozroznic dwie rzeczy, ktore z zewnatrz wygladaja identycznie:
+    /// **sterownik nie odpowiada** i **nikt go nie pyta**. Przy rotorze o pozycje nie pytamy
+    /// wcale - rytm nadaje program sterujacy - wiec po zamknieciu PstRotatora cisza od
+    /// sterownika jest calkowicie normalna. Karta meldowala wtedy "sterownik nie odpowiada",
+    /// czyli wskazywala winnego, ktory nic nie zrobil.
+    ///
+    /// Ten sam blad byl juz raz po stronie wzmacniacza (patrz <see cref="TrybStanu"/>) i tam
+    /// zostal naprawiony. Wrocil od drugiej strony, bo naprawa dotyczyla **naszego**
+    /// odpytywania, a nie cudzego.
+    /// </summary>
+    public TimeSpan CiszaKlienta
+    {
+        get
+        {
+            if (Stan != StanMostka.Polaczony) return TimeSpan.Zero;
+            long ostatni = Interlocked.Read(ref _ostatniRuchKlienta);
+            return ostatni == 0 ? TimeSpan.MaxValue : DateTime.UtcNow - new DateTime(ostatni);
         }
     }
 
@@ -365,13 +390,17 @@ public sealed class Mostek : IDisposable
         // Tylko kierunek od sterownika. Urwana odpowiedz to polowa liczby i lepiej jej
         // nie oddawac wcale; urwany rozkaz to niewykonana nastawa i tego gubic nie wolno.
         _skladacz.KasujUrwaneOdpowiedzi = punkt is Rotor;
-        _skladacz.Odrzucono = ogon => Pulapka.Zapisz(Podpis,
-            "SKASOWANY URWANY POCZATEK ODPOWIEDZI: " + Slad.Podglad(ogon, ogon.Length) +
-            " - nie doczekal sie reszty. " +
-            "Polowa ramki pozycji czytana przez program sterujacy daje 208 stopni, " +
-            "wiec lepiej, zeby nie dostal nic. Od zestawienia lacza: " + BilansWymian +
-            Environment.NewLine + "    " + CzujnikZastoju.Opis,
-            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
+        _skladacz.Odrzucono = ogon =>
+        {
+            ZanotujSamNaglowek(ogon);
+            Pulapka.Zapisz(Podpis,
+                "SKASOWANY URWANY POCZATEK ODPOWIEDZI: " + Slad.Podglad(ogon, ogon.Length) +
+                " - nie doczekal sie reszty. " +
+                "Polowa ramki pozycji czytana przez program sterujacy daje 208 stopni, " +
+                "wiec lepiej, zeby nie dostal nic. Od zestawienia lacza: " + BilansWymian +
+                Environment.NewLine + "    " + CzujnikZastoju.Opis,
+                _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
+        };
     }
 
     public void Start()
@@ -1236,7 +1265,47 @@ public sealed class Mostek : IDisposable
     private void ZanotujOdpowiedz(byte[] ramka)
     {
         if (ramka.Length != 5 || ramka[0] != 0x57 || ramka[4] != 0x20) return;
+
+        // Cala ramka konczy serie samych naglowkow - sterownik znowu mowi calymi zdaniami.
+        Interlocked.Exchange(ref _samychNaglowkow, 0);
         ZanotujOdbior();
+    }
+
+    /// <summary>
+    /// Ile odpowiedzi **z rzedu** skladalo sie z samego naglowka `0x57`.
+    ///
+    /// To nie jest zepsute lacze i nie jest cisza - to sterownik, ktory slyszy zapytanie
+    /// i zaczyna odpowiadac, po czym urywa przed czterema bajtami pozycji. **Zmierzone
+    /// 21 wrzesnia: 182 ms +-6 na kazde zapytanie, przez godziny.** Taki metronom wyklucza
+    /// szum i pływajace wejscie; tak wyglada sterownik SPID, ktory **nie jest w trybie A**.
+    /// Znalezienie tego zajelo dwa dni, wiec program ma to teraz mowic sam.
+    /// </summary>
+    public int SamychNaglowkow => Volatile.Read(ref _samychNaglowkow);
+
+    /// <summary>Prog, od ktorego seria samych naglowkow przestaje byc przypadkiem.</summary>
+    private const int ProgSamychNaglowkow = 5;
+
+    private void ZanotujSamNaglowek(byte[] ogon)
+    {
+        if (!(Punkt is Rotor) || ogon.Length != 1 || ogon[0] != 0x57)
+        {
+            Interlocked.Exchange(ref _samychNaglowkow, 0);
+            return;
+        }
+
+        int ile = Interlocked.Increment(ref _samychNaglowkow);
+
+        // Jeden wpis na serie, nie jeden na sekunde - przy tej usterce odpowiedzi jest
+        // tyle, co zapytan, a plik ma zostac czytelny.
+        if (ile != ProgSamychNaglowkow) return;
+
+        Pulapka.Zapisz(Podpis,
+            "STEROWNIK ODPOWIADA SAMYM NAGLOWKIEM: " + ile + " odpowiedzi z rzedu to samo " +
+            "`57` i nic wiecej. Slyszy zapytanie i zaczyna odpowiadac, wiec lacze, ser2net " +
+            "i przejsciowka dzialaja - urywa sie sam sterownik. **Sprawdz, czy jest w trybie " +
+            "A (Auto), a nie w recznym** - w recznym nie oddaje pozycji. Od zestawienia " +
+            "lacza: " + BilansWymian,
+            _doSterownika, _odSterownika, _odPolaczenia.Elapsed, _dziennik);
     }
 
     /// <summary>Odpowiedz przyszla - wspolne dla rotora i wzmacniacza.</summary>
