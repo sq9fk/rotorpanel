@@ -173,6 +173,32 @@ public sealed class Mostek : IDisposable
         }
     }
 
+    /// <summary>
+    /// Ostatnia pozycja opisana tak, zeby bylo widac **overlap**: azymut i obok niego
+    /// liczba ze znakiem.
+    ///
+    /// Ramka `57 H1 H2 H3 20` niesie liczbe 0-720, a azymut to ta liczba minus 360. Kierunek
+    /// wychodzi z niej modulo 360, wiec **sam azymut nie mowi, na ktorym okrazeniu stoi
+    /// maszt**: 210 stopni to zarowno surowe 570 (+210), jak i surowe 210 (-150). Przy
+    /// masztach 180+360+180 to sa dwa rozne miejsca, rozniace sie pelnym obrotem skretu
+    /// kabla - i to jest dokladnie ta informacja, ktorej nie widac na rozy kompasu.
+    ///
+    /// Dlatego piszemy obie liczby: <c>210° / -150</c>. Ujemna znaczy "przeciwnie do ruchu
+    /// wskazowek od polnocy", dodatnia - "zgodnie".
+    /// </summary>
+    public string OpisPozycji
+    {
+        get
+        {
+            int surowa = Volatile.Read(ref _ostatniaPozycja);
+            if (!(Punkt is Rotor) || surowa < 0) return "";
+
+            int zeZnakiem = surowa - 360;
+            int azymut = ((zeZnakiem % 360) + 360) % 360;
+            return azymut + "° / " + (zeZnakiem >= 0 ? "+" : "") + zeZnakiem;
+        }
+    }
+
     /// <summary>Ostatni odczytany stan wzmacniacza SPE albo null.</summary>
     public StatusSpe Status => _status;
 

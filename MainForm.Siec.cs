@@ -114,6 +114,7 @@ public partial class MainForm
                 zapytan > 0 ? odpowiedzi.ToString() : "—",
                 zapytan > 0 ? braki.ToString() : "—",
                 zapytan > 0 ? (braki * 100.0 / zapytan).ToString("0.0") + "%" : "—",
+                mostek != null && mostek.OpisPozycji.Length > 0 ? mostek.OpisPozycji : "—",
                 mostek != null && mostek.OpisWymiany.Length > 0 ? mostek.OpisWymiany : "—"
             });
         }
@@ -136,8 +137,8 @@ public partial class MainForm
         tekst.AppendLine();
         tekst.Append(Tabela(
             new[] { "Port", "Rotor", "Stan", "Zapytań", "Odpowiedzi", "Braki", "%",
-                    "Czasy min/śr/max" },
-            new[] { false, false, false, true, true, true, true, false },
+                    "Pozycja", "Czasy min/śr/max" },
+            new[] { false, false, false, true, true, true, true, true, false },
             wiersze));
 
         if (uwagi.Count > 0)

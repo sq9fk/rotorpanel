@@ -1920,6 +1920,22 @@ watkow (`ZaplanujBadanieStrony`, pola czytane atomowo), a przebudowa listy uzywa
 kazdej linii, w sciezce danych mostka. Teraz trzyma otwarty uchwyt, a po 10 MB przewija plik
 na `.old`.
 
+## Azymut nie mowi, na ktorym okrazeniu stoi maszt
+
+Ramka `57 H1 H2 H3 20` niesie liczbe 0-720, a azymut to ta liczba **minus 360**. Kierunek
+wychodzi z niej modulo 360, wiec dwie rozne pozycje masztu daja **ten sam azymut**:
+surowe 570 to +210, surowe 210 to -150, a oba pokazuja na 210 stopni.
+
+Przy masztach z overlapem 180+360+180 rozni je **pelny obrot skretu kabla**. Roza kompasu
+- nasza czy w PstRotatorze - nie ma jak tego pokazac, bo ma tylko 360 stopni. Dlatego
+w tabeli ser2neta stoi kolumna **Pozycja** z obiema liczbami: `210° / -150`. Znak mowi,
+z ktorej strony polnocy przyjechal maszt.
+
+Zmierzone w dziennikach: sterowniki melduja surowe wartosci **ponizej 360** (raz 208, czyli
+-152 stopnia), wiec dolna polowa zakresu jest realnie uzywana. 19 wrzesnia 15m stalo na
+surowym 360 (0 stopni), dostalo nastawe 210 i pojechalo **w lewo** na surowe 210. Nastawa
+jest kierunkiem, odczyt jest miejscem - i tych dwoch rzeczy nie wolno mylic.
+
 ## Sam naglowek `0x57` znaczy "sterownik nie jest w trybie A"
 
 21 wrzesnia trzy rotory przestaly odpowiadac. Dwa milczaly zupelnie, trzeci odsylal na kazde
